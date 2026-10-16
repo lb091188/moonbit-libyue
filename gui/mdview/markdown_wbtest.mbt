@@ -507,14 +507,14 @@ test "markdown_view 组件:链接点击走 on_link 回调、手型光标" {
   // 找到段落富文本行(首个孙级)并点击其前段(「看 文档」首链接区域)
   let para = w.kids[0].kids[0]
   let _ = root.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: para.rect.x + 30.0,
     y: para.rect.y + para.rect.h / 2.0,
     button: 0,
     mods: 0,
   })
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: para.rect.x + 30.0,
     y: para.rect.y + para.rect.h / 2.0,
     button: 1,
@@ -523,7 +523,7 @@ test "markdown_view 组件:链接点击走 on_link 回调、手型光标" {
   assert_true(hits.val >= 0) // 命中与否取决于像素排版;不崩即可(精确命中由真机复验)
   // 光标请求:悬停在富文本行上时行控件请求过手型(链接区域)
   let _ = root.dispatch_pointer({
-    kind: @core.Leave,
+    kind: @widget.PointerKind::Leave,
     x: para.rect.x + 30.0,
     y: para.rect.y + para.rect.h / 2.0,
     button: 0,

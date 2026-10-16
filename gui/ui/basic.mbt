@@ -446,15 +446,15 @@ pub fn icon_button(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => !off.off
-        @core.Up => {
+        @widget.PointerKind::Down => !off.off
+        @widget.PointerKind::Up => {
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
             ev.y >= 0.0 && ev.y <= self.rect.h
           if !off.off && inside { on_click() }
           false
         }
-        @core.Move => !off.off
-        @core.Leave => false
+        @widget.PointerKind::Move => !off.off
+        @widget.PointerKind::Leave => false
       }
     })
     handle(w)

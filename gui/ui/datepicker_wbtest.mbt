@@ -52,8 +52,8 @@ test "日期选择器：字段显示占位、点开日历、点选回填并收�
   click_at(root, field, 40.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let _ = root.dispatch_pointer({ kind: @core.Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
-  let _ = root.dispatch_pointer({ kind: @core.Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
   assert_eq(@core.overlay_count(), 0)
   click_at(root, field, 40.0, 16.0)
   assert_eq(@core.overlay_count(), 1)
@@ -225,14 +225,14 @@ test "日期选择只读样式槽：class 覆盖字段底、日历面板与箭�
     let (root, field) = mounted_with_overlay(node, 420.0, 360.0)
     if open_it {
       let _ = root.dispatch_pointer({
-        kind: @core.Down,
+        kind: @widget.PointerKind::Down,
         x: field.rect.x + 40.0,
         y: field.rect.y + 16.0,
         button: 1,
         mods: 0,
       })
       let _ = root.dispatch_pointer({
-        kind: @core.Up,
+        kind: @widget.PointerKind::Up,
         x: field.rect.x + 40.0,
         y: field.rect.y + 16.0,
         button: 1,

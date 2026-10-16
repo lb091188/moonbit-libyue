@@ -89,14 +89,14 @@ test "hover_group：子控件悬停即整组换底色，松开在组内才算一
   assert_eq(hits, 1)
   // 按下在组内、抬起出组：不算一次点击
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: g.rect.x + 20.0,
     y: g.rect.y + 10.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: g.rect.x + 20.0,
     y: g.rect.y + g.rect.h + 40.0,
     button: 1,

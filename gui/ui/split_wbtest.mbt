@@ -41,17 +41,17 @@ test "分隔把手：拖动增量按窗口坐标算、把手平移不把自己�
     )
     let _ = root.relayout(400.0, 200.0)
   }
-  send(@core.Down, x0 + 4.0)
+  send(@widget.PointerKind::Down, x0 + 4.0)
   // 拖 +50：首栏 250，把手跟着平移到 250
-  send(@core.Move, x0 + 54.0)
+  send(@widget.PointerKind::Move, x0 + 54.0)
   assert_true((bar.rect.x - (x0 + 50.0)).abs() < 1.5)
   // 再拖 +10：把手已经在 250，若按把手局部坐标算增量，这一帧会把上一帧的
   // 50 扣回去（实测退回 210），正确口径是跟到 260
-  send(@core.Move, x0 + 64.0)
+  send(@widget.PointerKind::Move, x0 + 64.0)
   assert_true((bar.rect.x - (x0 + 60.0)).abs() < 1.5)
   // 抬起后同一方向的移动不再改布局
-  send(@core.Up, x0 + 64.0)
-  send(@core.Move, x0 + 120.0)
+  send(@widget.PointerKind::Up, x0 + 64.0)
+  send(@widget.PointerKind::Move, x0 + 120.0)
   assert_true((bar.rect.x - (x0 + 60.0)).abs() < 1.5)
 }
 
@@ -76,10 +76,10 @@ test "分隔把手：两个最小宽度夹取仍然生效" {
     )
     let _ = root.relayout(400.0, 200.0)
   }
-  send(@core.Down, bar.rect.x + 4.0)
-  send(@core.Move, 0.0)
+  send(@widget.PointerKind::Down, bar.rect.x + 4.0)
+  send(@widget.PointerKind::Move, 0.0)
   assert_true(bar.rect.x >= 119.0)
-  send(@core.Move, 399.0)
+  send(@widget.PointerKind::Move, 399.0)
   // 次栏最小 80：把手最远只能到 400-8-80 = 312
   assert_true((bar.rect.x - 312.0).abs() < 1.5)
 }

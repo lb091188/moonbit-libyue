@@ -50,7 +50,7 @@ pub fn drag_source(
       let wx = self.rect.x + ev.x
       let wy = self.rect.y + ev.y
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           if ev.button != 1 {
             false
           } else {
@@ -61,7 +61,7 @@ pub fn drag_source(
             true
           }
         }
-        @core.Move => {
+        @widget.PointerKind::Move => {
           if dragging.val {
             let _ = @core.drag_move(wx, wy)
             true
@@ -115,7 +115,7 @@ pub fn drag_source(
             false
           }
         }
-        @core.Up => {
+        @widget.PointerKind::Up => {
           let was = dragging.val
           armed.val = false
           dragging.val = false
@@ -127,7 +127,7 @@ pub fn drag_source(
             false
           }
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           // 指针离开本控件：还在等阈值就撤销；已经开拖时不动（拖拽是跨控件的，
           // 会话自己按窗口坐标算落点）
           if !dragging.val {

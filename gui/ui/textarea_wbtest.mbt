@@ -13,14 +13,14 @@ fn area_font() -> @text.Font {
 /// 在控件内部坐标点一下（按下 + 抬起）。
 fn click_in(root : @core.Widget, w : @core.Widget, fx : Double, fy : Double) -> Unit {
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: w.rect.x + fx,
     y: w.rect.y + fy,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: w.rect.x + fx,
     y: w.rect.y + fy,
     button: 1,
@@ -148,21 +148,21 @@ test "多行框：点击定位到第几行、拖选跨行、只读不吃编辑�
   // 拖选跨行：从第一行行首拖到第三行行尾，删除后什么都不剩
   let (root2, w2, store2) = mounted_area("aaa\nbbb\nccc", 220.0, 90.0)
   let _ = root2.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: w2.rect.x + 4.0,
     y: w2.rect.y + 2.0,
     button: 1,
     mods: 0,
   })
   let _ = root2.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: w2.rect.x + 200.0,
     y: w2.rect.y + 2.0 * lh + 6.0,
     button: 1,
     mods: 0,
   })
   let _ = root2.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: w2.rect.x + 200.0,
     y: w2.rect.y + 2.0 * lh + 6.0,
     button: 1,

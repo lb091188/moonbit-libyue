@@ -175,8 +175,8 @@ pub fn message_box(
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Down => true
-              @core.Up => {
+              @widget.PointerKind::Down => true
+              @widget.PointerKind::Up => {
                 let ax = ev.x + self.rect.x
                 let ay = ev.y + self.rect.y
                 if !panel.rect.contains(ax, ay) && close_on_mask {
@@ -258,8 +258,8 @@ pub fn message_box(
           ev : @core.PointerEvent,
         ) -> Bool {
           match ev.kind {
-            @core.Down => true
-            @core.Up => {
+            @widget.PointerKind::Down => true
+            @widget.PointerKind::Up => {
               dismiss()
               false
             }
@@ -395,8 +395,8 @@ pub fn message_box(
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Down => true
-              @core.Up => {
+              @widget.PointerKind::Down => true
+              @widget.PointerKind::Up => {
                 respond(code)
                 false
               }

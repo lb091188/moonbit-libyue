@@ -121,8 +121,8 @@ fn nav_item(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
           if inside {
             on_click()
@@ -314,8 +314,8 @@ pub fn pagination(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => true
-          @core.Up => {
+          @widget.PointerKind::Down => true
+          @widget.PointerKind::Up => {
             let v = current.get() + delta
             current.set(if v < 1 {
               1
@@ -570,8 +570,8 @@ fn collapse_panel(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           open.val = !open.val
           body_w.set_visible(open.val)
           @core.invalidate()
@@ -705,8 +705,8 @@ fn menu_item(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
           if inside {
             selected.set(text)
@@ -847,8 +847,8 @@ pub fn menu_sections(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => foldable
-          @core.Up => {
+          @widget.PointerKind::Down => foldable
+          @widget.PointerKind::Up => {
             if foldable {
               open.val = !open.val
               body.set_visible(open.val)
@@ -949,8 +949,8 @@ fn build_tree_rows(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => has_kids
-        @core.Up => {
+        @widget.PointerKind::Down => has_kids
+        @widget.PointerKind::Up => {
           if has_kids {
             open.val = !open.val
             kids.set_visible(open.val)
@@ -1075,8 +1075,8 @@ pub fn tabs(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => true
-          @core.Up => {
+          @widget.PointerKind::Down => true
+          @widget.PointerKind::Up => {
             sel.set(idx)
             false
           }
@@ -1229,8 +1229,8 @@ pub fn transfer(
           ev : @core.PointerEvent,
         ) -> Bool {
           match ev.kind {
-            @core.Down => true
-            @core.Up => {
+            @widget.PointerKind::Down => true
+            @widget.PointerKind::Up => {
               sel.val = if contains(sel.val, mine) {
                 without(sel.val, mine)
               } else {
@@ -1310,8 +1310,8 @@ pub fn transfer(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => true
-          @core.Up => {
+          @widget.PointerKind::Down => true
+          @widget.PointerKind::Up => {
             if to_right {
               move_items(left_items, right_items, left_sel)
             } else {

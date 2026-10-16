@@ -220,7 +220,7 @@ test "柱状图：悬停那根换浅底并标数值，离开后复原" {
   let plain = bm_of(w)
   let px = 46.0 + (300.0 - 46.0 - 12.0) / 3.0 * 0.5 + 6.0
   let _ = root.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: w.rect.x + px,
     y: w.rect.y + 80.0,
     button: 0,
@@ -229,7 +229,7 @@ test "柱状图：悬停那根换浅底并标数值，离开后复原" {
   let lit = bm_of(w)
   assert_true(diff_of(lit, plain) > 100)
   let _ = root.dispatch_pointer({
-    kind: @core.Leave,
+    kind: @widget.PointerKind::Leave,
     x: w.rect.x + px,
     y: w.rect.y + 80.0,
     button: 0,

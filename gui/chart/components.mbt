@@ -82,7 +82,7 @@ pub fn bar_chart_t(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Move => {
+        @widget.PointerKind::Move => {
           let h = bar_hit(horiz, data.get().length(), self.rect.w, self.rect.h, ev.x, ev.y)
           if h != hover.val {
             hover.val = h
@@ -90,7 +90,7 @@ pub fn bar_chart_t(
           }
           true
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
             @core.invalidate()
@@ -143,7 +143,7 @@ pub fn donut_chart_t(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Move => {
+        @widget.PointerKind::Move => {
           let h = donut_hit(self.rect.h, data.get(), ev.x, ev.y)
           if h != hover.val {
             hover.val = h
@@ -151,7 +151,7 @@ pub fn donut_chart_t(
           }
           true
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
             @core.invalidate()

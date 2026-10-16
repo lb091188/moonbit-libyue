@@ -128,22 +128,22 @@ fn scroll_bar(state : ScrollState) -> @core.Widget {
     }
 
     match ev.kind {
-      @core.Down => {
+      @widget.PointerKind::Down => {
         dragging.val = true
         state.set_offset(y_to_offset(ev.y))
         true
       }
-      @core.Move => {
+      @widget.PointerKind::Move => {
         if dragging.val {
           state.set_offset(y_to_offset(ev.y))
         }
         true
       }
-      @core.Up => {
+      @widget.PointerKind::Up => {
         dragging.val = false
         true
       }
-      @core.Leave => false
+      @widget.PointerKind::Leave => false
     }
   })
   bar

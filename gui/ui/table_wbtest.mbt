@@ -226,7 +226,7 @@ test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最�
   // 第一列右缘在 head.x+120：按下命中边界
   let boundary_x = head.rect.x + 120.0
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: boundary_x,
     y: head.rect.y + 20.0,
     button: 1,
@@ -234,7 +234,7 @@ test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最�
   })
   // 往右拖 40：第一列 160、第二列 60（被拖的两列此消彼长）
   let _ = root.dispatch_pointer_to(head.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: boundary_x + 40.0,
     y: head.rect.y + 20.0,
     button: 1,
@@ -248,7 +248,7 @@ test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最�
   assert_eq(body.children()[0].children()[1].rect.w, 60.0)
   // 继续往右拖到越界：第二列夹在最小列宽 40
   let _ = root.dispatch_pointer_to(head.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: boundary_x + 500.0,
     y: head.rect.y + 20.0,
     button: 1,
@@ -259,14 +259,14 @@ test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最�
   assert_eq(head.children()[0].rect.w, 180.0)
   // 松手后再移动不再改
   let _ = root.dispatch_pointer_to(head.id, {
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: boundary_x + 500.0,
     y: head.rect.y + 20.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer_to(head.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: boundary_x + 120.0,
     y: head.rect.y + 20.0,
     button: 1,

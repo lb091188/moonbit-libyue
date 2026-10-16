@@ -37,8 +37,8 @@ fn counter_box(n : Ref[Int], w : Double, h : Double) -> @core.Node {
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           n.val = n.val + 1
           false
         }
@@ -363,7 +363,7 @@ test "右键上下文菜单：在指针处弹出、点项回调并收起" {
   with_overlay(root)
   // 右键（button 3）在包装控件内部 (30, 10) 处
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: wrap.rect.x + 30.0,
     y: wrap.rect.y + 10.0,
     button: 3,
@@ -439,14 +439,14 @@ test "浮层族只读样式槽：class 覆盖下拉触发件、菜单行文字�
     let (root, kid) = mounted_with_overlay(node, 300.0, 200.0)
     if open_it {
       let _ = root.dispatch_pointer({
-        kind: @core.Down,
+        kind: @widget.PointerKind::Down,
         x: kid.rect.x + 8.0,
         y: kid.rect.y + 8.0,
         button: 1,
         mods: 0,
       })
       let _ = root.dispatch_pointer({
-        kind: @core.Up,
+        kind: @widget.PointerKind::Up,
         x: kid.rect.x + 8.0,
         y: kid.rect.y + 8.0,
         button: 1,
@@ -598,7 +598,7 @@ test "轻提示层不吞点外点击，普通浮层照旧点外收起" {
     w.node.set_height(@yoga.fixed(40.0))
     w.on_pointer = Some(fn(_s : @core.Widget, ev : @core.PointerEvent) -> Bool {
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           got.val = got.val + 1
           true
         }
@@ -629,7 +629,7 @@ test "轻提示层不吞点外点击，普通浮层照旧点外收起" {
   assert_eq(@core.overlay_count(), 1)
   let _ = @core.route_pointer(
     root,
-    { kind: @core.Down, x: 10.0, y: 84.0, button: 1, mods: 0 },
+    { kind: @widget.PointerKind::Down, x: 10.0, y: 84.0, button: 1, mods: 0 },
     0,
     0,
   )
@@ -642,7 +642,7 @@ test "轻提示层不吞点外点击，普通浮层照旧点外收起" {
     w.node.set_height(@yoga.fixed(40.0))
     w.on_pointer = Some(fn(_s : @core.Widget, ev : @core.PointerEvent) -> Bool {
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           got2.val = got2.val + 1
           true
         }
@@ -662,7 +662,7 @@ test "轻提示层不吞点外点击，普通浮层照旧点外收起" {
   assert_eq(@core.overlay_count(), 1)
   let (_h3, _c3, _u3, _g3) = @core.route_pointer(
     root2,
-    { kind: @core.Down, x: 10.0, y: 84.0, button: 1, mods: 0 },
+    { kind: @widget.PointerKind::Down, x: 10.0, y: 84.0, button: 1, mods: 0 },
     0,
     0,
   )

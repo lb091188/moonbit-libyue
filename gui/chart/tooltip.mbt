@@ -382,7 +382,7 @@ pub fn ci_tooltip(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Move => {
+        @widget.PointerKind::Move => {
           match hit(ev.x, ev.y, self.rect.w, self.rect.h) {
             Some((title, rows)) => ci_tip_show(tip, title, rows, ev.x, ev.y)
             None => ci_tip_hide(tip)
@@ -403,7 +403,7 @@ pub fn ci_tooltip(
           }
           true
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           on_leave()
           if was_vis.val {
             ci_tip_hide(tip)
@@ -412,7 +412,7 @@ pub fn ci_tooltip(
           }
           false
         }
-        @core.Down => {
+        @widget.PointerKind::Down => {
           match zoom {
             None => false
             Some(z) =>
@@ -427,7 +427,7 @@ pub fn ci_tooltip(
               }
           }
         }
-        @core.Up => {
+        @widget.PointerKind::Up => {
           if dragging.val {
             dragging.val = false
             true

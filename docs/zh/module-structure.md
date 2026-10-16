@@ -50,8 +50,8 @@ moonbit-native-gui/                          # 根 workspace
 | 新子包 | 文件来源 | 下游依赖 |
 | --- | --- | --- |
 | `base` | signal, store, effect, keys, focus, list_store, prof, tick, node | 无 |
-| `shell` | loop, host, menu, hotkey, tray, notify, reveal（drag 暂留 core，吃 Widget）；app 的开窗/泵/子件槽段随步骤 2·乙落地 | win / sys / dbus |
-| `widget` | widget, overlay, overlay_native, app(app.mbt:root.on_draw + paint_frame), text | render + yoga (不含 core 旧名空间) |
+| `shell`（2026-10-17 已交付） | loop, session(原 host 的壳层半本账), menu, hotkey, tray, notify, reveal, probes | win / sys / dbus |
+| `widget`（2026-10-17 已交付） | widget, overlay, overlay_native, popup, drag, input_map, node + app.mbt/widget.mbt/host.mbt 全量 | base + shell + render/text/theme/yoga |
 
 其余子包 `style`, `theme`, `icons`, `input`, `text`, `chart`, `mdview`, `sys`, `dbus`, `win` 不动。
 
@@ -172,6 +172,12 @@ moonbit-native-gui/                          # 根 workspace
 3. **`pump_ime` 占 706-768 行，跨 `win` + `text` + `root` 三层**：IME 门控调 `@win`，文本批量初始化调 `text`，preedit/commit 投递调 root。建议 IME 整块留 widget——它服务的就是编辑控件；shell 只在 `step` 里调注入的 `on_frame`。
 
 **迁移顺序**：每步独立可编译、可回滚。
+
+0d. **步骤 3·widget 刀（2026-10-17 已交付）**：`gui/widget` 收 `widget`/`node`/`overlay`/`overlay_native`/`popup`/`drag`/`input_map` + `app.mbt`/`host.mbt`（App 主体、注册表、泵循环、绘制帧、输入法投递全部入住），`gui/core` 退为**纯门面包**（只剩 `compat*.mbt` 三张转发表）。实测三条：
+   ① **裸枚举变体是拆包最硬的收费点**：`@core.Down`/`Up`/`Move`/`Leave`/`FilePaths` 全仓约 290 处，别名转不出构造子、同名函数又会被解析成「类型上的方法」（`pub fn Down()` 报 `The type/trait Down is not found`），所以调用点一律改成 `@widget.PointerKind::Down` 全限定形态——这一步做完才轮到门面别名生效，也是「过渡包省事」预判被证伪的地方。
+   ② 包内书写形态靠 `gui/widget/aliases.mbt` 的私有别名与裸名转发（`Rect`/`FocusStack`/`Signal`/`Loop`/`Session` + `host_*` 壳层族 + KS/MOD 常量），迁移期不用把 widget 源码全量改成 `@base.`/`@shell.` 限定。
+   ③ `gui/core/moon.pkg` 瘦到 base/shell/widget/win/sys 五项；未用 import 会被 `--deny-warn` 判红，删文件必须同步删 import。
+   验证：库 16 包 `test` 967/967、全仓 `--deny-warn` 零警告（清 `_build` 重编）、全 workspace 1194/1194、hello/showcase/browser/sysmonitor native 重链 + hello 真窗冒烟优雅退出。
 
 0c. **步骤 2·乙核心手术（2026-10-17 已交付）**：`gui/shell/session.mbt` 落地 `Session`（平台窗 + 共用 `Loop` + 窗号/主窗/退出位 + 悬停/捕获/光标/IM 去重缓存 + 整窗 `dirty` 标志 + 泵推进 `session_pump_advance` + 定时器/quit/close 裁决），`host.mbt` 瘦身为「窗号 → 挂了内容的 App」的 widget 侧半本账（`g_apps : Map[Int, App]`），`App = { session, root, focus, host, canvas, dirty_rect, dirty_full, key_fallthrough }`。实测五条：
    ① **`App` 的字段不再对外**（原 `pub(all)`）——外部模块的无头回归（gui-webview 造假宿主）改走新增的 `@core.test_app(@core.fake_session(..))` 通道；仓内三份假窗 wbtest 同步改走 `fake_session`。

@@ -127,7 +127,7 @@ fn res_card(
       view.subscribe(fn(_v) { @core.invalidate() })
       c.on_pointer = Some(fn(_s : @core.Widget, ev : @core.PointerEvent) -> Bool {
         match ev.kind {
-          @core.Down =>
+          @widget.PointerKind::Down =>
             if ev.button == 1 {
               view.set_always(target)
               true

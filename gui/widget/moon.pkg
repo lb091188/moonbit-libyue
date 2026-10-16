@@ -1,0 +1,16 @@
+// 自绘控件层（G9 Batch 2 第三刀）：控件宿主、声明式 Node、浮层（图层档与
+// 原生档）、原生弹层窗、应用内拖放与输入映射。只依赖 base（响应式/几何）与
+// shell（壳层窗/泵/事件词汇）——不认识注册表之外的 core 任何东西。
+
+supported_targets = "native"
+
+import {
+  "NoahLiu/native-gui/base" @base,
+  "NoahLiu/native-gui/shell" @shell,
+  "NoahLiu/yoga-mbt/src" @yoga,
+  "moonbitlang/core/encoding/utf8",
+  "NoahLiu/native-gui/render",
+  "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/win",
+  "NoahLiu/native-gui/text",
+}

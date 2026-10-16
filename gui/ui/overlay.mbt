@@ -81,7 +81,7 @@ pub fn popover(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Up => {
+        @widget.PointerKind::Up => {
           // 开着时再点触发件通常到不了这里：那一击被图层消费掉（点浮层外收起）；
           // 这个分支兜底（程序化投递、或图层被撤掉的形态），免得句柄失效后打不开
           if overlay_alive(open_id.val) {
@@ -170,8 +170,8 @@ fn menu_row(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           on_pick()
           false
         }
@@ -302,8 +302,8 @@ pub fn dropdown(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           if overlay_alive(open_id.val) {
             close_pop()
           } else {
@@ -510,8 +510,8 @@ pub fn dialog(
           ev : @core.PointerEvent,
         ) -> Bool {
           match ev.kind {
-            @core.Down => true
-            @core.Up => {
+            @widget.PointerKind::Down => true
+            @widget.PointerKind::Up => {
               let ax = ev.x + self.rect.x
               let ay = ev.y + self.rect.y
               if !panel.rect.contains(ax, ay) && close_on_mask {
@@ -605,8 +605,8 @@ pub fn dialog(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => true
-          @core.Up => {
+          @widget.PointerKind::Down => true
+          @widget.PointerKind::Up => {
             close(false)
             false
           }
@@ -694,8 +694,8 @@ pub fn dialog(
           ev : @core.PointerEvent,
         ) -> Bool {
           match ev.kind {
-            @core.Down => true
-            @core.Up => {
+            @widget.PointerKind::Down => true
+            @widget.PointerKind::Up => {
               close(false)
               act()
               false
@@ -917,7 +917,7 @@ pub fn context_menu_for(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           if ev.button != 3 {
             false
           } else {
@@ -939,7 +939,7 @@ pub fn context_menu_for(
             true
           }
         }
-        @core.Up => ev.button == 3
+        @widget.PointerKind::Up => ev.button == 3
         _ => false
       }
     })

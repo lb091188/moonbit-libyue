@@ -463,7 +463,7 @@ pub fn textarea(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           let lines = lines_of(text_of(), self.rect.w)
           let now = @core.now_ms()
           let dbl = (now - last_down.val) < 400L &&
@@ -483,7 +483,7 @@ pub fn textarea(
           @core.invalidate()
           true
         }
-        @core.Move => {
+        @widget.PointerKind::Move => {
           if dragging.val {
             let lines = lines_of(text_of(), self.rect.w)
             ed.select_range(anchor.val, byte_at(lines, ev.x, ev.y))
@@ -491,11 +491,11 @@ pub fn textarea(
           }
           dragging.val
         }
-        @core.Up => {
+        @widget.PointerKind::Up => {
           dragging.val = false
           false
         }
-        @core.Leave => false
+        @widget.PointerKind::Leave => false
       }
     })
     w.on_scroll = Some(fn(ev : @core.ScrollEvent) -> Bool {

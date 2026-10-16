@@ -486,10 +486,10 @@ fn table_header(
             match ev.kind {
               // 贴列边界那 3px 的按下让给表头（列宽拖动）：单元格自己吃下按下就
               // 轮不到父控件，可排序列的边界拖动会整个失效（真窗口实测）
-              @core.Down =>
+              @widget.PointerKind::Down =>
                 !((idx > 0 && ev.x <= 3.0) ||
                   (idx < columns.length() - 1 && ev.x >= self.rect.w - 3.0))
-              @core.Up => {
+              @widget.PointerKind::Up => {
                 // 全选框区（前 28px）优先于排序：点框切全选/清空，点标题照旧排序
                 match sel_here {
                   Some(sel) =>
@@ -528,7 +528,7 @@ fn table_header(
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Up =>
+              @widget.PointerKind::Up =>
                 match sel_here {
                   Some(sel) =>
                     if ev.x >= 0.0 && ev.x <= 28.0 {
@@ -553,7 +553,7 @@ fn table_header(
     ev : @core.PointerEvent,
   ) -> Bool {
     match ev.kind {
-      @core.Down => {
+      @widget.PointerKind::Down => {
         let mut acc = 0.0
         let mut hit = -1
         for j = 0; j < widths.val.length() - 1; j = j + 1 {
@@ -572,7 +572,7 @@ fn table_header(
           false
         }
       }
-      @core.Move => {
+      @widget.PointerKind::Move => {
         if drag.val >= 0 {
           let dx = ev.x - drag_start_x.val
           let total = drag_left0.val + drag_right0.val
@@ -591,7 +591,7 @@ fn table_header(
           false
         }
       }
-      @core.Up => {
+      @widget.PointerKind::Up => {
         if drag.val >= 0 {
           drag.val = -1
           true
@@ -599,7 +599,7 @@ fn table_header(
           false
         }
       }
-      @core.Leave => false
+      @widget.PointerKind::Leave => false
     }
   })
 
@@ -703,8 +703,8 @@ fn table_row_widget(
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Down => true
-              @core.Up => {
+              @widget.PointerKind::Down => true
+              @widget.PointerKind::Up => {
                 match selection {
                   Some(s) => {
                     let cur = s.get()

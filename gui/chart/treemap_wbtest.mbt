@@ -393,7 +393,7 @@ test "矩形树图组件：出像素、hover 提亮、换数据画面变" {
   assert_true(ink_of(plain) > 2000)
   // hover 左上角格子：提亮 + 描边（flat 画卷与绘制同源）
   let _ = root.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: w.rect.x + 30.0,
     y: w.rect.y + 30.0,
     button: 0,
@@ -401,7 +401,7 @@ test "矩形树图组件：出像素、hover 提亮、换数据画面变" {
   })
   assert_true(diff_of(bm_of(w), plain) > 20)
   let _ = root.dispatch_pointer({
-    kind: @core.Leave,
+    kind: @widget.PointerKind::Leave,
     x: w.rect.x + 30.0,
     y: w.rect.y + 30.0,
     button: 0,

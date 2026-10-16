@@ -75,7 +75,7 @@ test "虚拟列表：拖滚动条改偏移、数据变短偏移夹回上界" {
   p.end()
   // 拖到滚动条中点 → 偏移接近一半
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + 100.0,
     button: 1,

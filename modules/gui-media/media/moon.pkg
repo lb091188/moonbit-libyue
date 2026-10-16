@@ -17,6 +17,7 @@ import {
   "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/ffmpeg-mbt/src" @ffmbt,
   "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/render",
   "NoahLiu/native-gui/text",
   "NoahLiu/native-gui/theme",

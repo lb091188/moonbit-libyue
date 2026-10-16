@@ -377,7 +377,7 @@ fn build_calendar(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           let (y, m) = month_shift(view_y.val, view_m.val, delta)
           view_y.val = y
           view_m.val = m
@@ -535,8 +535,8 @@ fn build_calendar(
       ) -> Bool {
         match ev.kind {
           // 松开才算选中（与弹层内点项同一口径），跨月格不可选
-          @core.Down => inm.val
-          @core.Up => {
+          @widget.PointerKind::Down => inm.val
+          @widget.PointerKind::Up => {
             let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
             if inm.val && inside {
               on_cell(dref.val)

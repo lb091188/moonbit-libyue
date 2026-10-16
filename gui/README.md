@@ -13,7 +13,7 @@ A **lightweight cross-platform desktop GUI framework for MoonBit** — native-di
 - **Desktop-grade system integration** — tray, notifications, native menus, global shortcuts, message boxes, file dialogs, drag & drop (in-app and cross-application), clipboard, autostart, idle detection and OS queries (volume, power, monitors, browser history, installed apps…) behind one `@sys` / `@core` facade.
 - **Content batteries included** — 20 chart types with a cross-cutting interactive layer, a GFM Markdown view, multi-language code highlighting, an embedded WebView (JS interop, custom protocols, DOM capture, policy hooks) and an audio/video engine with subtitles and speed control.
 - **Honest degradation** — every capability family exposes a probe and returns a structured `Unsupported` / `NotFound` on environments that lack it, instead of crashing or pretending success.
-- **Pay only for what you import** — 15 packages in this module; an unimported package never enters your binary. Heavier optional capabilities (the media engine) live in their own modules, outside the default dependency closure entirely.
+- **Pay only for what you import** — 16 packages in this module; an unimported package never enters your binary. Heavier optional capabilities (the media engine) live in their own modules, outside the default dependency closure entirely.
 
 ## Usage
 
@@ -55,7 +55,8 @@ Each showcase page is its own source file under `examples/showcase/pages/` — t
 |---|---|---|
 | `NoahLiu/native-gui/base` | `@base` | Platform-free primitives: `Store` / `Signal` / `ListStore`, focus stack, key codes, tick/prof |
 | `NoahLiu/native-gui/shell` | `@shell` | System-capability shell: menus, global hotkeys, tray, notifications, reveal, the loop scheduler and read-only platform probes |
-| `NoahLiu/native-gui/core` | `@core` | App host, event loop, pointer, overlays, drag & drop (`@base`/`@shell` names still forwarded during G9 Batch 2) |
+| `NoahLiu/native-gui/widget` | `@widget` | Self-drawn widget host: layout mapping, hit-testing, event routing, paint walk, declarative `Node`, overlays, drag & drop, input mapping, the `App` pump |
+| `NoahLiu/native-gui/core` | `@core` | G9 Batch 2 migration facade forwarding `@base`/`@shell`/`@widget` names |
 | `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
 | `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |

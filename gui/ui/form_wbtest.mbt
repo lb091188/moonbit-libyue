@@ -6,8 +6,8 @@
 /// 点击 = 按下 + 抬起。坐标是**窗口坐标**（`dispatch_pointer` 按坐标命中，
 /// 与宿主真实投递一致），所以调用方传 `w.rect.x + 局部x`。
 fn click(w : @core.Widget, x : Double, y : Double) -> Bool {
-  let _ = w.dispatch_pointer({ kind: @core.Down, x, y, button: 1, mods: 0, })
-  let last = w.dispatch_pointer({ kind: @core.Up, x, y, button: 1, mods: 0, })
+  let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Down, x, y, button: 1, mods: 0, })
+  let last = w.dispatch_pointer({ kind: @widget.PointerKind::Up, x, y, button: 1, mods: 0, })
   last
 }
 
@@ -23,14 +23,14 @@ test "复选框：点一下换状态，再点回来；禁用态不动作" {
   assert_eq(on.get(), false)
   // 松开落在控件外：不算一次操作
   let _ = w.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: w.rect.x + 6.0,
     y: w.rect.y + 6.0,
     button: 1,
     mods: 0,
   })
   let _ = w.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: w.rect.x + 6.0,
     y: w.rect.y + w.rect.h + 30.0,
     button: 1,
@@ -99,7 +99,7 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
   let root = mount_root([slider(v, width=120.0)], 240.0, 60.0)
   let w = kid(root, 0)
   assert_eq((w.rect.w, w.rect.h), (120.0, @theme.control_height))
-  let _ = w.dispatch_pointer({ kind: @core.Down, x: 60.0, y: 10.0, button: 1, mods: 0, })
+  let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Down, x: 60.0, y: 10.0, button: 1, mods: 0, })
   let mid = v.get()
   assert_true(mid > 40.0 && mid < 60.0)
 
@@ -115,13 +115,13 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
       mods: 0,
     })
   }
-  drag(@core.Move, w.rect.x - 20.0)
+  drag(@widget.PointerKind::Move, w.rect.x - 20.0)
   assert_eq(v.get(), 0.0)
-  drag(@core.Move, w.rect.x + 400.0)
+  drag(@widget.PointerKind::Move, w.rect.x + 400.0)
   assert_eq(v.get(), 100.0)
-  drag(@core.Up, w.rect.x + 400.0)
+  drag(@widget.PointerKind::Up, w.rect.x + 400.0)
   // 松开之后再拖动不改值
-  drag(@core.Move, w.rect.x + 20.0)
+  drag(@widget.PointerKind::Move, w.rect.x + 20.0)
   assert_eq(v.get(), 100.0)
 
   // 步长 25：只落在刻度上
@@ -129,11 +129,11 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
   let root2 = mount_root([slider(s, width=100.0, step=25.0)], 240.0, 60.0)
   let w2 = kid(root2, 0)
   // 轨道宽 = 控件宽 - 2×手柄半径(6) = 88：x=50 → 比值 0.5 → 50（正好在刻度上）
-  let _ = w2.dispatch_pointer({ kind: @core.Down, x: w2.rect.x + 50.0, y: w2.rect.y + 10.0, button: 1, mods: 0, })
+  let _ = w2.dispatch_pointer({ kind: @widget.PointerKind::Down, x: w2.rect.x + 50.0, y: w2.rect.y + 10.0, button: 1, mods: 0, })
   assert_eq(s.get(), 50.0)
   // x=94 → 比值 1.0 → 100
   let _ = w2.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: w2.rect.x + 94.0,
     y: w2.rect.y + 10.0,
     button: 1,
@@ -146,7 +146,7 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
   let root3 = mount_root([slider(d, width=100.0, disabled=true)], 240.0, 60.0)
   let w3 = kid(root3, 0)
   let consumed = w3.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: w3.rect.x + 50.0,
     y: w3.rect.y + 10.0,
     button: 1,
@@ -269,9 +269,9 @@ test "主题化按钮：宽度随文本、抬起落在框内才算点击、焦�
   let _ = click(w, w.rect.x + w.rect.w / 2.0, w.rect.y + w.rect.h / 2.0)
   assert_eq(hits, 1)
   // 按下后拖出框外抬起：不算一次点击
-  let _ = w.dispatch_pointer({ kind: @core.Down, x: w.rect.x + 4.0, y: w.rect.y + 4.0, button: 1, mods: 0, })
+  let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Down, x: w.rect.x + 4.0, y: w.rect.y + 4.0, button: 1, mods: 0, })
   let _ = w.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: w.rect.x + 4.0,
     y: w.rect.y + w.rect.h + 20.0,
     button: 1,
@@ -392,12 +392,12 @@ test "评分：星顶点几何、点击写值并回调、悬停只预亮不改�
   let dim = color_of(bm_empty, ox + 11, oy + 11)
   assert_true(dim != lit0)
   // 移到第 3 颗星（x=60 → 预亮 1..3），第 1 颗重新亮起，值仍是 0
-  let _ = w.dispatch_pointer({ kind: @core.Move, x: w.rect.x + 60.0, y: w.rect.y + 11.0, button: 0, mods: 0, })
+  let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Move, x: w.rect.x + 60.0, y: w.rect.y + 11.0, button: 0, mods: 0, })
   assert_eq(value.get(), 0)
   let (bm1, _, _) = shot(w)
   assert_true(color_of(bm1, ox + 11, oy + 11) != dim)
   // 离开后预亮清零
-  let _ = w.dispatch_pointer({ kind: @core.Leave, x: 0.0, y: 0.0, button: 0, mods: 0, })
+  let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Leave, x: 0.0, y: 0.0, button: 0, mods: 0, })
   let (bm2, _, _) = shot(w)
   assert_eq(color_of(bm2, ox + 11, oy + 11), dim)
 }
@@ -480,8 +480,8 @@ test "下拉选择：点浮层外收起后，再点字段立刻能重开（句�
   assert_eq(@core.overlay_count(), 1)
   root.relayout(420.0, 300.0)
   // 点浮层外：图层吃掉这一击并收起（组件的句柄就此失效）
-  let _ = root.dispatch_pointer({ kind: @core.Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
-  let _ = root.dispatch_pointer({ kind: @core.Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
   assert_eq(@core.overlay_count(), 0)
   // 第二次点字段应直接重开，而不是「先清旧句柄、要点两下」
   click_at(root, field, 30.0, 16.0)
@@ -776,10 +776,10 @@ test "步进器三格共框：同高、首尾相接、点 +/- 改值且触界禁
   let tap = fn(i : Int) -> Unit {
     let c = cells[i]
     let _ = root.dispatch_pointer_to(c.id, {
-      kind: @core.Down, x: c.rect.x + 4.0, y: c.rect.y + 4.0, button: 1, mods: 0,
+      kind: @widget.PointerKind::Down, x: c.rect.x + 4.0, y: c.rect.y + 4.0, button: 1, mods: 0,
     })
     let _ = root.dispatch_pointer_to(c.id, {
-      kind: @core.Up, x: c.rect.x + 4.0, y: c.rect.y + 4.0, button: 1, mods: 0,
+      kind: @widget.PointerKind::Up, x: c.rect.x + 4.0, y: c.rect.y + 4.0, button: 1, mods: 0,
     })
   }
   tap(2)

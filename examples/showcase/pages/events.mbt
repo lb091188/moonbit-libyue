@@ -150,7 +150,7 @@ fn key_focus_area(echo : @core.Store[String]) -> @core.Node {
       })
       w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
         match ev.kind {
-          @core.Down => true
+          @widget.PointerKind::Down => true
           _ => false
         }
       })
@@ -220,19 +220,19 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         skin_panel(w)
         w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
           match ev.kind {
-            @core.Down => {
+            @widget.PointerKind::Down => {
               cap_log.set("\{tag} 按下 → 捕获者换成 \{tag}（pressed 已由宿主置上）")
               true
             }
-            @core.Move => {
+            @widget.PointerKind::Move => {
               cap_log.set("\{tag} 收到 move (\{ev.x.round()}, \{ev.y.round()})——负值 = 指针已移出本区，仍投给捕获者")
               false
             }
-            @core.Up => {
+            @widget.PointerKind::Up => {
               cap_log.set("\{tag} 抬起 → 捕获释放，悬停按抬起位置重判")
               true
             }
-            @core.Leave => false
+            @widget.PointerKind::Leave => false
           }
         })
       },
@@ -268,7 +268,7 @@ pub fn page_events(app : @shared.App) -> @core.Node {
             skin_panel(w)
             w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
               match ev.kind {
-                @core.Down => {
+                @widget.PointerKind::Down => {
                   let now = @core.now_ms()
                   let (t0, x0, y0) = last_down.val
                   if now - t0 < 400L && (ev.x - x0).abs() < 4.0 && (ev.y - y0).abs() < 4.0 {
@@ -279,15 +279,15 @@ pub fn page_events(app : @shared.App) -> @core.Node {
                   evt_mouse.set("down btn=\{ev.button} mods=\{mods_label(ev.mods)}")
                   true
                 }
-                @core.Up => {
+                @widget.PointerKind::Up => {
                   evt_mouse.set("up btn=\{ev.button}")
                   true
                 }
-                @core.Move => {
+                @widget.PointerKind::Move => {
                   evt_mouse.set("move (\{ev.x.round()}, \{ev.y.round()}) btn=\{ev.button} mods=\{mods_label(ev.mods)}")
                   false
                 }
-                @core.Leave => {
+                @widget.PointerKind::Leave => {
                   evt_mouse.set("leave（窗口坐标 (\{ev.x.round()}, \{ev.y.round()})）")
                   false
                 }
@@ -303,10 +303,10 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         "@ui.col([@ui.text(\"鼠标操作区\", role=@ui.Body)], height=96.0, handle=fn(w) {",
         "  w.on_pointer = Some(fn(_self, ev : @core.PointerEvent) -> Bool {",
         "    match ev.kind {",
-        "      @core.Down => { evt.set(\"down btn=\\{ev.button}\"); true }",
-        "      @core.Up => { evt.set(\"up btn=\\{ev.button}\"); true }",
-        "      @core.Move => { evt.set(\"move (\\{ev.x}, \\{ev.y})\"); false }",
-        "      @core.Leave => { evt.set(\"leave\"); false }",
+        "      @widget.PointerKind::Down => { evt.set(\"down btn=\\{ev.button}\"); true }",
+        "      @widget.PointerKind::Up => { evt.set(\"up btn=\\{ev.button}\"); true }",
+        "      @widget.PointerKind::Move => { evt.set(\"move (\\{ev.x}, \\{ev.y})\"); false }",
+        "      @widget.PointerKind::Leave => { evt.set(\"leave\"); false }",
         "    }",
         "  })",
         "})",
@@ -377,10 +377,10 @@ pub fn page_events(app : @shared.App) -> @core.Node {
         "// 宿主规则：命中即捕获，没有显式开关",
         "w.on_pointer = Some(fn(_self, ev) -> Bool {",
         "  match ev.kind {",
-        "    @core.Down => true   // 按下起，Move/Up 全归本控件",
-        "    @core.Move => { log.set(\"(\\{ev.x}, \\{ev.y})\"); false }",
-        "    @core.Up => true     // 松手释放；指针在区外也收得到",
-        "    @core.Leave => false",
+        "    @widget.PointerKind::Down => true   // 按下起，Move/Up 全归本控件",
+        "    @widget.PointerKind::Move => { log.set(\"(\\{ev.x}, \\{ev.y})\"); false }",
+        "    @widget.PointerKind::Up => true     // 松手释放；指针在区外也收得到",
+        "    @widget.PointerKind::Leave => false",
         "  }",
         "})",
       ],

@@ -104,7 +104,7 @@ test "滚动容器：点轨道跳转与拖动拇指（松手后移动不再跟�
   let _ = paint(root, 240, 140)
   // 点轨道最下端：拇指中心对齐指针 → 偏移接近最大
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + bar.rect.h - 1.0,
     button: 1,
@@ -114,7 +114,7 @@ test "滚动容器：点轨道跳转与拖动拇指（松手后移动不再跟�
   let mid = st.offset_y()
   // 捕获期拖动（宿主按身份投递）继续改偏移
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + bar.rect.h / 2.0,
     button: 1,
@@ -123,7 +123,7 @@ test "滚动容器：点轨道跳转与拖动拇指（松手后移动不再跟�
   assert_true(st.offset_y() < mid)
   let after_drag = st.offset_y()
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + bar.rect.h / 2.0,
     button: 1,
@@ -131,7 +131,7 @@ test "滚动容器：点轨道跳转与拖动拇指（松手后移动不再跟�
   })
   // 松手后再移动不再跟手
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + 4.0,
     button: 1,

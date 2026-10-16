@@ -10,7 +10,7 @@ fn key(root : @core.Widget, w : @core.Widget, keysym : Int, mods : Int) -> Unit 
 ///|
 fn press(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
   let _ = root.dispatch_pointer_to(w.id, {
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x,
     y: w.rect.y + 6.0,
     button: 1,
@@ -21,7 +21,7 @@ fn press(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
 ///|
 fn move_to(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
   let _ = root.dispatch_pointer_to(w.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x,
     y: w.rect.y + 6.0,
     button: 1,
@@ -32,7 +32,7 @@ fn move_to(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
 ///|
 fn release(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
   let _ = root.dispatch_pointer_to(w.id, {
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x,
     y: w.rect.y + 6.0,
     button: 1,
@@ -100,7 +100,7 @@ test "clearable：悬停出清空标记，点它整框清空并回写 Store" {
   }
   assert_true(diff > 4, msg="悬停时清空标记没出现（热区像素零变化）")
   let _ = root.dispatch_pointer_to(w.id, {
-    kind: @core.Down, x: 189.0, y: 12.0, button: 1, mods: 0,
+    kind: @widget.PointerKind::Down, x: 189.0, y: 12.0, button: 1, mods: 0,
   })
   assert_eq(store.get(), "")
 }

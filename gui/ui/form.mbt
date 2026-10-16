@@ -25,15 +25,15 @@ fn attach_toggle(
 ) -> Unit {
   w.on_pointer = Some(fn(self : @core.Widget, ev : @core.PointerEvent) -> Bool {
     match ev.kind {
-      @core.Down => !off.off
-      @core.Up => {
+      @widget.PointerKind::Down => !off.off
+      @widget.PointerKind::Up => {
         let inside_x = ev.x >= 0.0 && ev.x <= self.rect.w
         let inside_y = ev.y >= 0.0 && ev.y <= self.rect.h
         if !off.off && inside_x && inside_y { toggle() }
         false
       }
-      @core.Move => !off.off
-      @core.Leave => false
+      @widget.PointerKind::Move => !off.off
+      @widget.PointerKind::Leave => false
     }
   })
 }
@@ -402,20 +402,20 @@ pub fn slider(
         return false
       }
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           dragging.val = true
           set_from_x(self, ev.x)
           true
         }
-        @core.Move => {
+        @widget.PointerKind::Move => {
           if dragging.val { set_from_x(self, ev.x) }
           true
         }
-        @core.Up => {
+        @widget.PointerKind::Up => {
           dragging.val = false
           false
         }
-        @core.Leave => false
+        @widget.PointerKind::Leave => false
       }
     })
     w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
@@ -554,8 +554,8 @@ fn step_cell(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => !off.off
-        @core.Up => {
+        @widget.PointerKind::Down => !off.off
+        @widget.PointerKind::Up => {
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
             ev.y >= 0.0 && ev.y <= self.rect.h
           if !off.off && inside {
@@ -563,8 +563,8 @@ fn step_cell(
           }
           false
         }
-        @core.Move => !off.off
-        @core.Leave => false
+        @widget.PointerKind::Move => !off.off
+        @widget.PointerKind::Leave => false
       }
     })
     w
@@ -887,15 +887,15 @@ pub fn button(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => !off.off
-        @core.Up => {
+        @widget.PointerKind::Down => !off.off
+        @widget.PointerKind::Up => {
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
             ev.y >= 0.0 && ev.y <= self.rect.h
           if !off.off && inside { on_click() }
           false
         }
-        @core.Move => !off.off
-        @core.Leave => false
+        @widget.PointerKind::Move => !off.off
+        @widget.PointerKind::Leave => false
       }
     })
     w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
@@ -949,8 +949,8 @@ pub fn link(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w &&
             ev.y >= 0.0 && ev.y <= self.rect.h
           if inside { on_click() }
@@ -1089,13 +1089,13 @@ pub fn rate(
         idx.clamp(min=1, max=n)
       }
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           let v = star_at(ev.x)
           value.set(v)
           on_change(v)
           true
         }
-        @core.Move => {
+        @widget.PointerKind::Move => {
           let h = star_at(ev.x)
           if h != hover_n.val {
             hover_n.val = h
@@ -1103,12 +1103,12 @@ pub fn rate(
           }
           true
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           hover_n.val = 0
           @core.invalidate()
           false
         }
-        @core.Up => false
+        @widget.PointerKind::Up => false
       }
     })
     w.on_draw = Some(fn(
@@ -1230,8 +1230,8 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           on_pick()
           false
         }
@@ -1610,8 +1610,8 @@ fn color_swatch(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           on_pick()
           false
         }
@@ -1726,7 +1726,7 @@ fn combo_impl(
       match ev.kind {
         // 字段里的抬起（选完词、点完插入点）顺手把候选开出来：
         // 输入框自己消费了按下，这一击的抬起才冒泡到这里
-        @core.Up => {
+        @widget.PointerKind::Up => {
           open()
           false
         }

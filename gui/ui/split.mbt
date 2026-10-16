@@ -124,7 +124,7 @@ fn splitter_impl(
       let origin = if horizontal { s.rect.x } else { s.rect.y }
       let win = at + origin
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           dragging.val = true
           drag_start.val = win
           drag_first0.val = if horizontal {
@@ -134,7 +134,7 @@ fn splitter_impl(
           }
           true
         }
-        @core.Move => {
+        @widget.PointerKind::Move => {
           if dragging.val {
             let cur = win
             // 总量从三个控件的实际矩形读：不捕获父控件（父子互指是引用环）
@@ -159,11 +159,11 @@ fn splitter_impl(
             false
           }
         }
-        @core.Up => {
+        @widget.PointerKind::Up => {
           dragging.val = false
           true
         }
-        @core.Leave => false
+        @widget.PointerKind::Leave => false
       }
     })
     w.append_child(first_wrap)

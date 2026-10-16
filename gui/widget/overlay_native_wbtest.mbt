@@ -5,7 +5,7 @@
 fn fake_host_app() -> App {
   let root = Widget::new()
   {
-    session: fake_session(900, 1, true, 400, 300),
+    session: @shell.fake_session(900, 1, true, 400, 300),
     root,
     focus: FocusStack::new(),
     host: make_overlay_host(root),

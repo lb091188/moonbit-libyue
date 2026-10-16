@@ -549,7 +549,7 @@ pub fn tm_chart_t(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Move => {
+        @widget.PointerKind::Move => {
           let mut hit = -1
           for k in 0..<flat.length() {
             let cell = flat[k].1
@@ -566,7 +566,7 @@ pub fn tm_chart_t(
           }
           true
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
             @core.invalidate()

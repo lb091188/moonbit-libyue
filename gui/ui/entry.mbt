@@ -260,7 +260,7 @@ pub fn input(
     })
     w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
       match ev.kind {
-        @core.Down => {
+        @widget.PointerKind::Down => {
           if clear_shown(_self) && !off.off {
             let (cx, cy, cw, ch) = clear_box(_self.rect)
             if ev.x >= cx && ev.x <= cx + cw && ev.y >= cy && ev.y <= cy + ch {
@@ -288,7 +288,7 @@ pub fn input(
           @core.invalidate()
           true
         }
-        @core.Move => {
+        @widget.PointerKind::Move => {
           if dragging.val {
             // 拖出的部分靠宿主的捕获期投递，选区可以越过框边缘继续走
             ed.select_range(anchor.val, byte_at_x(ed, ev.x, pad, font))
@@ -296,11 +296,11 @@ pub fn input(
           }
           dragging.val
         }
-        @core.Up => {
+        @widget.PointerKind::Up => {
           dragging.val = false
           false
         }
-        @core.Leave => false
+        @widget.PointerKind::Leave => false
       }
     })
     w.im_context = Some(fn() -> (String, Int)? {

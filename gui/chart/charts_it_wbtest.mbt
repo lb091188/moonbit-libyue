@@ -129,7 +129,7 @@ test "折线交互图：hover 浮层与准线、图例点击显隐" {
   let px = 46.0 + (320.0 - 56.0 - 46.0) / 2.0
   let py = 12.0 + (160.0 - 18.0 - 12.0) / 2.0
   let _ = root.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: canvas.rect.x + px,
     y: canvas.rect.y + py,
     button: 0,
@@ -139,7 +139,7 @@ test "折线交互图：hover 浮层与准线、图例点击显隐" {
   assert_true(diff_of(lit, plain) > 50)
   // 离开：浮层收起，画面复原
   let _ = root.dispatch_pointer({
-    kind: @core.Leave,
+    kind: @widget.PointerKind::Leave,
     x: canvas.rect.x + px,
     y: canvas.rect.y + py,
     button: 0,
@@ -149,14 +149,14 @@ test "折线交互图：hover 浮层与准线、图例点击显隐" {
   // 图例点第二项（b 序列色块附近，图例行高 24）：Down+Up 翻转显隐
   let lg = bm_of(canvas)
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: legend.rect.x + ci_legend_item_w("a") + 12.0,
     y: legend.rect.y + 12.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: legend.rect.x + ci_legend_item_w("a") + 12.0,
     y: legend.rect.y + 12.0,
     button: 1,
@@ -207,7 +207,7 @@ test "环形交互图：hover 扇区与图例显隐" {
   let cy = 160.0 / 2.0
   let r_out = d / 2.0
   let _ = root.dispatch_pointer({
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: canvas.rect.x + cx,
     y: canvas.rect.y + (cy - r_out * 0.8),
     button: 0,
@@ -217,7 +217,7 @@ test "环形交互图：hover 扇区与图例显隐" {
   assert_true(diff_of(lit, plain) > 50)
   // 离开复原
   let _ = root.dispatch_pointer({
-    kind: @core.Leave,
+    kind: @widget.PointerKind::Leave,
     x: canvas.rect.x + cx,
     y: canvas.rect.y + (cy - r_out * 0.8),
     button: 0,

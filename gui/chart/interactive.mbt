@@ -736,7 +736,7 @@ pub fn ci_legend(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Move => {
+        @widget.PointerKind::Move => {
           let names : Array[String] = []
           for it in items.get() {
             names.push(it.0)
@@ -748,15 +748,15 @@ pub fn ci_legend(
           }
           true
         }
-        @core.Leave => {
+        @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
             @core.invalidate()
           }
           false
         }
-        @core.Down => ev.button == 1
-        @core.Up => {
+        @widget.PointerKind::Down => ev.button == 1
+        @widget.PointerKind::Up => {
           let inside_x = ev.x >= 0.0 && ev.x <= self.rect.w
           let inside_y = ev.y >= 0.0 && ev.y <= self.rect.h
           if ev.button == 1 && inside_x && inside_y {

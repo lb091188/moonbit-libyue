@@ -234,7 +234,7 @@ fn player_display(
     ev : @core.PointerEvent,
   ) -> Bool {
     match ev.kind {
-      @core.Down => {
+      @widget.PointerKind::Down => {
         let hit = bar_hit(ev.x, bar_w.val)
         if hit.0 == "seek" {
           dragging.val = true
@@ -247,7 +247,7 @@ fn player_display(
         }
         true
       }
-      @core.Move => {
+      @widget.PointerKind::Move => {
         let hit = bar_hit(ev.x, bar_w.val)
         if dragging.val {
           drag_frac.val = hit.1
@@ -258,7 +258,7 @@ fn player_display(
         }
         dragging.val || vol_drag.val
       }
-      @core.Up => {
+      @widget.PointerKind::Up => {
         if dragging.val {
           dragging.val = false
           seek_to(drag_frac.val * dur())
@@ -267,7 +267,7 @@ fn player_display(
         vol_drag.val = false
         true
       }
-      @core.Leave => dragging.val || vol_drag.val
+      @widget.PointerKind::Leave => dragging.val || vol_drag.val
     }
   })
   w

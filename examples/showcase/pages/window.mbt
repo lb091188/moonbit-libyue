@@ -283,7 +283,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
                 padding=8.0,
               ),
               accept=fn(d : @core.DragData) -> Bool {
-                d.kind() == @core.FilePaths
+                d.kind() == @widget.DataKind::FilePaths
               },
               on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
                 match d {
@@ -375,7 +375,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "// 投放目标：悬停描主色边（读 drag_hover 自判，无 enter/leave 三回调）",
         "@ui.drop_target(",
         "  panel,",
-        "  accept=fn(d) { d.kind() == @core.FilePaths }, // 不收时系统光标显示禁止",
+        "  accept=fn(d) { d.kind() == @widget.DataKind::FilePaths }, // 不收时系统光标显示禁止",
         "  on_drop=fn(d, _x, _y) {",
         "    match d {",
         "      @core.DragData::Paths(ps) => ...",

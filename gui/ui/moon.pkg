@@ -11,6 +11,7 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/math",
   "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/input",
   "NoahLiu/native-gui/icons",
   "NoahLiu/native-gui/render",

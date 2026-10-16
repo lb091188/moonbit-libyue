@@ -160,14 +160,14 @@ test "提示条：有描述时更高，关闭热区与标记都只在右上角�
   p0.end()
   assert_true(mark_in(bm0, 276, 0, 300, 24) > 8)
   let _ = root1.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: a1.rect.x + 20.0,
     y: a1.rect.y + 10.0,
     button: 1,
     mods: 0,
   })
   let _ = root1.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: a1.rect.x + 20.0,
     y: a1.rect.y + 10.0,
     button: 1,
@@ -176,14 +176,14 @@ test "提示条：有描述时更高，关闭热区与标记都只在右上角�
   assert_eq(closes.val, 0)
   assert_eq(a1.visible, true)
   let _ = root1.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: a1.rect.x + a1.rect.w - 8.0,
     y: a1.rect.y + 8.0,
     button: 1,
     mods: 0,
   })
   let _ = root1.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: a1.rect.x + a1.rect.w - 8.0,
     y: a1.rect.y + 8.0,
     button: 1,
@@ -270,8 +270,8 @@ test "折线进度：条与百分比两列，填充随 Store 变化" {
 fn click_at(root : @core.Widget, w : @core.Widget, fx : Double, fy : Double) -> Unit {
   let x = w.rect.x + fx
   let y = w.rect.y + fy
-  let _ = root.dispatch_pointer({ kind: @core.Down, x, y, button: 1, mods: 0 })
-  let _ = root.dispatch_pointer({ kind: @core.Up, x, y, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x, y, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Up, x, y, button: 1, mods: 0 })
 }
 
 ///|

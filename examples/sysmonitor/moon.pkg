@@ -6,6 +6,7 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "NoahLiu/yoga-mbt/src" @yoga,
   "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/theme" @theme,
   "NoahLiu/native-gui/render" @render,

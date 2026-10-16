@@ -979,7 +979,7 @@ fn md_rich_label(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => {
+          @widget.PointerKind::Down => {
             let u = hit_url(ev.x, ev.y)
             if u != "" {
               (ctx.on_link)(u)
@@ -988,7 +988,7 @@ fn md_rich_label(
               false
             }
           }
-          @core.Move => {
+          @widget.PointerKind::Move => {
             let h = hit_url(ev.x, ev.y) != ""
             if h != hover.val {
               hover.val = h
@@ -996,14 +996,14 @@ fn md_rich_label(
             }
             true
           }
-          @core.Leave => {
+          @widget.PointerKind::Leave => {
             if hover.val {
               hover.val = false
               w.cursor = 0
             }
             false
           }
-          @core.Up => false
+          @widget.PointerKind::Up => false
         }
       })
     }

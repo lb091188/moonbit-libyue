@@ -96,8 +96,8 @@ fn setup_picker_field(
     ev : @core.PointerEvent,
   ) -> Bool {
     match ev.kind {
-      @core.Down => true
-      @core.Up => {
+      @widget.PointerKind::Down => true
+      @widget.PointerKind::Up => {
         on_click(ev.x)
         @core.invalidate()
         false
@@ -267,8 +267,8 @@ fn time_popup(
               ev : @core.PointerEvent,
             ) -> Bool {
               match ev.kind {
-                @core.Down => true
-                @core.Up => {
+                @widget.PointerKind::Down => true
+                @widget.PointerKind::Up => {
                   cur.val = step(-1)
                   @core.invalidate()
                   false
@@ -322,8 +322,8 @@ fn time_popup(
               ev : @core.PointerEvent,
             ) -> Bool {
               match ev.kind {
-                @core.Down => true
-                @core.Up => {
+                @widget.PointerKind::Down => true
+                @widget.PointerKind::Up => {
                   cur.val = step(1)
                   @core.invalidate()
                   false
@@ -399,8 +399,8 @@ fn time_popup(
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Down => true
-              @core.Up => {
+              @widget.PointerKind::Down => true
+              @widget.PointerKind::Up => {
                 on_cancel()
                 false
               }
@@ -452,8 +452,8 @@ fn time_popup(
             ev : @core.PointerEvent,
           ) -> Bool {
             match ev.kind {
-              @core.Down => true
-              @core.Up => {
+              @widget.PointerKind::Down => true
+              @widget.PointerKind::Up => {
                 on_confirm(cur.val)
                 false
               }

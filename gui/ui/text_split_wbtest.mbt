@@ -82,14 +82,14 @@ test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
   assert_eq(sp.children()[2].rect.w, 400.0 - 200.0 - 8.0)
   // 往右拖 60：首栏 260
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + 40.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 4.0 + 60.0,
     y: bar.rect.y + 40.0,
     button: 1,
@@ -99,7 +99,7 @@ test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
   assert_eq(first.rect.w, 260.0)
   // 拖到极右：夹在「总宽 − 把手 − 次栏最小」
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 4000.0,
     y: bar.rect.y + 40.0,
     button: 1,
@@ -109,7 +109,7 @@ test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
   assert_eq(first.rect.w, 312.0)
   // 拖到极左：夹在首栏最小
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x - 4000.0,
     y: bar.rect.y + 40.0,
     button: 1,
@@ -119,14 +119,14 @@ test "水平分隔：把手拖动改首栏宽，两端按最小尺寸夹取" {
   assert_eq(first.rect.w, 80.0)
   // 松手后再移动不再改
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: bar.rect.x + 4.0,
     y: bar.rect.y + 40.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 200.0,
     y: bar.rect.y + 40.0,
     button: 1,
@@ -155,14 +155,14 @@ test "垂直分隔：把手上下拖动改首栏高，按最小高度夹取" {
   assert_eq(bar.rect.h, 8.0)
   assert_eq(first.rect.h, 120.0)
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: bar.rect.x + 40.0,
     y: bar.rect.y + 4.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 40.0,
     y: bar.rect.y + 4.0 + 40.0,
     button: 1,
@@ -171,7 +171,7 @@ test "垂直分隔：把手上下拖动改首栏高，按最小高度夹取" {
   root.relayout(300.0, 240.0)
   assert_eq(first.rect.h, 160.0)
   let _ = root.dispatch_pointer_to(bar.id, {
-    kind: @core.Move,
+    kind: @widget.PointerKind::Move,
     x: bar.rect.x + 40.0,
     y: bar.rect.y + 4000.0,
     button: 1,

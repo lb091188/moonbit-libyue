@@ -46,8 +46,8 @@ fn cell_at(panel : @core.Widget, idx : Int) -> @core.Widget {
 fn pick(root : @core.Widget, c : @core.Widget) -> Unit {
   let x = c.rect.x + c.rect.w / 2.0
   let y = c.rect.y + c.rect.h / 2.0
-  let _ = root.dispatch_pointer({ kind: @core.Down, x, y, button: 1, mods: 0 })
-  let _ = root.dispatch_pointer({ kind: @core.Up, x, y, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x, y, button: 1, mods: 0 })
+  let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Up, x, y, button: 1, mods: 0 })
 }
 
 ///|
@@ -154,14 +154,14 @@ test "日历面板：点当月格选中并写 Store，跨月格与格外松开�
   // 按下后在格外松开不算一次（捕获期仍投给被按下的格）
   let c = cell_at(panel, 10)
   let _ = root.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: c.rect.x + 18.0,
     y: c.rect.y + 15.0,
     button: 1,
     mods: 0,
   })
   let _ = root.dispatch_pointer_to(c.id, {
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: c.rect.x + 900.0,
     y: c.rect.y + 15.0,
     button: 1,

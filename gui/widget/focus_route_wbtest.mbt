@@ -8,7 +8,7 @@
 fn fake_win_app() -> App {
   let root = Widget::new()
   {
-    session: fake_session(900, host_new_wid(), false, 10, 10),
+    session: @shell.fake_session(900, @shell.host_new_wid(), false, 10, 10),
     root,
     focus: FocusStack::new(),
     host: make_overlay_host(root),

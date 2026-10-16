@@ -127,14 +127,14 @@ test "按钮：松开落在按钮内才算点击，落在外面不算" {
 
   // 正常点击：按下 + 在同处松开
   let _ = w.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: cx,
     y: cy,
     button: 1,
     mods: 0,
   })
   let _ = w.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: cx,
     y: cy,
     button: 1,
@@ -144,14 +144,14 @@ test "按钮：松开落在按钮内才算点击，落在外面不算" {
 
   // 按下后在按钮外松开：不触发
   let _ = w.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: cx,
     y: cy,
     button: 1,
     mods: 0,
   })
   let _ = w.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: cx,
     y: w.rect.h + 40.0,
     button: 1,
@@ -167,7 +167,7 @@ test "按钮：禁用态不消费事件、也不响应点击" {
   let root = mount_root([b], 200.0, 60.0)
   let w = kid(root, 0)
   let consumed = w.dispatch_pointer({
-    kind: @core.Down,
+    kind: @widget.PointerKind::Down,
     x: 10.0,
     y: 10.0,
     button: 1,
@@ -175,7 +175,7 @@ test "按钮：禁用态不消费事件、也不响应点击" {
   })
   assert_false(consumed)
   let _ = w.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: 10.0,
     y: 10.0,
     button: 1,
@@ -392,9 +392,9 @@ test "图标按钮：尺寸固定、悬停换底色、点击在抬起且落在�
   let _ = click(w, w.rect.x + 12.0, w.rect.y + 12.0)
   assert_eq(hits, 1)
   // 抬起在框外：不算一次点击
-  let _ = w.dispatch_pointer({ kind: @core.Down, x: 4.0, y: 4.0, button: 1, mods: 0, })
+  let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Down, x: 4.0, y: 4.0, button: 1, mods: 0, })
   let _ = w.dispatch_pointer({
-    kind: @core.Up,
+    kind: @widget.PointerKind::Up,
     x: 4.0,
     y: w.rect.y + 90.0,
     button: 1,

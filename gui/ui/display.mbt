@@ -171,8 +171,8 @@ fn chip(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => true
-          @core.Up => {
+          @widget.PointerKind::Down => true
+          @widget.PointerKind::Up => {
             let inside_x = ev.x >= 0.0 && ev.x <= self.rect.w
             let inside_y = ev.y >= 0.0 && ev.y <= self.rect.h
             if inside_x && inside_y { on_click() }
@@ -591,8 +591,8 @@ pub fn alert(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Down => true
-          @core.Up => {
+          @widget.PointerKind::Down => true
+          @widget.PointerKind::Up => {
             // 关闭热区在右上角 24×24。✕ 的本体行为是收起（回调留默认就是
             // 「只收起」，真机反馈「点了不关」正是缺了这一步）；收起会让
             // 下方内容整列回流，走全窗置脏
@@ -1006,7 +1006,7 @@ pub fn carousel(
           ev : @core.PointerEvent,
         ) -> Bool {
           match ev.kind {
-            @core.Down => {
+            @widget.PointerKind::Down => {
               do_switch(if right { cur.val + 1 } else { cur.val - 1 })
               true
             }
@@ -1054,7 +1054,7 @@ pub fn carousel(
           ev : @core.PointerEvent,
         ) -> Bool {
           match ev.kind {
-            @core.Down => {
+            @widget.PointerKind::Down => {
               do_switch(di)
               true
             }
@@ -1072,11 +1072,11 @@ pub fn carousel(
         ev : @core.PointerEvent,
       ) -> Bool {
         match ev.kind {
-          @core.Move => {
+          @widget.PointerKind::Move => {
             rotation.paused.val = true
             false
           }
-          @core.Leave => {
+          @widget.PointerKind::Leave => {
             rotation.paused.val = false
             false
           }

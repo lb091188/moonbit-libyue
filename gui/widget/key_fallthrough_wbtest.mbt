@@ -10,14 +10,14 @@ test "无焦点也吃到键，抬起事件不进通道" {
   let seen : Array[Int] = []
   a.add_key_fallthrough(fn(ev : KeyEvent) -> Bool {
     seen.push(ev.keysym)
-    ev.keysym == KS_SPACE
+    ev.keysym == @base.KS_SPACE
   })
-  key_down(a, KS_SPACE)
-  assert_eq(seen, [KS_SPACE])
+  key_down(a, @base.KS_SPACE)
+  assert_eq(seen, [@base.KS_SPACE])
   // 抬起（code=1）在 Key 分支开头就被拦下，不该问处理器
   let up : @win.InputEvent = {
     code: 1,
-    keysym: KS_SPACE,
+    keysym: @base.KS_SPACE,
     mods: 0,
     x: 0,
     y: 0,
@@ -25,7 +25,7 @@ test "无焦点也吃到键，抬起事件不进通道" {
     axis: 0,
   }
   a.route(up)
-  assert_eq(seen, [KS_SPACE])
+  assert_eq(seen, [@base.KS_SPACE])
   host_reset()
 }
 
@@ -42,13 +42,13 @@ test "焦点链消费就不抢，多处理器按序截断" {
   assert_eq(a.focus.current(), Some(7))
   a.add_key_fallthrough(fn(ev : KeyEvent) -> Bool {
     order.push("first")
-    ev.keysym == KS_SPACE
+    ev.keysym == @base.KS_SPACE
   })
-  key_down(a, KS_SPACE)
+  key_down(a, @base.KS_SPACE)
   assert_eq(order, [])
   // 焦点控件放手：同一条键改由通道接手
   one.on_key = Some(fn(_ev : KeyEvent) -> Bool { false })
-  key_down(a, KS_SPACE)
+  key_down(a, @base.KS_SPACE)
   assert_eq(order, ["first"])
   // 第二个处理器：第一个不吃才轮到它
   a.add_key_fallthrough(fn(_ev : KeyEvent) -> Bool {

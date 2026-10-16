@@ -206,8 +206,8 @@ pub fn hover_group(
       ev : @core.PointerEvent,
     ) -> Bool {
       match ev.kind {
-        @core.Down => true
-        @core.Up => {
+        @widget.PointerKind::Down => true
+        @widget.PointerKind::Up => {
           if ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h {
             on_click()
           }
