@@ -46,7 +46,7 @@ rm -rf _build/native/debug/build/examples/<示例>/<示例>   # 该示例重链
 - **内网与离线**：环境变量 `NATIVE_GUI_VENDOR_BASE` 接受单个 base 或逗号分隔列表，排在最前；也可手工把文件放到对应路径，prebuild 只在缺失时下载，已存在不动。
 - 全部失败时 prebuild 不中断，只提示手工放置，把缺文件错误留给链接期给出。
 
-授权与来源见仓库根 [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md)。
+授权与来源见仓库根 [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md)。
 
 ## 5. 相关
 
