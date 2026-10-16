@@ -3,7 +3,7 @@ layout: home
 hero:
   name: native-gui
   text: MoonBit 轻量跨平台桌面 GUI 框架
-  tagline: 窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备——一份 MoonBit 代码,Windows / Linux 原生窗口。moon add 之后零配置。
+  tagline: 窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备。一份 MoonBit 代码,Windows / Linux 原生窗口,moon add 之后零配置。
   actions:
     - theme: brand
       text: 包结构
