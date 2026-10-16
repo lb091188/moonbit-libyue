@@ -54,7 +54,8 @@ GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github
 
 | Import in `moon.pkg` | Alias | Contents |
 |---|---|---|
-| `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, hotkey facade, overlays, drag & drop, `Store` / `Signal` |
+| `NoahLiu/native-gui/base` | `@base` | Platform-free primitives: the `Store` / `Signal` / `ListStore` reactive core, the focus stack, key-code constants, end-of-frame batching and the frame ledger |
+| `NoahLiu/native-gui/core` | `@core` | App host, event loop, pointer, menus, notifications, tray, hotkey facade, overlays, drag & drop (during the G9 Batch 2 migration `@base` names stay reachable through `@core`) |
 | `.../native-gui/ui` | `@ui` | Self-drawn controls and the component library: window mounting, labels / buttons, forms, display, navigation, date, tables and virtual lists, entries, scrolling, overlays, code view, declarative layer |
 | `.../native-gui/render` | `@render` | Rasterizer: pure-MoonBit software raster plus a Cairo backend; bitmaps, canvas, images, PNG |
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, rich text and range attributes (Pango / DirectWrite) |

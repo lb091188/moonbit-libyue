@@ -24,7 +24,7 @@ let g_frame_prof : FrameProf = {
 }
 
 ///|
-fn prof_record(
+pub fn prof_record(
   layout_ms : Int64,
   paint_ms : Int64,
   present_ms : Int64,

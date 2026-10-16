@@ -3,7 +3,7 @@
 native-gui(`NoahLiu/native-gui`,2026-10-12 前名 moonbit-libyue):MoonBit 的轻量跨平台桌面 **GUI 框架**——窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备(窗口/像素/事件循环/布局全自有,控件一律自绘,**不依赖 libyue**)。
 当前主链路:**Ubuntu 24.04 + X11 + XFCE**(其余平台状态见适配经验文档)。
 
-包布局(2026-10-12 定案): 库模块根 = `gui/`(`moon.mod` 在此,name 仍是 `NoahLiu/native-gui`,故 mooncakes 上包路径 `NoahLiu/native-gui/<包>` 与用户既有 import **全部不变**),13 个库包(`core`/`ui`/`render`/`text`/`theme`/`icons`/`sys`/`input`/`win`/`dbus`/`chart`/`mdview`/`style`)都在其下(web 已于 2026-10-16 G9 Batch 1 出成独立模块 `modules/gui-webview`);`examples/`、`experiment/` 各为**独立模块**(`NoahLiu/native-gui-examples` / `NoahLiu/native-gui-experiment`),经 `moon.work` 本地解析依赖库模块——示例/探针的构建与测试不再牵连库门禁;重资产扩展独立模块 `modules/gui-media`(媒体)与 `modules/gui-webview`(WebView),均模块级可选;扩展示例模块 `modules/gui-examples`;旧链 `yue/` 已删除。libyue 只作**老师**(行为参考、可平移资产来源、`patches/` 的真实 bug 语料)。
+包布局(2026-10-12 定案): 库模块根 = `gui/`(`moon.mod` 在此,name 仍是 `NoahLiu/native-gui`,故 mooncakes 上包路径 `NoahLiu/native-gui/<包>` 与用户既有 import **全部不变**),14 个库包(`base`/`core`/`ui`/`render`/`text`/`theme`/`icons`/`sys`/`input`/`win`/`dbus`/`chart`/`mdview`/`style`)都在其下(web 已于 2026-10-16 G9 Batch 1 出成独立模块 `modules/gui-webview`;`base` 是 2026-10-17 Batch 2 第一刀从 `core` 提出的响应式/焦点/记账层,迁移期 `@base` 公开名仍经 `core/compat.mbt` 转发);`examples/`、`experiment/` 各为**独立模块**(`NoahLiu/native-gui-examples` / `NoahLiu/native-gui-experiment`),经 `moon.work` 本地解析依赖库模块——示例/探针的构建与测试不再牵连库门禁;重资产扩展独立模块 `modules/gui-media`(媒体)与 `modules/gui-webview`(WebView),均模块级可选;扩展示例模块 `modules/gui-examples`;旧链 `yue/` 已删除。libyue 只作**老师**(行为参考、可平移资产来源、`patches/` 的真实 bug 语料)。
 分层原则: 能用 MoonBit 解决的不进 C/C++;平台 C 桩按「单一 stub.c 多分支 + prebuild 宏」组织(先例 `win/stub.c`);链接参数由 prebuild 全权托管。
 
 ## 硬性规则

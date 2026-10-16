@@ -70,14 +70,14 @@ test "bind_node：旧代子树的订阅整袋退订，不随重建次数累积" 
     })
   })
   let _ = (bn.mount)(parent)
-  assert_eq(source.node.subs.length(), 1)
+  assert_eq(source.sub_count(), 1)
   let mut i = 1
   while i < 6 {
     sig.set(i)
     i = i + 1
   }
   // 重建了 5 次，订阅仍然只有当前一代那一条
-  assert_eq(source.node.subs.length(), 1)
+  assert_eq(source.sub_count(), 1)
 }
 
 ///|

@@ -114,7 +114,7 @@ moonbit-native-gui/                          # 根 workspace
 
 | 风险 | 缓解 |
 | --- | --- |
-| `core` 重新划包导致大量 import 路径变更 | 分批做、每批独立可编译；先用 `GuiCore = { "base"|"shell"|"widget" }` 过渡，再全量替换 |
+| `core` 重新划包导致大量 import 路径变更 | 分批做、每批独立可编译；实测过渡形态取**包内 compat 薄层**（2026-10-17 步骤 1：`gui/core/compat.mbt` 用类型别名转发结构体/枚举、函数逐条转调、常量按值重定义——别名让 `@core.Store::new`、`s.subscribe(..)` 这类静态调用与方法调用全部原样可编，下游零改动；本工具链无 `pub use`，且 `moon.pkg` 的对象式 `import-all` 导入解析器不认（实测报 `unexpected token {`） |
 | `shell` 和 `widget` 之间的边界模糊 | 严格守约：`widget` 能调 `@shell`，但不能反调；Painter 契约只在 `widget` 出现 |
 | `modules/*` 版本脱节 | 发布前同一批递增版本号，参照 0.1.1 重发流程；CI 测试清单扩展到新模块 |
 | prebuild 复制劳动 | 考虑抽 shared library，如 `scripts/shared_prebuild.py`；先解决功能再抽象 |
@@ -173,13 +173,13 @@ moonbit-native-gui/                          # 根 workspace
 
 **迁移顺序**：每步独立可编译、可回滚。
 
-1. 建 `base/`：搬 `signal`/`store`/`effect`/`keys`/`focus`/`list_store`/`prof`/`tick`/`node` 九文件 + 对应 wbtest。
+1. 建 `base/`（2026-10-17 已交付）：搬 `signal`/`store`/`effect`/`keys`/`focus`/`list_store`/`prof`/`tick` 八文件 + 对应 wbtest。`node` 不在本刀——它的 `mount : (Widget) -> Widget` 直接吃 widget 层类型，落位归步骤 3 的 `widget/`；`node_wbtest` 两条读 `Signal` 内部字段 `node.subs` 的断言改走公开 `sub_count()`（跨包私有字段不可见，顺带把测试拉回公开 API）。`prof_record` 从包私有提为公开——core 的帧账本调用点跨包了。
 2. 建 `shell/`：搬 `loop`/`host`/`menu`/`hotkey`/`tray`/`notify`/`reveal`/`drag` + `app.mbt` 的 26 个 shell 定义；此步 `App` 一分为二、`ShellApp` 落地。
 3. 建 `widget/`：搬 `widget`/`overlay`/`overlay_native` + `app.mbt` 剩余 13 个定义。
 4. 集中改 import：`ui`/`chart`/`mdview` + **模块外消费者**——`modules/gui-media`、`modules/gui-examples`、`examples/*`、`experiment/*`，一次一批包。
 5. 门禁：`cd gui && moon check --deny-warn` + 分包 `moon test` + 各模块 `--deny-warn` + 示例构建。
 
-**过渡形态（把 §7 未决 #2 定死）**：本工具链**没有 `pub use` 再导出**，`moon.pkg` 也不能给依赖包配短名（实测，见 design.md §1.6 表）。所以「过渡期 re-export」只有两条路：做**聚合包** `GuiCore = { base | shell | widget }`——新写一个只 import 三者、把公共面薄转发一层的面子包；或一步到位全量改 import。判据是调用点总数：`@core.` 在 `gui/` + `examples/` + `experiment/` + `modules/` 的 `.mbt` 里出现 **3528 次**（实测 grep 计数，含注释与文档行；只算主模块 `gui/` 是 2302 次）。全量改是数千处机械编辑加四轮编译报错驱动，聚合包则多一层长期维护的面子包。**建议**：先按这个量级拍，别默认「过渡包更省事」。
+**过渡形态（把 §7 未决 #2 定死）**：本工具链**没有 `pub use` 再导出**，`moon.pkg` 的对象式 `import-all` 导入解析器不认（实测，2026-10-17）。落地形态是**包内 compat 薄层**：拆分把文件挪进新包后，在原包里写一个 `compat.mbt`——结构体/枚举用类型别名、顶层函数逐条转调、常量按值重定义；别名让 `@core.Store::new` 与方法调用原样可编，`@core.*` 调用点因此在迁移期一行不改。比独立聚合包少一层长期维护的面子包，也比一步改完安全（每步绿色）。判据是调用点总数：`@core.` 在 `gui/` + `examples/` + `experiment/` + `modules/` 的 `.mbt` 里出现 **3528 次**（实测 grep 计数，含注释与文档行；只算主模块 `gui/` 是 2302 次）。全量改是数千处机械编辑加四轮编译报错驱动，聚合包则多一层长期维护的面子包。**建议**：先按这个量级拍，别默认「过渡包更省事」。
 
 **风险红线**：步骤 1-3 期间 `core` 与三个新包并存、调用点不动；**不要在步骤 1 就删 `core`**——那是唯一会让全仓中途编不过的做法。每步一个提交，出问题 revert 该步。
 

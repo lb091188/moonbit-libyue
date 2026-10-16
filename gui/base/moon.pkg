@@ -1,0 +1,7 @@
+// 响应式内核 + 焦点栈 + 记账基元（G9 Batch 2 第一刀，从 `core` 提出）：
+// 零外部依赖——不碰 render/text/theme/win/yoga，任何路线（自绘 / webview / 3D）
+// 都只吃这一层起步。`Signal`/`Store`/`ListStore` 是从 master 平移的响应式内核，
+// `FocusStack` 是逻辑焦点栈，`keys` 是键码常量，`tick`/`prof`/`effect` 是帧末
+// 合并、账本与副作用通道。
+
+supported_targets = "native"

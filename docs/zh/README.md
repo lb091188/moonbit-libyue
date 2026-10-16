@@ -8,7 +8,8 @@
 
 | `moon.pkg` 里的导入 | 别名 | 内容 |
 |---|---|---|
-| `NoahLiu/native-gui/core` | `@core` | 应用宿主、事件循环、焦点 / 键 / 指针、菜单、通知、托盘、浮层、拖放、`Store` / `Signal` |
+| `NoahLiu/native-gui/base` | `@base` | 平台无关基元：`Store` / `Signal` / `ListStore`、焦点栈、键码、帧末合并与账本 |
+| `NoahLiu/native-gui/core` | `@core` | 应用宿主、事件循环、指针、菜单、通知、托盘、浮层、拖放（G9 Batch 2 迁移期 `@base` 名仍经 `@core` 转发可用） |
 | `.../native-gui/ui` | `@ui` | 自绘控件与组件库：窗口挂载、标签 / 按钮、表单、显示、导航、日期、表格与虚拟列表、输入框、滚动、浮层、代码视图、声明式层 |
 | `.../native-gui/render` | `@render` | 光栅器：纯 MoonBit 软件光栅 + Cairo 后端；位图、画布、图像、PNG |
 | `.../native-gui/text` | `@text` | 文本层：字体族、字体、富文本与区间属性（Pango / DirectWrite） |
