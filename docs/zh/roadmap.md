@@ -89,6 +89,19 @@ Linux 列里带 **`X11`** 标记的格 = **只在 X11 会话成立**，Wayland �
 状态只回答「这个功能点在某平台上成不成」；接口形态、验收细节与根因在 [adaptation.md](adaptation.md) 与各包文档，未完成排期在仓库根 [TODO.md](https://github.com/lb091188/moonbit-native-gui/blob/master/TODO.md)。
 
 
+### 交付面与工程化
+
+| 功能点 | Windows | Linux | macOS |
+|---|---|---|---|
+| 示例（`hello` / `hello-themed` / `showcase` / `browser` / 媒体两例） | ✅ | ✅ | 🚧 |
+| CI 分层门禁（分包 `--deny-warn` + 测试 + 虚拟显示冒烟） | ✅ | ✅ | ❌ 无 mac job |
+| mooncakes 发布（`native-gui` / `yoga-mbt`） | ✅ | ✅ | ✅ |
+| `gui-media` / `gui-examples` 发布 | ❌ 未首发 | ❌ |  |
+| 文档站（中英 VitePress） | ✅ | ✅ | ✅ |
+| 真机验证矩阵（非 XFCE 桌面、地板/天花板发行版档） | 部分 | ？待核 | ❌ |
+| 性能治理（局部重绘、光栅快路径、文本对象缓存、布局版本缓存） | 🚧 | ✅ | ？ |
+| 无障碍（ATK / UIA / NSAccessibility） | ❌ | ❌ | ❌ |
+
 ### 待核清单（查过代码与适配文档仍无定论，不当已验凑数）
 
 - **浮层的原生档 · Windows**：批 E 的交付与回证全在 Linux（`wm_window_set_popup` 那条 GTK 链），Windows 侧 `win/stub.c` 有没有对应的 popup/transient 通道，需要读桩确认后定档（现在既不打 ✅ 也不打 ❌）。

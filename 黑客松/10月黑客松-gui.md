@@ -13,9 +13,9 @@
 
 native-gui 是 MoonBit 生态的**轻量原生跨平台桌面 GUI 库**，主攻三个方向：**系统接口丰富、轻量、开箱即用**。
 
-- **系统接口：** —— 托盘、桌面通知、全局快捷键（Windows / macOS）、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、媒体控制（Linux），以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询
-- **轻量：** —— 渲染、布局、控件纯 MoonBit 自绘，不依赖 Skia；`hello` release **1.1 MB** / 约 0.1 s 出窗，`showcase` 15 页 **5.5 MB** / 约 1 s（Linux 实测）；重能力拆独立模块
-- **开箱即用：** —— `moon add` 后零配置直接 `moon run`；组件库、14 种图表 + 交互层、Markdown 视图、内嵌 WebView 都是库内成品；声明式组件、响应式数据、跨平台统一接口，开发体验好
+- **系统接口：** —— 托盘、桌面通知、全局快捷键、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、媒体控制，以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询
+- **轻量：** —— 渲染、布局、控件基于系统原生，不依赖 Skia；`hello` release **1.1 MB** / 约 0.1 s 出窗，`showcase` 15 页 **5.5 MB** / 约 1 s（Linux 实测）；重能力拆独立模块
+- **开箱即用：** —— `moon add` 后零配置直接 `moon run`；组件库、14 种交互图表、Markdown 视图、内嵌 WebView 都是库内成品；声明式组件、响应式数据、跨平台统一接口，开发体验好
 
 平台状态：**🟩 Windows / 🟩 Linux / 🟨 macOS ** 
  - 🟨 待真机测试（`mac` 分支已落地，CI 全绿）
@@ -23,7 +23,7 @@ native-gui 是 MoonBit 生态的**轻量原生跨平台桌面 GUI 库**，主攻
 
 ## 与既有 GUI 能力的边界
 
-与 MoUI、Sun 零代码依赖，直接依赖只有 MoonBit 标准库与系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）。定位互补：MoUI 走多端共享逻辑，Sun 是渲染底层，本库专注桌面系统集成——这是独立重建的立足点。
+与 MoUI、Sun 零代码依赖，直接依赖只有 MoonBit 库与系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）。定位互补：MoUI 走多端共享逻辑，Sun 是渲染底层，本库专注桌面系统集成。
 
 ## 差异化用户收益：同一界面的操作案例
 
@@ -49,16 +49,17 @@ match @core.Tray::new("my-player", icon=ic) {
 @sys.autostart_enable("com.example.my-player")
 ```
 
-操作走查：点关闭 → 图标驻留托盘，左键点回主窗口；切去别的应用 → 桌面通知汇报后台进度；重启系统 → 应用自动拉起。走的是真实桌面协议（SNI / freedesktop Notifications / XDG autostart）。
+操作走查：点关闭 → 图标驻留托盘，左键点回主窗口；切去别的应用 → 桌面通知汇报后台进度；重启系统 → 应用自动拉起。
 
 ## 10 月工作
 
 - **全面原生化收口**：删除 libyue 绑定包与 vendored 二进制（52 MB），更名 `NoahLiu/native-gui`，框架主体纯 MoonBit
-- **macOS 平台批（`mac` 分支，①–⑰）**：Cocoa 窗口 / CoreText / ImageIO / WKWebView / 系统能力族 / 媒体线，CI 三平台全绿，待真机复验
+- **macOS 平台批（mac 分支，①–⑰）**：Cocoa 窗口 / CoreText / ImageIO / WKWebView / 系统能力族 / 媒体线，CI 全绿，待真机复验
 - **系统能力探测页**：showcase 第 15 页，五段只读探针（系统桌面 / 显示器窗口 / 应用文件 / 浏览器数据 / 剪贴板电源总线）
 - **图表扩展**：雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日九种 + 横切交互层，并入 showcase 图表页
 - **音视频示例**：audio / video 独立示例（播放列表 / 字幕双来源 / 倍速音画同步）
 - **全局快捷键门面**：Windows / macOS 后端落地
+- **代码组织优化**：减少二进制冗余体积、优化大型应用启动路径，目标 showcase 级应用 300 ms 出窗
 
 ## 核心功能范围
 
@@ -78,7 +79,7 @@ match @core.Tray::new("my-player", icon=ic) {
   - 滚动 / 覆盖层 / 模态消息框
   - 代码视图 / Markdown 视图
 - 光栅化（@render）
-  - 纯 MoonBit 软件光栅：路径 / 填充 / 混合 / 渐变
+  - 软件光栅：路径 / 填充 / 混合 / 渐变
   - Cairo 后端 / 位图 / 画布 / 图片 / PNG
 - 文字（@text）：字体族 / 属性文本与区间属性
 - 主题（@theme）：调色板派生 / 深浅色与强调色跟随 / 变更订阅
@@ -88,7 +89,7 @@ match @core.Tray::new("my-player", icon=ic) {
   - 文件 / JSON / 文件对话框 / 最近文件
   - 浏览器历史与书签 / 已装应用查找
   - 壁纸 / 音量 / 电源 / 打印机 / 显示器 / 窗口控制
-- Linux 桥（@dbus，纯 MoonBit 协议栈）
+- Linux 桥（@dbus）
   - 托盘 SNI / 通知
   - logind / upower / MPRIS 媒体 / 网络 / 屏保
 - 窗口后端（@win）：平台窗口桩层——门面之下的平台实现（表面 / 图标 / IME 等），对外能力一律经跨平台门面暴露
@@ -101,7 +102,7 @@ match @core.Tray::new("my-player", icon=ic) {
   - 策略面：新窗 / 权限 / 下载——默认拦截并回报、可切换
   - 自定义协议本地内容通道 / 能力探测 / 崩溃回报
 - 媒体（gui-media）：音频 / 视频播放器组件 / 字幕轨 / 倍速
-- 布局（yoga-mbt）：纯 MoonBit Flexbox，W3C 规范逐条实现
+- 布局（yoga-mbt）：Flexbox，按 W3C 规范逐条实现
 
 ## 预期验收产物
 
