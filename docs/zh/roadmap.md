@@ -92,7 +92,7 @@ Linux 列里带 **`X11`** 标记的格 = **只在 X11 会话成立**，Wayland �
 ### 待核清单（查过代码与适配文档仍无定论，不当已验凑数）
 
 - **浮层的原生档 · Windows**：批 E 的交付与回证全在 Linux（`wm_window_set_popup` 那条 GTK 链），Windows 侧 `win/stub.c` 有没有对应的 popup/transient 通道，需要读桩确认后定档（现在既不打 ✅ 也不打 ❌）。
-- **`gui-media/README.md` 的「平台现状」表与 TODO 平台批互相矛盾**：README 写 Windows 的 ffmpeg 解码「⬜ 未接」，TODO 记 2026-10-13 平台批已升级为真链接。本表按后者暂取 🚧（媒体各族 Windows 列），**必须现场核一次 `modules/ffmpeg-mbt` 与 `modules/gui-media/prebuild.py` 的 Windows 分支再定**，两处文档同步改。挂账见 TODO §2「交付面」。
+- ~~**`gui-media/README.md` 的「平台现状」表与 TODO 平台批互相矛盾**~~ 已定案（2026-10-16 现场核）：`modules/ffmpeg-mbt/prebuild.py` 走 vendor dev 包真链接、缺内容才降级空 link_configs，CI 的 Windows job 装运行库跑真解码测试——README 那句「Windows ⬜ 未接」是过期描述，已改；播放器组件族 Windows 因缺逐项 UI 回证定 🚧。
 - **播放器组件族 · Windows**：`video`/`audio`/字幕/歌词/频谱/倍速在 Windows 上只到「可编译可运行、音频后端有探针」级，解码链档位随上一条待定。
 
 ### 地基与宿主
@@ -211,13 +211,13 @@ Linux 列里带 **`X11`** 标记的格 = **只在 X11 会话成立**，Wayland �
 
 | 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
-| 解码引擎（ffmpeg 动态链） | ✅ | ✅ | ❌ |
+| 解码引擎（ffmpeg 动态链） | ✅ vendor 真链接（CI 跑真解码） | ✅ | ❌ |
 | 音频输出（miniaudio 设备层） | ✅ | ✅ | ❌ |
-| 播放器组件（`video` / `audio`） | ？ | ✅ | ❌ |
-| 字幕层（SRT / VTT / 内嵌轨） | ？ | ✅ | ❌ |
-| 歌词层（LRC） | ？ | ✅ | ❌ |
-| 实时频谱 | ？ | ✅ | ❌ |
-| 倍速 / 逐帧步进 / 缩放三档 / 全屏 / 快捷键 | ？ | ✅ | ❌ |
+| 播放器组件（`video` / `audio`） | 🚧 | ✅ | ❌ |
+| 字幕层（SRT / VTT / 内嵌轨） | 🚧 | ✅ | ❌ |
+| 歌词层（LRC） | 🚧 | ✅ | ❌ |
+| 实时频谱 | 🚧 | ✅ | ❌ |
+| 倍速 / 逐帧步进 / 缩放三档 / 全屏 / 快捷键 | 🚧 | ✅ | ❌ |
 | 硬解与 GPU 合成 | ❌ | ❌ | ❌ |
 
 ## 承诺与版本
