@@ -309,7 +309,7 @@ fn main {
         [
           @ui.text("音频播放", role=@ui.Section),
           @ui.text(
-            "gui-media audio（ffmpeg 解码 + 设备直出）：列表点选换曲，控制条自带播放/进度/音量/倍速与 ±5 秒跳转，歌词按同名 .lrc 自动配对。",
+            "gui-media audio（ffmpeg 解码 + 设备直出）：列表点选换曲，控制条是图标按钮 + 进度/音量条，歌词按同名 .lrc 自动配对；快捷键 空格播放/暂停、回车全屏、←/→ ±5 秒、↑/↓ 音量、Esc 退全屏。",
             role=@ui.Secondary,
             max_width=860.0,
           ),

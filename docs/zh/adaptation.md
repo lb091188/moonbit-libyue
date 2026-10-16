@@ -1818,6 +1818,18 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - 工具链坑：① **记录字段存闭包必须写成 `(self.tap)(...)`**，`self.tap(...)` 会被当方法解析、报 `Type AudioPlayer has no method tap`；② `String.trim()` 给的是 `StringView`，喂要 `String` 的函数得 `.to_owned()`（`s[0:n]` 同理）；③ 只改数组内容不整体重赋值时字段别标 `mut`，否则吃 `unused_mut` 警告（`--deny-warn` 下就是错误）。
 - 验证：`moon test ./media` **33/33**（新增 4 条频谱用例）、全仓 `moon test` **1187/1187**、`gui-media` 与 `gui-examples` `--deny-warn` 零警告、audio 示例 native 构建通过。真机观感（条子跟不跟得上节奏、seek 后闪不闪、静音降级环境下的空态）由用户复验。
 
+### 播放器控制面：图标按钮行、缩放三档、全屏与窗口级快捷键（2026-10-16 用户真机反馈）
+
+- 现象（用户报）：控制条是**画出来的文字字形**（`▶ ❚❚ |< >|`），没有悬停、没有焦点环、进不了 Tab 链；视频组件**没有缩放也没有全屏**（全屏能力在 `App::set_fullscreen`，但控件层拿不到窗口，一直没人接）；两个播放器**都不吃键盘**。
+- 图标库够用：`gui/icons` 的 `IconKind` 里 `video-play`/`video-pause`/`pause`、`d-arrow-left/right`、`full-screen`/`fullscreen-exit`、`zoom-in/zoom-out`、`sound`/`sound-fill`、`folder-open`/`file` 都在，自绘侧走 `draw_icon(painter, kind, cx, cy, size, color)`。
+- 形态：控制条拆成**左边真按钮 + 右边自绘显示区**（`media/control_bar.mbt`，两个组件共用一份）。播放/暂停与全屏用 `ui.icon_button`（悬停浅底、按下更深、焦点环、Tab 可达都由 ui 给）；倍速与缩放用 `ui.button(variant=Text)` 显示当前档——图标说不清「1.25x」和「铺满」。档位读数走 `Store` + `bind_node` 重挂（`Store::set` 等值不重发，每 tick 刷一次不产生重建）。
+- 旧判据作废重写：`bar_hit` 原来在一条自绘区里分「播放/逐帧/倍速/轨道/音量/时间」六区，现在只剩显示区三区（seek/volume/时间文字），坐标从「整条控件」改成「显示区本地横坐标」；分区常量仍只有一份，绘制与命中同读。
+- 缩放三档：`vp_fit_rect(vw, vh, rw, rh, mode)` 纯函数——适配取小边、铺满取大边（超出由控件矩形裁掉）、1:1 原始像素，都居中；无头断言钉三档落位与非法尺寸给零矩形。
+- 全屏：组件经 `@core.host_active()` 拿当前窗再 `App::set_fullscreen`（这条是 `core/app.mbt` 门面注释里「控件层拿不到窗口」的既有出口，不是新开后门）；没有宿主（无头）返回 false，本地档位状态不动。
+- 快捷键：走上一节的**窗口级兜底通道**，空格播放/暂停、回车全屏、`←/→`（音频 ±5 秒、视频逐帧）、`↑/↓` 音量、`Esc` 退全屏（只在全屏态接管）。活体判据是 `watch.is_painted()`——通道没有反注册口，摘掉的播放器下一帧起不再被画，也就不再吃键。
+- 依赖口径：`gui-media/media` 因此新依赖 `NoahLiu/native-gui/ui`（图标按钮要真控件，自己重画一套按钮等于把 ui 抄进媒体层）。方向仍是 media → ui，`ui` 不认媒体，无环。
+- 验证：`moon test ./media` **35/35**（新增 `control_bar_wbtest.mbt` 三条：显示区分区、缩放三档落位、档位标签；旧六区判据随形态作废）、`moon check --deny-warn` 零警告、两示例 native 构建通过。真机复验清单：图标按钮悬停/焦点环出不出、Tab 能不能走到播放键、空格不点窗口能否暂停、回车/Esc 全屏进出、铺满档左右溢出是否被裁、1:1 是否居中。
+
 ### Store 内建去重与 `T : Eq` 限定实现（2026-10-13，前端化 P3 第 0 步）
 
 - 口径：`Store::set` / `Store::update` 给 `pub fn[T : Eq]` 限定实现（相同值只存不发，走 `Signal::set_eq`）；`Signal::set` 本体与通知发射不动，`Store::signal()` 仍可直连 `Signal::set` 强发。需要无条件重发用 `set_always` / `update_always`。

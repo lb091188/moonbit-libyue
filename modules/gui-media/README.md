@@ -50,6 +50,10 @@ let v = @media.video("demo.mp4", width=640.0, height=360.0, auto_play=true)
 
 两个组件都返回 `@core.Node`，直接挂进声明式树即可；观测口 `on_tick`/`on_speed`/`on_subtitle`/`on_lyric` 给位置、档位、字幕来源与歌词行数，调用方不必读引擎内部状态。打不开时不抛异常——画说明板并把原因经 `on_error` 交出去。
 
+控制条（两个组件同一份实现，`media/control_bar.mbt`）：左边一排真按钮——播放/暂停与全屏是图标按钮（悬停浅底、进 Tab 链、有焦点环），倍速与缩放是文字按钮（图标说不清「1.25x」和「铺满」），右边是自绘的进度轨 + 音量条 + 时间文字。进度**抬手才 seek**（真 seek 要回退关键帧），音量**每步生效**。视频另有缩放三档循环：适配（等比居中留黑边）→ 铺满（取大边，超出由控件裁掉）→ 1:1（原始像素）。
+
+快捷键走 `App::add_key_fallthrough` 的**窗口级兜底通道**，不点窗口也生效：空格播放/暂停、回车全屏、`←`/`→`（音频 ±5 秒、视频逐帧）、`↑`/`↓` 音量、`Esc` 退全屏。焦点在输入框里时按键被编辑器吃掉，播放器不抢字；换载摘掉的播放器靠 `Widget::is_painted()` 自证活体，不再吃键。
+
 外部文本（`.lrc` / `.srt`）由调用方读好喂进来，组件不做 IO；解析本身可单用：`@media.lrc_parse(text)` 给 `Lrc`（排好序的 `cues` + `ti/ar/al/by` 元信息），`@media.lrc_at(l, 秒)` 取当前行。
 
 频谱条默认开着（`spectrum=false` 关掉）：引擎在每段 PCM 推给设备前经 `pcm_tap` 转一份出来，`@media.Spectrum` 加 Hann 窗做 1024 点 radix-2 FFT、转 dB 后按对数频段分 24 条，快起慢落。取样点比耳朵快一个队列深度（约 0.23 秒），绘制时按 `AudioPlayer::queued_frames` 往回看同样多的帧补回来。

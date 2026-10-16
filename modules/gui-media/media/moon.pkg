@@ -20,6 +20,8 @@ import {
   "NoahLiu/native-gui/render",
   "NoahLiu/native-gui/text",
   "NoahLiu/native-gui/theme",
+  "NoahLiu/native-gui/icons" @icons,
+  "NoahLiu/native-gui/ui" @ui,
 }
 
 options(

@@ -75,12 +75,47 @@ pub fn audio(
   let lrc = lrc_parse(lyric)
   on_lyric(lrc.cues.length())
   let dragging : Ref[Bool] = Ref(false)
-  let drag_frac : Ref[Double] = Ref(0.0)
-  let vol_drag : Ref[Bool] = Ref(false)
-  let speed_i = Ref(0)
-  let bar_w : Ref[Double] = Ref(0.0)
+  let speed_i : Ref[Int] = Ref(0)
+  // 按钮行是真控件，档位/态变了要重挂，所以读数走 Store（等值不重发）
+  let playing : @core.Store[Bool] = @core.Store::new(false)
+  let speed_st : @core.Store[Double] = @core.Store::new(1.0)
+  let full_st : @core.Store[Bool] = @core.Store::new(false)
   if auto_play {
     engine.play()
+  }
+  playing.set(engine.is_playing())
+  fn toggle() -> Unit {
+    if engine.is_playing() {
+      engine.pause()
+    } else {
+      engine.play()
+    }
+    playing.set(engine.is_playing())
+    @core.invalidate()
+  }
+  fn skip_by(delta : Double) -> Unit {
+    engine.seek(ap_skip(engine.current(), engine.duration(), delta))
+    sp.reset()
+    @core.invalidate()
+  }
+  fn cycle_speed() -> Unit {
+    speed_i.val = speed_i.val + 1
+    let v = bar_speed_at(speed_i.val)
+    engine.set_speed(v)
+    speed_st.set(v)
+    on_speed(v)
+    @core.invalidate()
+  }
+  fn toggle_full() -> Unit {
+    let on = !full_st.get()
+    if player_set_fullscreen(on) {
+      full_st.set(on)
+      @core.invalidate()
+    }
+  }
+  fn bump_vol(d : Double) -> Unit {
+    engine.set_volume(bar_clamp01(engine.get_volume() + d))
+    @core.invalidate()
   }
   // 舞台区：撑高时占住多出来的高度，歌词写在底部，无输出设备的降级说明写在中间。
   let stage = @core.Widget::new()
@@ -139,147 +174,54 @@ pub fn audio(
       )
     }
   })
-  let bar = @core.Widget::new()
-  bar.node.set_height(@yoga.fixed(34.0))
-  bar.on_draw = Some(fn(
-    _w : @core.Widget,
-    p : @render.Painter,
-    r : @core.Rect,
-  ) -> Unit {
-    bar_w.val = r.w
-    p.set_fill_color(@theme.theme_bg_panel())
-    p.fill_rect(0.0, 0.0, r.w, r.h)
-    let dur = engine.duration()
-    let t = if dragging.val { drag_frac.val * dur } else { engine.current() }
-    let frac = vp_pct(t, dur)
-    p.set_fill_color(@theme.theme_border())
-    p.fill_rect(BAR_TRACK_X, 15.0, bar_track_w(r.w), 4.0)
-    p.set_fill_color(@theme.theme_primary())
-    p.fill_rect(BAR_TRACK_X, 15.0, bar_track_w(r.w) * frac, 4.0)
-    if bar_has_volume(r.w) {
-      let vol = engine.get_volume()
-      p.set_fill_color(@theme.theme_border())
-      p.fill_rect(bar_vol_x(r.w), 15.0, BAR_VOL_W, 4.0)
-      p.set_fill_color(@theme.theme_text_secondary())
-      p.fill_rect(bar_vol_x(r.w), 15.0, BAR_VOL_W * vol, 4.0)
-    }
-    p.flush()
-    let _ = @text.draw_text_at(
-      p,
-      8.0,
-      9.0,
-      if engine.is_playing() { "❚❚" } else { "▶" },
-      13.0,
-      @theme.theme_text_primary(),
-    )
-    // 两个跳转键写秒数而不是视频那对 |< >|：音频没有「帧」可走。
-    let _ = @text.draw_text_at(
-      p,
-      38.0,
-      10.0,
-      "-5s",
-      11.0,
-      @theme.theme_text_secondary(),
-    )
-    let _ = @text.draw_text_at(
-      p,
-      74.0,
-      10.0,
-      "+5s",
-      11.0,
-      @theme.theme_text_secondary(),
-    )
-    let _ = @text.draw_text_at(
-      p,
-      110.0,
-      9.0,
-      vp_fmt_speed(engine.get_speed()),
-      12.0,
-      @theme.theme_text_secondary(),
-    )
-    let _ = @text.draw_text_at(
-      p,
-      r.w - 142.0,
-      9.0,
-      vp_fmt_time(t) + " / " + vp_fmt_time(dur),
-      12.0,
-      @theme.theme_text_secondary(),
-    )
-  })
-  bar.on_pointer = Some(fn(
-    _w : @core.Widget,
-    ev : @core.PointerEvent,
-  ) -> Bool {
-    match ev.kind {
-      @core.Down => {
-        let hit = bar_hit(ev.x, ev.y, bar_w.val, 34.0)
-        if hit.0 == "pause" {
-          if engine.is_playing() {
-            engine.pause()
-          } else {
-            engine.play()
-          }
-          @core.invalidate()
-        } else if hit.0 == "step_back" || hit.0 == "step_fwd" {
-          let delta = if hit.0 == "step_back" {
-            -ap_skip_step
-          } else {
-            ap_skip_step
-          }
-          engine.seek(ap_skip(engine.current(), engine.duration(), delta))
-          sp.reset()
-          @core.invalidate()
-        } else if hit.0 == "speed" {
-          speed_i.val = speed_i.val + 1
-          let v = bar_speed_at(speed_i.val)
-          engine.set_speed(v)
-          on_speed(v)
-          @core.invalidate()
-        } else if hit.0 == "seek" {
-          dragging.val = true
-          drag_frac.val = hit.1
-          @core.invalidate()
-        } else if hit.0 == "volume" {
-          vol_drag.val = true
-          engine.set_volume(hit.1)
-          @core.invalidate()
-        }
-        true
-      }
-      @core.Move => {
-        if dragging.val {
-          let hit = bar_hit(ev.x, ev.y, bar_w.val, 34.0)
-          drag_frac.val = hit.1
-          @core.invalidate()
-        } else if vol_drag.val {
-          let hit = bar_hit(ev.x, ev.y, bar_w.val, 34.0)
-          engine.set_volume(hit.1)
-          @core.invalidate()
-        }
-        dragging.val || vol_drag.val
-      }
-      @core.Up => {
-        if dragging.val {
-          dragging.val = false
-          engine.seek(drag_frac.val * engine.duration())
-          sp.reset()
-          @core.invalidate()
-        }
-        vol_drag.val = false
-        true
-      }
-      @core.Leave => dragging.val || vol_drag.val
-    }
-  })
+  let display = player_display(
+    fn() -> Double { engine.current() },
+    fn() -> Double { engine.duration() },
+    fn() -> Double { engine.get_volume() },
+    fn(v : Double) -> Unit {
+      engine.set_volume(v)
+      @core.invalidate()
+    },
+    fn(t : Double) -> Unit {
+      engine.seek(t)
+      sp.reset()
+      @core.invalidate()
+    },
+    dragging,
+  )
   let root = @core.Widget::new()
   root.node.set_flex_direction(@yoga.Column)
   root.node.set_width(@yoga.fixed(width))
   root.node.set_height(@yoga.fixed(height))
   root.append_child(stage)
-  root.append_child(bar)
+  let _ = player_bar(
+    playing,
+    speed_st,
+    full_st,
+    None,
+    @icons.DArrowLeft,
+    @icons.DArrowRight,
+    toggle,
+    fn() -> Unit { skip_by(0.0 - ap_skip_step) },
+    fn() -> Unit { skip_by(ap_skip_step) },
+    cycle_speed,
+    toggle_full,
+    fn() -> Unit { () },
+    display,
+  ).mount_into(root)
+  player_bind_keys(
+    root,
+    toggle,
+    fn() -> Unit { skip_by(0.0 - ap_skip_step) },
+    fn() -> Unit { skip_by(ap_skip_step) },
+    toggle_full,
+    bump_vol,
+    fn() -> Bool { full_st.get() },
+  )
   let tick : Ref[() -> Unit] = Ref(fn() { () })
   tick.val = fn() -> Unit {
     engine.pump()
+    playing.set(engine.is_playing())
     on_tick(engine.current(), engine.is_playing())
     if engine.is_playing() || dragging.val {
       @core.invalidate()
