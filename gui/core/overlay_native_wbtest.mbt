@@ -22,6 +22,7 @@ fn fake_host_app() -> App {
     capture: -1,
     cursor_kind: 0,
     canvas: None,
+    key_fallthrough: [],
     dirty_rect: None,
     dirty_full: false,
   }

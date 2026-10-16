@@ -50,6 +50,21 @@ pub(all) struct App {
   /// 按窗复用的帧位图：尺寸没变就不重新分配（每帧 new 是 MB 级分配+清零；
   /// 平台桩在 present 时同步拷贝像素，MoonBit 侧缓冲无延迟读，复用安全）
   mut canvas : @render.Bitmap?
+  /// 窗口级按键兜底通道（见 `App::add_key_fallthrough`）
+  key_fallthrough : Array[(KeyEvent) -> Bool]
+}
+
+///|
+/// 注册一个**窗口级**按键兜底处理器：焦点链（焦点控件及其带 `on_key` 的祖先）
+/// 没消费、或压根没有焦点控件时，按注册序逐个问过去，第一个返回 `true` 的截断。
+/// 给「不点也能用键盘」的组件（播放器快捷键一类）用。三条口径：
+/// ① 焦点在输入框里时按键被编辑器消费，兜底不会抢字——不需要额外判据；
+/// ② 只在本窗事件循环里生效，不是系统级热键（那是 `sys`/`win` 的 hotkey 线）；
+/// ③ 注册没有反注册通道（本层还没有控件卸载钩子），所以处理器**自己负责活体
+/// 判断**——用 `Widget::is_painted()` 问「我这棵子树还在被画吗」，不在就返回
+/// `false` 放行，别让摘掉的组件继续吃键。
+pub fn App::add_key_fallthrough(self : App, f : (KeyEvent) -> Bool) -> Unit {
+  let _ = self.key_fallthrough.push(f)
 }
 
 ///|
@@ -150,6 +165,7 @@ fn app_window(
         capture: -1,
         cursor_kind: 0,
         canvas: None,
+        key_fallthrough: [],
         dirty_rect: None,
         dirty_full: false,
       }
@@ -664,9 +680,24 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
             None => self.schedule_paint()
           }
         }
+      } else if self.fire_key_fallthrough(kev) {
+        // 兜底通道吃掉了这条键：受影响的是处理器自己的子树（组件自己置脏），
+        // 宿主不知道范围，整窗兜一帧
+        self.schedule_paint()
       }
     }
   }
+}
+
+///|
+/// 兜底通道派发：按注册序问，第一个吃掉的返回 true（`App::add_key_fallthrough`）。
+fn App::fire_key_fallthrough(self : App, kev : KeyEvent) -> Bool {
+  for f in self.key_fallthrough {
+    if f(kev) {
+      return true
+    }
+  }
+  false
 }
 
 ///|
