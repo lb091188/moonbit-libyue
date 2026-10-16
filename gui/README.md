@@ -1,6 +1,6 @@
 # native-gui
 
-A **lightweight cross-platform desktop GUI framework for the MoonBit ecosystem** — native-direct windowing, a self-drawn rendering pipeline, a complete component set and complete system interfaces; the position GTK, WinForms or AppKit hold in their own ecosystems, built for MoonBit. Windows, pixels, the event loop, layout and every widget are owned by the library itself and written in pure MoonBit (self-drawn, no libyue dependency); platform specifics converge in a handful of thin C layers for windows, text, image decoding, WebView and media. One codebase runs native windows on Windows and Linux; `moon add` and go, zero configuration.
+A **lightweight cross-platform desktop GUI framework for MoonBit** — native-direct windowing, a self-drawn rendering pipeline, a complete component set, full system integration. Windows, pixels, the event loop, layout and every widget belong to the library itself and are written in pure MoonBit; no libyue dependency. Platform specifics converge in five thin C layers: windows, text, image decoding, WebView, media. One codebase runs native windows on Windows and Linux. `moon add`, then run.
 
 > Formerly `moonbit-libyue` (renamed 2026-10). The mooncakes package is **`NoahLiu/native-gui`** and all existing import paths are unchanged.
 
@@ -8,7 +8,7 @@ A **lightweight cross-platform desktop GUI framework for the MoonBit ecosystem**
 
 ## Highlights
 
-- **Self-drawn widgets, one look everywhere** — controls are drawn by the library's own rasterizer, so they render identically on every platform; light/dark mode and the system accent colour are followed by default, and a theme is a plain value you can override wholesale.
+- **Self-drawn widgets, one look everywhere** — the library's own rasterizer draws every control, so rendering is identical across platforms; light/dark mode and the system accent colour are followed by default, and a theme is a plain value you can override.
 - **Declarative UI with reactive state** — describe the interface as a tree of `@core.Node` values and mount it with one `mount_window` call; keep state in `Store` / `Signal` and bound spots refresh themselves.
 - **Desktop-grade system integration** — tray, notifications, native menus, global shortcuts, message boxes, file dialogs, drag & drop (in-app and cross-application), clipboard, autostart, idle detection and OS queries (volume, power, monitors, browser history, installed apps…) behind one `@sys` / `@core` facade.
 - **Content batteries included** — 20 chart types with a cross-cutting interactive layer, a GFM Markdown view, multi-language code highlighting, an embedded WebView (JS interop, custom protocols, DOM capture, policy hooks) and an audio/video engine with subtitles and speed control.
@@ -80,7 +80,7 @@ Optional capabilities in **separate modules** (a plain `moon add` of this module
 | | Windows | Linux | macOS |
 |---|---|---|---|
 | Status | ✅ 10 / 11 | ✅ X11 mainline | 🚧 landing |
-| Notes | GUI-subsystem exe — double-click with no console window | committed span **deepin 20 ~ Ubuntu 26**, staying on GTK3; Wayland sessions run with X11-dependent capabilities degrading per session | the backend (window / text / image decode / WebView / system capabilities) is developed on the `mac` branch, not yet merged into master; on master macOS calls degrade to `Unsupported` |
+| Notes | GUI-subsystem exe: double-click opens no console window | Committed span **deepin 20 ~ Ubuntu 26**, staying on GTK3; Wayland sessions run, X11-dependent capabilities degrade per session | Windowing, text, image decoding, WebView and system capabilities are developed on the `mac` branch, not yet merged; on master they degrade to `Unsupported` |
 
 ## Roadmap
 
@@ -99,7 +99,7 @@ Explicit non-goals: accessibility APIs, GTK4 / Qt backends, and platform-native 
 
 - Repository root [README](https://github.com/lb091188/moonbit-native-gui) — architecture, package map, contributing and gates
 - [Documentation site](https://moonbit-libyue.pages.dev/) — usage docs, Chinese version under [`/zh/`](https://moonbit-libyue.pages.dev/zh/)
-- [Platform adaptation notes](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/zh/adaptation.md) — field-tested pitfalls, root causes and fixes per platform
-- [Public roadmap](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/zh/roadmap.md) — positioning, support matrix, commitments, non-goals
+- [Platform adaptation notes](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/adaptation.md) — field-tested pitfalls, root causes and fixes per platform
+- [Public roadmap](https://github.com/lb091188/moonbit-native-gui/blob/master/docs/zh/roadmap.md) (Chinese) — positioning, support matrix, commitments, non-goals
 
 MIT License.
