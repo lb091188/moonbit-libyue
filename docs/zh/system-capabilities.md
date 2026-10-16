@@ -15,7 +15,7 @@
 
 Windows 直调的底层：SystemParametersInfoW（壁纸）、ShellExecuteW（启动/定位/打印）、PowerGet/SetActiveScheme、注册表（产品与 DMI 信息）、GlobalMemoryStatusEx、GetTickCount64、EnumWindows、EnumPrintersW、IAudioEndpointVolume（COM）、GetLastInputInfo。踩坑与头文件/链接要求见 [adaptation.md](adaptation.md) 各平台批条目。
 
-完整演示见 `moon run examples/showcase` 的「系统能力探测」页——每段可「重新探测」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理（logind 路径、wpctl/pactl 差异、SQLite 库直读等）见 [adaptation.md](adaptation.md)。
+完整演示见 `moon run examples/showcase` 的「系统能力探测」页——每段可「重新探测」逐项呈现本机真实结果，不支持的能力显示对应错误文本。各能力在不同发行版 / 桌面环境的实测结论与原理见 [adaptation.md](adaptation.md)——含 logind 路径、wpctl/pactl 差异、SQLite 库直读等。
 
 ## 系统音量
 
@@ -24,12 +24,12 @@ Windows 直调的底层：SystemParametersInfoW（壁纸）、ShellExecuteW（�
 | 函数 | 说明 |
 |---|---|
 | `vol_supported() -> Bool` | 当前系统是否支持音量控制 |
-| `vol_get() -> Result[VolumeInfo, VolumeError]` | 读快照：`VolumeInfo{ sink, volume, muted }`（sink 名取不到为空串，不影响音量与静音） |
+| `vol_get() -> Result[VolumeInfo, VolumeError]` | 读快照：`VolumeInfo{ sink, volume, muted }`；sink 取不到时为空串，不影响音量与静音 |
 | `vol_set(percent) -> Result[Unit, VolumeError]` | 设绝对音量（0-100，出界钳制） |
-| `vol_add(delta) -> Result[Unit, VolumeError]` | 相对增减（正增负减，最终音量由工具侧钳制） |
+| `vol_add(delta) -> Result[Unit, VolumeError]` | 相对增减；最终音量由工具侧钳制 |
 | `vol_set_mute(mute) -> Result[Unit, VolumeError]` | 设 / 取消静音 |
 
-错误 `VolumeError`：`Unsupported`（无可用音量工具）/ `CommandFailed(String)`（执行失败、超时等）/ `ParseFailed(String)`（输出解析失败，带原文）。
+错误 `VolumeError`：`Unsupported`（无可用音量工具）/ `CommandFailed(String)`（含超时）/ `ParseFailed(String)`（输出解析失败，带原文）。
 
 ```moonbit
 match @sys.vol_get() {
@@ -46,15 +46,15 @@ let _ = @sys.vol_set_mute(false)
 
 ## 应用查找
 
-两部分：已装应用清单与应用二进制查找。Linux 扫描 XDG `.desktop` 条目（用户目录覆盖系统目录）；Windows 递归扫描开始菜单（用户级 + 全机级）的 `.lnk`，条目的 exec 为 lnk 全路径（ShellExecute 可直接启动）、categories 标 `StartMenu`；macOS `Unsupported`。
+两部分：已装应用清单与应用二进制查找。Linux 扫描 XDG `.desktop` 条目，用户目录覆盖系统目录；Windows 递归扫描开始菜单（用户级 + 全机级）的 `.lnk`，条目的 exec 为 lnk 全路径（ShellExecute 可直接启动）、categories 标 `StartMenu`；macOS `Unsupported`。
 
 | 函数 | 说明 |
 |---|---|
-| `appfind_installed() -> Result[Array[AppEntry], AppFindError]` | 已装应用清单（真实扫描；全部扫描目录都不存在给 `NoScanDir`） |
+| `appfind_installed() -> Result[Array[AppEntry], AppFindError]` | 已装应用清单；全部扫描目录都不存在给 `NoScanDir` |
 | `appfind_installed_with(list_dir) -> Result[Array[AppEntry], AppFindError]` | 同上，目录枚举由调用方注入（供无 fsx 层的调用方与测试；仅 Linux 分支） |
 | `appfind_executable(name) -> Result[String, AppFindError]` | Linux 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 按序找；Windows 按 `PATH` 各目录找 name / name.exe；找不到给 `NotFound` |
 
-`AppEntry{ id, name, locale_name, exec, icon, categories }`：id 为 desktop id（.desktop 文件名去扩展名）、name 为显示名、locale_name 为本地化名（`Name[zh_CN]` 优先回退 Name）、exec / icon 原样、categories 按分号拆分。结果按 desktop id 去重（用户目录覆盖系统目录）、按 name 排序；Type 非 Application、NoDisplay=true、缺 Name 的条目已滤除。
+`AppEntry{ id, name, locale_name, exec, icon, categories }`：id 为 desktop id（.desktop 文件名去扩展名），name 为显示名，locale_name 为本地化名（`Name[zh_CN]` 优先回退 Name），exec / icon 原样，categories 按分号拆分。结果按 desktop id 去重（用户目录覆盖系统目录）、按 name 排序；Type 非 Application、NoDisplay=true、缺 Name 的条目已滤除。
 
 ```moonbit
 // 已装清单:注入目录列举函数(如自有的 readdir 封装)
@@ -74,15 +74,15 @@ match @sys.appfind_executable("code") {
 
 ## VS Code 本地历史与最近工作区
 
-读取本机 VS Code 用户数据：某文件的本地历史快照列表（`User/History`）与最近打开的工作区 / 文件夹。三平台路径均已实现（Linux / macOS / Windows 各按其用户数据目录定位）。
+读取本机 VS Code 用户数据：文件的本地历史快照列表（`User/History`）与最近工作区。三平台路径均已实现，各按其用户数据目录定位。
 
 | 函数 | 说明 |
 |---|---|
 | `vsc_supported() -> Bool` | 本机是否具备可读的 VS Code 用户数据 |
-| `vsc_local_history(file_path) -> Result[Array[VscHistoryEntry], VscodeError]` | 某文件的历史快照（按时间倒序，新→旧）；传绝对路径或 `file://` URI 均可，无历史记录返回空数组 |
+| `vsc_local_history(file_path) -> Result[Array[VscHistoryEntry], VscodeError]` | 某文件的历史快照（时间倒序）；传绝对路径或 `file://` URI 均可，无历史记录返回空数组 |
 | `vsc_recent() -> Result[Array[String], VscodeError]` | 最近打开的工作区 / 文件夹路径（最近活动的在最前）；无窗口状态返回空数组 |
 
-`VscHistoryEntry{ path, timestamp }`：path 为快照文件绝对路径（内容即该时刻文件全文），timestamp 为 Unix 毫秒，`timestamp_seconds()` 换算秒。错误 `VscodeError`：`Unsupported`（无法定位用户数据目录）/ `StorageUnavailable`（VS Code 从未在本机运行过）/ `StorageCorrupted(String)` / `HistoryCorrupted(String)`。
+`VscHistoryEntry{ path, timestamp }`：path 为快照文件绝对路径，即该时刻文件全文；timestamp 为 Unix 毫秒，`timestamp_seconds()` 换算秒。错误 `VscodeError`：`Unsupported`（无法定位用户数据目录）/ `StorageUnavailable`（VS Code 从未在本机运行过）/ `StorageCorrupted(String)` / `HistoryCorrupted(String)`。
 
 ```moonbit
 match @sys.vsc_local_history("/home/me/proj/src/main.mbt") {
@@ -101,7 +101,7 @@ match @sys.vsc_recent() {
 
 ## 浏览器历史与下载记录
 
-只读读取 Chrome / Chromium / Edge / Brave 的 History 库（直接解析磁盘文件，不复制、不修改原库）；自动探测全部 profile（Default 与 Profile 1..24）。仅实现 Linux 路径探测，其余平台 `BhUnsupported`。
+只读读取 Chrome / Chromium / Edge / Brave 的 History 库；自动探测全部 profile（Default 与 Profile 1..24）。仅实现 Linux 路径探测，其余平台 `BhUnsupported`。
 
 | 函数 | 说明 |
 |---|---|
@@ -133,7 +133,7 @@ let _ = @sys.bh_search("moonbit", limit=10)
 
 ## 媒体控制（MPRIS）
 
-枚举会话总线上的 `org.mpris.MediaPlayer2.*` 播放器实例，播放控制（play / pause / play_pause / next / previous / stop）与状态读取（PlaybackStatus + Metadata 的 title / artist / album）走 MPRIS Player 接口；总线失败的播放控制可回退 `playerctl` 子命令（命令类回退路径）。目前仅实现 Linux 路径，其余平台一律 `Unsupported`。
+枚举会话总线上的 `org.mpris.MediaPlayer2.*` 播放器实例，播放控制（play / pause / play_pause / next / previous / stop）与状态读取（PlaybackStatus + Metadata 的 title / artist / album）走 MPRIS Player 接口；总线失败可回退 `playerctl` 子命令。目前仅实现 Linux 路径，其余平台一律 `Unsupported`。
 
 | 函数 | 说明 |
 |---|---|
@@ -163,7 +163,7 @@ match @dbus.media_players() {
 
 ### 媒体状态监视
 
-MPRIS 不提供统一的信号回调通路（总线可订阅 `PropertiesChanged`，但需要常驻读循环，与库的同步调用模型不兼容），状态监视采用轮询增量：按间隔读状态，播放态 / 标题 / 艺术家 / 专辑任一变化即触发 `on_change`；首轮只建立基线不触发；目标播放器（空 player 取首个实例）出现前每轮重试解析，出现后锁定；查询失败的轮次静默跳过。
+MPRIS 无统一信号回调通路——`PropertiesChanged` 需要常驻读循环，与库的同步调用模型不兼容。状态监视采用轮询增量：按间隔读状态，播放态 / 标题 / 艺术家 / 专辑任一变化即触发 `on_change`；首轮只建立基线不触发；目标播放器（空 player 取首个实例）出现前每轮重试解析，出现后锁定；查询失败的轮次静默跳过。
 
 | 函数 | 说明 |
 |---|---|
@@ -172,7 +172,7 @@ MPRIS 不提供统一的信号回调通路（总线可订阅 `PropertiesChanged`
 | `media_watch_stop(w)` | 停止监视（下一帧注销定时器；不可恢复，重新监视请用新句柄） |
 | `MediaWatcher::is_running() -> Bool` | 句柄是否在监视 |
 
-`on_change` 回调抛异常会中断该定时器（先保证自身不抛）；组件销毁前调用 `media_watch_stop` 显式停止。
+`on_change` 回调抛异常会中断该定时器；组件销毁前调用 `media_watch_stop` 显式停止。
 
 ```moonbit
 let w = @sys.media_watch_status(interval_ms=1000, fn(s : @sys.MediaStatus) {
@@ -184,7 +184,7 @@ let w = @sys.media_watch_status(interval_ms=1000, fn(s : @sys.MediaStatus) {
 
 ### 通知进度
 
-桌面通知规范本身没有进度字段（freedesktop 通知协议无 progress，Windows / macOS 的原生进度呈现也各自为政），跨平台一致的做法是在正文内渲染字符进度条 + 百分比。
+freedesktop 通知协议无 progress 字段，Windows / macOS 的原生进度呈现各自为政。跨平台一致的做法是在正文内渲染字符进度条 + 百分比。
 
 | 函数 | 说明 |
 |---|---|
@@ -208,7 +208,7 @@ n.show()
 | `nl_set_temperature(percent) -> Result[Unit, NightlightError]` | 设色温（0-100，出界钳制；redshift 路径 0→2500K / 100→6500K） |
 | `nl_reset() -> Result[Unit, NightlightError]` | 复位（redshift `-x` / `xrandr --gamma 1.00:1.00:1.00`，不带 `--output` 作用于全部输出） |
 
-错误 `NightlightError`：`Unsupported`（非 Linux，或 redshift 与 xrandr 均不可用、xrandr 无已连接输出）/ `CommandFailed(String)`。xrandr 路径的输出从当前主输出取，无主输出取首个已连接输出。
+错误 `NightlightError`：`Unsupported`（非 Linux，或 redshift 与 xrandr 均不可用、xrandr 无已连接输出）/ `CommandFailed(String)`。xrandr 路径从当前主输出取，无主输出取首个已连接输出。
 
 ```moonbit
 let _ = @sys.nl_set_temperature(30) // 偏暖
@@ -217,7 +217,7 @@ let _ = @sys.nl_reset()
 
 ## 壁纸
 
-Windows 走 `SystemParametersInfoW（SPI_SETDESKWALLPAPER）` 直调。Linux 按桌面环境分派（DE 识别为 sys 包内自带的纯函数，即 `XDG_CURRENT_DESKTOP`）。**XFCE** 走 `xfconf-query` 读写 xfce4-desktop 频道的 `/backdrop/<screen>/monitor<输出>/<workspace>/last-image` 属性（多个显示器时取已连接输出）；**GNOME** 走 `gsettings` 读写 `org.gnome.desktop.background` 的 `picture-uri`（未设置回退 `picture-uri-dark`）；**KDE** 走 `qdbus6`/`qdbus` 调 plasmashell 的 `evaluateScript`（Plasma 脚本约定，本仓库未在 KDE 真机验证）。
+Windows 走 `SystemParametersInfoW`（SPI_SETDESKWALLPAPER）直调。Linux 按 `XDG_CURRENT_DESKTOP` 分派，DE 识别用 sys 包内自带的纯函数。**XFCE** 走 `xfconf-query` 读写 xfce4-desktop 频道的 `/backdrop/<screen>/monitor<输出>/<workspace>/last-image` 属性（多个显示器时取已连接输出）；**GNOME** 走 `gsettings` 读写 `org.gnome.desktop.background` 的 `picture-uri`（未设置回退 `picture-uri-dark`）；**KDE** 走 `qdbus6`/`qdbus` 调 plasmashell 的 `evaluateScript`；本仓库未在 KDE 真机验证。
 
 | 函数 | 说明 |
 |---|---|
@@ -236,14 +236,14 @@ let _ = @sys.wp_set("/home/me/Pictures/wall.png")
 
 ## 音频/视频播放（gui-media 可选层）
 
-媒体播放不在 yue 核心包里（不引入 ffmpeg 依赖的人零成本），在可选模块 `NoahLiu/gui-media`（依赖 `NoahLiu/ffmpeg-mbt` 的 FFI 绑定）：
+媒体播放不在 yue 核心包里，在可选模块 `NoahLiu/gui-media`（依赖 `NoahLiu/ffmpeg-mbt`）：
 
 ```moonbit
 // moon.mod import: "NoahLiu/gui-media@0.1.0"
 // moon.pkg import: "NoahLiu/gui-media/src" @yuemedia
 ```
 
-解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出设备由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。
+解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。
 
 ### AudioPlayer（对标浏览器 `<audio>`）
 
@@ -264,12 +264,12 @@ let view = @yuemedia.audio_player_t(player)  // 播放/暂停/进度/时间/音�
 
 ### 视频帧源视图（yue 核心，零依赖）
 
-视频帧渲染走「帧源回调产出 RGBA 字节 → `pngr_encode_rgba` 内存编码为 PNG → `Image::new_from_png` 解码 → `Painter::draw_image` 铺满」：把内存里的 RGBA 经 PNG 编码再解码，是纯 MoonBit 的中转通道（stored 压缩，合法 zlib 流，小分辨率够用）。解码器与本组件解耦——任何帧源（未来的 moonav1 / 平台解码器）按帧号提供 RGBA 即可接入。
+视频帧渲染走「帧源回调产出 RGBA 字节 → `pngr_encode_rgba` 内存编码为 PNG → `Image::new_from_png` 解码 → `Painter::draw_image` 铺满」——纯 MoonBit 中转通道，stored 压缩、合法 zlib 流，小分辨率够用。解码器与本组件解耦——任何帧源（未来的 moonav1 / 平台解码器）按帧号提供 RGBA 即可接入。
 
 | 函数 | 说明 |
 |---|---|
 | `video_view_t(width, height, frame_count, source, fps?=30, looping?=false, handle?, fill?, style?, on_ready?)` | 视频视图；帧缺失/解码失败画主题底色占位，不中断播放 |
-| `vid_pause(handle)` / `vid_resume(handle)` / `vid_stop(handle)` | 暂停/恢复/停止（stop 后定时器下一帧注销，不可恢复；**卸载组件前必须 vid_stop**——帧推进定时器无取消 id，漏 stop 会继续对已销毁的视图空转到播完） |
+| `vid_pause(handle)` / `vid_resume(handle)` / `vid_stop(handle)` | 暂停/恢复/停止（stop 后定时器下一帧注销，不可恢复；**卸载组件前必须 vid_stop**——定时器无取消 id，漏 stop 会对已销毁视图空转到播完） |
 | `VidHandle::make()` / `is_running()` / `is_paused()` | 播放句柄 |
 | `vid_frame_image(source, idx, w, h)` | 单体帧 → Image（长度校验+编码+解码，失败 None） |
 | `pngr_encode_rgba(data, w, h)` | RGBA → PNG（Result；尺寸/长度不符 Err） |
@@ -285,7 +285,7 @@ let view = @yuemedia.video_view_t(320, 240, 120, source, fps=30)
 
 ### VideoPlayer（对标浏览器 `<video>`）
 
-FFI 全链路：视频流逐帧 RGBA（时间戳级 seek），音轨是同文件的第二个独立解码器（读游标互不干扰）解出 PCM 直推输出设备——无 CLI 子进程。无音轨/无输出设备自动静音。
+FFI 全链路：视频流逐帧 RGBA（时间戳级 seek），音轨是同文件的第二个独立解码器，解出 PCM 直推输出设备——无 CLI 子进程。无音轨/无输出设备自动静音。
 
 ```moonbit
 let player = @yuemedia.VideoPlayer::make("demo.mp4", fps=12, width=480)?
@@ -307,7 +307,7 @@ let view = @yuemedia.video_player_t(player)
 
 ## 显示器配置
 
-解析 `xrandr --query` 输出，给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。
+解析 `xrandr --query` 输出，给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点比较。
 
 | 函数 | 说明 |
 |---|---|
@@ -327,7 +327,7 @@ match @sys.mon_current() {
 
 ## 系统窗口管理
 
-窗口列表（id / 桌面 / 主机 / 标题）、按 id 或标题激活、按标题关闭。Windows 走 `EnumWindows` / `SetForegroundWindow` / `WM_CLOSE` 直调；Linux 解析 `wmctrl -l` 并走其激活 / 关闭动作。不依赖 GUI 应用环境，普通 MoonBit 进程即可使用。
+窗口列表（id / 桌面 / 主机 / 标题）、按 id 或标题激活、按标题关闭。Windows 走 `EnumWindows` / `SetForegroundWindow` / `WM_CLOSE` 直调；Linux 解析 `wmctrl -l` 并走其激活 / 关闭动作。普通 MoonBit 进程即可调用，不需 GUI 宿主。
 
 | 函数 | 说明 |
 |---|---|
@@ -336,9 +336,9 @@ match @sys.mon_current() {
 | `win_activate(id_or_title) -> Result[Unit, WinError]` | 按窗口 id（wmctrl 的 `0x...` 十六进制）或标题激活 |
 | `win_close(title) -> Result[Unit, WinError]` | 按标题关闭窗口 |
 
-`WindowInfo{ id, desktop, host, title }`：id 可直接回传 `win_activate`；desktop 为窗口所在桌面，-1 为全部桌面（sticky）。错误 `WinError`：`Unsupported` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。
+`WindowInfo{ id, desktop, host, title }`：id 可直接回传 `win_activate`；desktop 为窗口所在桌面，-1 表示 sticky（跨全部桌面）。错误 `WinError`：`Unsupported` / `CommandFailed(String)` / `ParseFailed(String)` / `InvalidParam(String)`。
 
-激活与关闭会改变真实窗口状态（设置类）：接口完整实现，应用层只在用户操作时调用。
+激活与关闭会改变真实窗口状态：接口完整实现，应用层只在用户操作时调用。
 
 ```moonbit
 match @sys.win_list() {
@@ -351,7 +351,7 @@ let _ = @sys.win_close("ZCode")
 
 ## 剪贴板监听
 
-文本读写与变化监听。Windows 走 Win32 的 `CF_UNICODETEXT` 直调；Linux 优先 GtkClipboard（需宿主跑过 gtk_init，探测给 0 时退回命令线 `xclip`），文本内容变化时回调派发新文本。本模块是纯轮询实现，任意 MoonBit 进程可用、回调落在调用方上下文。
+文本读写与变化监听。Windows 走 Win32 `CF_UNICODETEXT` 直调；Linux 优先 GtkClipboard（需宿主跑过 gtk_init，探测给 0 时退回命令线 `xclip`），文本内容变化时回调派发新文本。本模块为纯轮询实现，任意 MoonBit 进程可用，回调落在调用方上下文。
 
 | 函数 | 说明 |
 |---|---|
@@ -380,7 +380,7 @@ let w = @sys.cbw_start_watch(interval_ms=500, fn(text) {
 | `pp_current() -> Result[PowerProfile, PowerProfileError]` | 当前计划 |
 | `pp_set(profile) -> Result[Unit, PowerProfileError]` | 切换计划（有副作用、需要认证，调用方自行走授权流程） |
 
-`PowerProfile`：`PPerformance`（性能）/ `PBalanced`（均衡）/ `PPowerSaver`（省电）。错误 `PowerProfileError`：`PpUnsupported` / `PpCommandFailed(String)` / `PpParseFailed(String)`。
+`PowerProfile`：`PPerformance` / `PBalanced` / `PPowerSaver`。错误 `PowerProfileError`：`PpUnsupported` / `PpCommandFailed(String)` / `PpParseFailed(String)`。
 
 ```moonbit
 match @sys.pp_profiles() {
@@ -393,13 +393,13 @@ match @sys.pp_profiles() {
 
 ## 系统信息
 
-只读 `/proc` 与 `/sys` 文本：发行版标识（`/etc/os-release`）、机器 DMI 标识（`/sys/class/dmi/id/`）、物理内存（`/proc/meminfo`）、开机时长（`/proc/uptime`）。非 Linux 一律 `Unsupported`；读不到（文件不存在 / 权限不足）给 `Err` 并带路径，不糊弄成空串。
+只读 `/proc` 与 `/sys` 文本：发行版标识（`/etc/os-release`）、机器 DMI 标识（`/sys/class/dmi/id/`）、物理内存（`/proc/meminfo`）、开机时长（`/proc/uptime`）。非 Linux 一律 `Unsupported`；文件不存在或权限不足给 `Err` 并带路径，不以空串代替。
 
 | 函数 | 说明 |
 |---|---|
 | `si_os() -> Result[OsInfo, SysInfoError]` | 发行版：`OsInfo{ pretty_name, id, version_id }` |
 | `si_machine() -> Result[MachineInfo, SysInfoError]` | 机器：`MachineInfo{ vendor, product, serial }`（序列号多数发行版仅 root 可读，读不到给 `Err`） |
-| `si_memory() -> Result[MemoryInfo, SysInfoError]` | 内存：`MemoryInfo{ total_kb, available_kb }`（单位 kB，MemAvailable 为「还能拿来用多少」的实口径） |
+| `si_memory() -> Result[MemoryInfo, SysInfoError]` | 内存：`MemoryInfo{ total_kb, available_kb }`（单位 kB，available_kb 即 MemAvailable） |
 | `si_uptime() -> Result[Double, SysInfoError]` | 开机时长（秒） |
 
 错误 `SysInfoError`：`SiUnsupported`（非 Linux）/ `SiReadFailed(String)`（带路径）/ `SiParseFailed(String)`。
@@ -412,7 +412,7 @@ let up = @sys.si_uptime() // Ok(84088.08)
 
 ## 打印机
 
-Windows 走 winspool 直调（`EnumPrintersW` 列表 + `GetDefaultPrinterW` 默认名）与 `ShellExecuteW`「print」动词打印；Linux 经 `lpstat` 读打印机列表（`-p`）与默认打印机（`-d`）、`lp` 提交打印任务。未装 CUPS（lpstat 以退出码 127 呈现）→ `PrtUnsupported`，属合法降级。
+Windows 走 winspool 直调（`EnumPrintersW` 列表 + `GetDefaultPrinterW` 默认名）与 `ShellExecuteW`「print」动词打印；Linux 经 `lpstat` 读打印机列表（`-p`）与默认打印机（`-d`）、`lp` 提交打印任务。未装 CUPS（lpstat 以退出码 127 呈现）→ `PrtUnsupported`。
 
 | 函数 | 说明 |
 |---|---|
@@ -434,7 +434,7 @@ match @sys.prt_default() {
 
 ## 环境变量与目录枚举
 
-两块小原语：进程内环境变量读写与环境变量删（`envx`，读走 `core/env`、写删走 C 层 setenv/unsetenv），目录枚举（`fsx`，C 层 opendir/readdir 或 Win32 FindFirstFileW）。
+两块小原语：进程内环境变量读写与删除（`envx`，读走 `core/env`、写删走 C 层 setenv/unsetenv），目录枚举（`fsx`，C 层 opendir/readdir 或 Win32 FindFirstFileW）。
 
 | 函数 | 用途 |
 |---|---|
@@ -446,7 +446,7 @@ match @sys.prt_default() {
 | `fsx_set_env(name, value, overwrite) -> Result[Unit, FsError]` | 写环境变量（overwrite=false 且已存在时保持原值，仍为 Ok） |
 | `fsx_unset_env(name) -> Result[Unit, FsError]` | 删环境变量（envx_unset 的底层） |
 
-语义为「进程内生效」——写只改当前进程环境，不触碰系统持久配置，也不影响父进程。错误：`EnvxError::ExInvalidParam(String)`（变量名空串）/ `ExFailed(String)`（C 层拒绝，如名含 '='）；`FsError::InvalidParam(String)` / `OpenFailed(String)`（目录打不开，带路径）/ `EnvFailed(String)`。`fsx_list_dir` 的已知边界：子项名本身含 '\n' 的极端文件名会被拆开（扁平文本编码）。
+语义为「进程内生效」——写只改当前进程环境，不触碰系统持久配置，也不影响父进程。错误：`EnvxError::ExInvalidParam(String)`（变量名空串）/ `ExFailed(String)`（C 层拒绝，如名含 '='）；`FsError::InvalidParam(String)` / `OpenFailed(String)`（目录打不开，带路径）/ `EnvFailed(String)`。`fsx_list_dir` 已知边界：子项名含 '\n' 的极端文件名会被拆开。
 
 ```moonbit
 let path = @sys.envx_get("PATH")
@@ -460,7 +460,7 @@ match @sys.fsx_list_dir("/usr/share/applications") {
 
 ## 最近文件（GTK recently-used.xbel）
 
-解析 freedesktop 的 `recently-used.xbel`（GTK 应用经 GtkRecentManager / xdg-desktop-portal-gtk 统一写这份清单，Thunar / Nautilus / GIO 打开文件都会往里追加）。文件位置 `$XDG_DATA_HOME/recently-used.xbel`（缺省 `$HOME/.local/share/`）。XML 解析为手写薄扫描器：只取 bookmark 节点与 `bookmark:application` / `mime:mime-type` 子节点属性，属性值做 XML 实体解码，href 的 `file://` URI 做百分号解码；时间戳 ISO 8601 → Unix 毫秒。
+解析 freedesktop 的 `recently-used.xbel`——GTK 应用经 `GtkRecentManager` / xdg-desktop-portal-gtk 写入此清单，Thunar / Nautilus / GIO 打开文件均追加其中。文件位置 `$XDG_DATA_HOME/recently-used.xbel`（缺省 `$HOME/.local/share/`）。XML 解析为手写薄扫描器：只取 bookmark 节点与 `bookmark:application` / `mime:mime-type` 子节点属性，属性值做 XML 实体解码，href 的 `file://` URI 做百分号解码；时间戳 ISO 8601 → Unix 毫秒。
 
 | 函数 | 说明 |
 |---|---|
@@ -468,7 +468,7 @@ match @sys.fsx_list_dir("/usr/share/applications") {
 | `rf_recent(limit? = 100) -> Result[Array[RecentItem], RecentError]` | 最近文件列表（modified 倒序，并列按 path 升序）；limit ≤ 0 取全部 |
 | `rf_by_app(name, limit? = 100) -> Result[Array[RecentItem], RecentError]` | 按应用名过滤（`bookmark:application` 的 name 精确匹配），同样倒序 |
 
-`RecentItem{ uri, path, mime, added, modified, app_count }`：path 为 href 去 `file://` 前缀并百分号解码后的本地路径（非 file:// 方案给空串）、mime 为 MIME 类型（该 bookmark 无此节点给 None）、added / modified 为 Unix 毫秒（缺失或非法为 0）、app_count 为记录过该文件的应用个数。错误 `RecentError`：`RfUnsupported` / `RfNoDataDir` / `RfNoFile`（从未记录过）/ `RfParseFailed(String)`。解码与换算纯函数：`rf_xml_unescape` / `rf_percent_decode` / `rf_uri_to_path` / `rf_iso_to_unix_ms` / `rf_sort_recent`。
+`RecentItem{ uri, path, mime, added, modified, app_count }`：path 为 href 去 `file://` 前缀并百分号解码后的本地路径（非 file:// 方案给空串）、mime 为 MIME 类型（无此节点给 None）、added / modified 为 Unix 毫秒（缺失或非法为 0）、app_count 为记录过该文件的应用个数。错误 `RecentError`：`RfUnsupported` / `RfNoDataDir` / `RfNoFile` / `RfParseFailed(String)`。解码与换算纯函数：`rf_xml_unescape` / `rf_percent_decode` / `rf_uri_to_path` / `rf_iso_to_unix_ms` / `rf_sort_recent`。
 
 ```moonbit
 match @sys.rf_recent(limit=8) {
@@ -479,7 +479,7 @@ match @sys.rf_recent(limit=8) {
 
 ## 浏览器书签（Chrome 系）
 
-只读解析 Chrome / Chromium / Edge / Brave 的 `Bookmarks` JSON 文件（不复制、不修改原文件）。JSON 解析复用同包手写解析器（整数字段保持 Int64 精度——Chrome 的 date_added 等以数值字符串存储，微秒值换算为 Unix 毫秒）；自动探测全部 profile（Default 与 Profile 1..24）。
+只读解析 Chrome / Chromium / Edge / Brave 的 `Bookmarks` JSON 文件。JSON 解析复用同包手写解析器——Chrome 的 date_added 等以数值字符串存储，整数字段保持 Int64 精度，微秒值换算为 Unix 毫秒；自动探测全部 profile（Default 与 Profile 1..24）。
 
 | 函数 | 说明 |
 |---|---|
@@ -487,7 +487,7 @@ match @sys.rf_recent(limit=8) {
 | `bm_browsers() -> Result[Array[BookmarkProfile], BookmarkError]` | 列出有可读 Bookmarks 文件的 profile |
 | `bm_bookmarks(browser) -> Result[BookmarkNode, BookmarkError]` | 指定浏览器的首个可读书签树（浏览器标识取 "google-chrome"/"chromium"/"microsoft-edge"/"brave"，profile 取 Default 优先、其次 Profile 1..24） |
 
-`BookmarkProfile{ browser, profile, bookmarks_path }`；`BookmarkNode{ name, url?, children, added, root }`（added 为 Unix 毫秒、root 标注所属根 bookmark_bar / other / synced）——返回虚拟根树（名称 `"<浏览器>/<profile>"`，children 为三根合并），`BookmarkNode::is_folder()` / `is_url()` 分类，`bm_flatten(node)` 给先序扁平 url 书签列表。错误 `BookmarkError`：`BmUnsupported` / `BmNoConfigDir` / `BmNoBrowser` / `BmIoFailed(String)`。
+`BookmarkProfile{ browser, profile, bookmarks_path }`；`BookmarkNode{ name, url?, children, added, root }`（added 为 Unix 毫秒，root 标注所属根 bookmark_bar / other / synced）。返回虚拟根树（名称 `"<浏览器>/<profile>"`，children 为三根合并），`BookmarkNode::is_folder()` / `is_url()` 分类，`bm_flatten(node)` 给先序扁平 url 书签列表。错误 `BookmarkError`：`BmUnsupported` / `BmNoConfigDir` / `BmNoBrowser` / `BmIoFailed(String)`。
 
 ```moonbit
 match @sys.bm_bookmarks("google-chrome") {
@@ -501,7 +501,7 @@ match @sys.bm_bookmarks("google-chrome") {
 
 ## Firefox 浏览历史
 
-读取 `~/.mozilla/firefox/` 下各 profile 的 `places.sqlite`（`moz_places` 表，纯 MoonBit 读取，不复制、不修改原库）。条目复用 `browser_history.mbt` 的 `HistoryItem`（字段结构与 Chrome 历史一致），时间按 Firefox 的 Unix 纪元微秒 → 毫秒换算；排序 / 截断 / 取列同样复用该文件导出的纯函数。
+读取 `~/.mozilla/firefox/` 下各 profile 的 `places.sqlite`（`moz_places` 表）。条目复用 `browser_history.mbt` 的 `HistoryItem`，时间按 Unix 纪元微秒 → 毫秒换算；排序 / 截断 / 取列复用同文件导出的纯函数。
 
 | 函数 | 说明 |
 |---|---|
@@ -509,7 +509,7 @@ match @sys.bm_bookmarks("google-chrome") {
 | `ffx_profiles() -> Result[Array[FirefoxProfile], FirefoxHistoryError]` | 列出有可读 places.sqlite 的 profile |
 | `ffx_history(limit? = 200) -> Result[Array[HistoryItem], FirefoxHistoryError]` | 浏览历史（聚合全部已探测 profile，按最近访问时间降序）；limit ≤ 0 取全部 |
 
-`FirefoxProfile{ profile, places_path }`（profile 为 profiles.ini 的 `Path=` 目录名，绝对路径取末段）。hidden 条目（书签等）已滤除；单 profile 读失败跳过、全部失败给 `FfxIoFailed`。错误 `FirefoxHistoryError`：`FfxUnsupported` / `FfxNoProfile`（未安装或从未启动 Firefox）/ `FfxIoFailed(String)`。profiles.ini 缺失时回退固定候选名（default / default-release / default-esr / default-nightly / dev-edition-default），随机前缀命名的 profile 目录收不到。
+`FirefoxProfile{ profile, places_path }`（profile 为 profiles.ini 的 `Path=` 目录名，绝对路径取末段）。hidden 条目已滤除；单 profile 读失败跳过，全部失败给 `FfxIoFailed`。错误 `FirefoxHistoryError`：`FfxUnsupported` / `FfxNoProfile`（未安装或从未启动 Firefox）/ `FfxIoFailed(String)`。profiles.ini 缺失时回退固定候选名（default / default-release / default-esr / default-nightly / dev-edition-default），随机前缀命名的 profile 目录收不到。
 
 ```moonbit
 match @sys.ffx_history(limit=10) {
@@ -520,16 +520,16 @@ match @sys.ffx_history(limit=10) {
 
 ## 共享基建：子进程执行 procrun
 
-命令行类能力（音量、显示器、壁纸、夜间色温、打印机、电源计划、Firefox profile 定位）共用的「spawn → 限时回收 → 临时文件捕获 stdout/stderr」封装：命令名按 PATH 解析；子进程环境强制 C locale 使输出语言恒定可解析；退出码 0 归一为 `Ok`，非零退出归一为 `Err` 并携带 stderr，调用方无需再自行判码。
+命令行类能力（音量、显示器、壁纸、夜间色温、打印机、电源计划、Firefox profile 定位）共用的「spawn → 限时回收 → 临时文件捕获 stdout/stderr」封装：命令名按 PATH 解析；子进程强制 C locale；退出码 0 归一为 `Ok`，非零归一为 `Err` 并携带 stderr。
 
 | 函数 | 说明 |
 |---|---|
 | `pr_available() -> Bool` | 当前平台是否支持子进程执行（Linux / macOS / Windows 三主平台为真，基于 sys 包自有 C 桩） |
 | `pr_run(cmd, args, timeout_ms? = 5000) -> Result[ProcOutput, ProcError]` | 运行命令并归一结果（超时进程会被强制终止） |
 
-`ProcOutput{ stdout, exit_code }`；错误 `ProcError`：`Unsupported`（非 Linux / macOS / Windows 主平台）/ `SpawnFailed(String)`（命令不存在按 Unix 惯例由子进程以退出码 127 呈现，归入非零退出）/ `Timeout(String)` / `NonZeroExit(Int, String)` / `Signaled(Int)`。
+`ProcOutput{ stdout, exit_code }`；错误 `ProcError`：`Unsupported`（非 Linux / macOS / Windows 主平台）/ `SpawnFailed(String)`（命令不存在时由子进程以退出码 127 呈现，归入非零退出）/ `Timeout(String)` / `NonZeroExit(Int, String)` / `Signaled(Int)`。
 
-命令缺失与「存在但失败」是两种语义：前者在该模块自身通常归一为 `*Supported == false` 或 `Unsupported`（如 `PpUnsupported`、`PrtUnsupported`），后者是 `CommandFailed`——调用方按错误值分类处理即可。
+命令缺失与「存在但失败」语义不同：前者归一为 `*Supported == false` 或 `Unsupported`（如 `PpUnsupported`、`PrtUnsupported`），后者是 `CommandFailed`。
 
 ```moonbit
 match @sys.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
@@ -541,7 +541,7 @@ match @sys.pr_run("wpctl", ["get-volume", "@DEFAULT_SINK@"]) {
 
 ## 共享基建：通用 D-Bus 调用层（@dbus）
 
-面向任意服务的方法调用与属性读写，是媒体控制（MPRIS）等模块的公共地基。连接复用 `bus.mbt` 的进程级会话 / 系统连接，编解码复用 `wire.mbt` 的线协议；同步调用 1.5 秒超时，应答超时给 `gdbus.timeout` 错误。
+面向任意服务的方法调用与属性读写，是媒体控制（MPRIS）等模块的公共地基。连接复用 `bus.mbt` 的进程级会话 / 系统连接，编解码复用 `wire.mbt` 的线协议；同步调用 1.5 秒超时，应答超时给 `gdbus.timeout`。
 
 | 函数 | 说明 |
 |---|---|
@@ -568,9 +568,9 @@ match
 
 ## 边界
 
-- 浏览器 History 库在浏览器运行中可能不断有新写入，读取结果是读入时刻的快照（不含尚未合并进主库的最新记录）。
-- Firefox 的 places.sqlite 常处于 WAL 模式，本实现只读主库文件、尚未 checkpoint 进主库的最新浏览记录读不到；多 profile 聚合时同一 url 会各出现一次（与 Chrome 侧聚合口径一致）。
+- 浏览器运行中 History 库不断有新写入，读取结果是读入时刻的快照。
+- Firefox 的 places.sqlite 常处于 WAL 模式，本实现只读主库文件，尚未 checkpoint 进主库的最新浏览记录读不到；多 profile 聚合时同一 url 各出现一次（与 Chrome 侧聚合口径一致）。
 - `appfind_executable` 的命中判定为目录里有该名字的条目，不读文件内容、不校验执行权限位。
-- 音量设置依赖对应系统服务在线（Windows IAudioEndpointVolume / Linux PipeWire-Pulse），服务缺席时写接口返回错误值，按错误值逐项处理即可。
-- 打印 / 切电源计划是会改变系统真实状态的操作：接口完整实现，但只在用户显式操作时调用，不要在探测或查询路径里代为触发。
-- 剪贴板监听与涟漪动画的定时器都由消息循环驱动且无取消 id（`set_timer`）：停止的途径是让回调返回 false，故句柄类 API（`cbw_stop` / `eff_stop`）应在组件卸载前显式调用。
+- 音量设置依赖对应系统服务在线（Windows IAudioEndpointVolume / Linux PipeWire-Pulse），服务缺席时写接口返回错误值。
+- 打印 / 切电源计划会改变系统真实状态：接口完整实现，但只在用户显式操作时调用，不要在探测或查询路径里代为触发。
+- 剪贴板监听与涟漪动画的定时器都由消息循环驱动且无取消 id（`set_timer`）：停止的途径是让回调返回 false，故句柄类 API（`cbw_stop` / `eff_stop`）应在组件销毁前显式调用。
