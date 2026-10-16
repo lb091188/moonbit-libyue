@@ -14,16 +14,16 @@
 native-gui 是 MoonBit 生态的**轻量原生跨平台 GUI 库**，主攻三个方向：**系统接口丰富、轻量、开箱即用**。
 
 - **系统接口：** —— 托盘、桌面通知、全局快捷键、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、媒体控制，以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询
-- **轻量：** —— 渲染、布局、控件均为纯 MoonBit 自绘（软件光栅器），不依赖 Skia 等外部图形引擎；`hello` 最小窗口的 release 二进制 **1.1 MB**、冷启动约 0.5 s 出窗，`showcase` 15 页全功能板 5.5 MB / 约 1 s（Linux 实测）；音视频引擎等重能力拆独立模块
+- **轻量：** —— 渲染、布局、控件纯 MoonBit 自绘，不依赖 Skia；`hello` release **1.1 MB** / 约 0.5 s 出窗，`showcase` 15 页 **5.5 MB** / 约 1 s（Linux 实测）；重能力拆独立模块
 - **开箱即用：** —— `moon add` 后零配置直接 `moon run`；组件库、14 种图表 + 交互层、Markdown 视图、内嵌 WebView 都是库内成品
 
 平台状态：**🟩 Windows / 🟩 Linux / 🟨 macOS ** 
- - 🟨 待真机测试（后端已在 `mac` 分支落地，CI 三平台全绿）
+ - 🟨 待真机测试（`mac` 分支已落地，CI 全绿）
  - 🟩 已真机测试
 
 ## 与既有 GUI 能力的边界
 
-与 MoUI（wzzc-dev/moui）、Sun（wzzc-dev/sun）**零代码依赖**：本库直接依赖只有 MoonBit 标准库与操作系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）。定位互补：MoUI 面向多端共享逻辑（Skia / WebGPU 渲染），Sun 是图形文本渲染底层，native-gui 专注桌面线——生态内此前没有以桌面系统集成为主线的 MoonBit GUI 库，此为独立重建的立足点。
+与 MoUI、Sun 零代码依赖，直接依赖只有 MoonBit 标准库与系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）。定位互补：MoUI 走多端共享逻辑，Sun 是渲染底层，本库专注桌面系统集成——这是独立重建的立足点。
 
 ## 差异化用户收益：同一界面的操作案例
 
