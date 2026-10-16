@@ -124,3 +124,49 @@ test "when：非布尔源用 pred 折算" {
   n.set(1)
   assert_true(!host.children()[0].visible)
 }
+
+///|
+test "when_else 通用档：非布尔源 pred 折算，真挂 then 假挂 otherwise" {
+  // 回归 2026-10-16 moon-launcher 实踩：通用档曾把 (then, otherwise) 直喂
+  // swap_node（位序 a=假支、b=真支），条件真显示的是 otherwise
+  let n = @core.Store::new(0)
+  let root = mount_root(
+    [when_else(n.signal(), text("有数"), text("无数"), pred=fn(v : Int) -> Bool { v > 3 })],
+    200.0,
+    300.0,
+  )
+  let host = kid(root, 0)
+  assert_eq(host.children().length(), 2)
+  assert_true(!host.children()[0].visible && host.children()[1].visible)
+  n.set(5)
+  assert_true(host.children()[0].visible && !host.children()[1].visible)
+  n.set(2)
+  assert_true(!host.children()[0].visible && host.children()[1].visible)
+  // 零重建：两支控件不换
+  let a = host.children()[0].id
+  let b = host.children()[1].id
+  n.set(9)
+  assert_true(host.children()[0].id == a && host.children()[1].id == b)
+}
+
+///|
+test "when_else_store 通用档：Store 形态与信号版同极性" {
+  // 缺省折算恒真（when_default_pred），这里显式给判据
+  let opt : @core.Store[String?] = @core.Store::new(None)
+  let root = mount_root(
+    [
+      when_else_store(
+        opt,
+        text("有名字"),
+        text("缺名字"),
+        pred=fn(v : String?) -> Bool { v is Some(_) },
+      ),
+    ],
+    200.0,
+    300.0,
+  )
+  let host = kid(root, 0)
+  assert_true(!host.children()[0].visible && host.children()[1].visible)
+  opt.set(Some("甲"))
+  assert_true(host.children()[0].visible && !host.children()[1].visible)
+}

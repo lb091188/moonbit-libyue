@@ -48,7 +48,6 @@
 - [~] **P2 组件层**收尾：
   - [ ] P2-e 边界②：`chip` 的 `class` 只吃颜色与显式宽度——字号在挂载期参与测量宽，class 改字号不会跟着改宽，真要改字号请调用方给 `width=`/`class=[style(width=…)]`；
   - [ ] 观感逐页比对不回退（真机由用户复验，`examples/hello`、`hello-themed`、`showcase`、`native-app`、`sysmonitor`）。
-- [ ] **P3 回归 bug：通用档 `when_else` / `when_else_store` 极性反了**（2026-10-16 moon-launcher 实测踩中）——两者把 `(then, otherwise)` 原样喂给 `swap_node`，而 `swap_node` 位序是 a=假支、b=真支（`node.mbt`：`va.set_visible(!v); vb.set_visible(v)`），结果**条件真显示的是 `otherwise`**，与注释「真挂 then」相反；`when_else_bool` 是绕开 `swap_node` 的自实现（`reactive.mbt` 注释自述「套一层宿主以便按 then/else 语义对齐位序」）所以布尔档正确，wbtest 也只盖了布尔档。修法=按布尔档同款宿主包裹或换实参位序，**验收=给通用档（非 Bool 源 + `pred`）补 wbtest 断言两分支显隐**。
 
 ### 控件（一律自绘，不再引入原生控件皮肤；家族名对应 master `yue/components/` 九个源文件）
 

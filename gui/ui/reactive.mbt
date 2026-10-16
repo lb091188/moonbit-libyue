@@ -5,7 +5,7 @@
 //   按下标对齐（等价 Vue 无 `:key`）。
 // - `when`：if/else 对应物，入参收 **Signal/Store 本体**（不收 `.get()` 快照，
 //   §3 第 5 条绑定语义通则）；不给 `else` 是单支（假时隐藏不重建、状态不丢），
-//   给了是双支常驻切显隐（`swap_node` 落地）。要销毁重建的场合走 `bind_node`，
+//   给了是双支常驻切显隐（宿主包裹落地）。要销毁重建的场合走 `bind_node`，
 //   `when` 只是上面的糖。任意类型的源用 `pred` 折算真假（缺省=非空即真）。
 //
 // 值本体变了怎么办：行内容来自普通值（`t.title` 那类）走 changed 档重挂该行；
@@ -40,14 +40,26 @@ pub fn[T] when(
 }
 
 ///|
-/// `when`（双支常驻）：两支都预建，按信号切显隐（`swap_node` 落地，零重建）。
+/// `when`（双支常驻）：两支都预建，按信号切显隐（宿主包裹切显隐，零重建）。
 pub fn[T] when_else(
   cond : @core.Signal[T],
   then : @core.Node,
   otherwise : @core.Node,
   pred? : (T) -> Bool = when_default_pred,
 ) -> @core.Node {
-  @core.swap_node(cond.map(pred), then, otherwise)
+  @core.node_of_new(fn(host : @core.Widget) -> @core.Widget {
+    let va = (then.mount)(host)
+    let vb = (otherwise.mount)(host)
+    fn apply(v : T) -> Unit {
+      let t = pred(v)
+      va.set_visible(t)
+      vb.set_visible(!t)
+      let _ = @core.invalidate()
+    }
+    apply(cond.get())
+    let _ = cond.subscribe(apply)
+    host
+  })
 }
 
 ///|
