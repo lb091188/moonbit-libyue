@@ -442,7 +442,7 @@ pub fn drag_external_disable(id : Int64) -> Unit {
 fn drag_window_root_of(slot : Int) -> Widget? {
   let mut found : Widget? = None
   for a in host_windows() {
-    if a.window.id.to_int() == slot {
+    if a.session.window.id.to_int() == slot {
       found = Some(a.root)
     }
   }
@@ -644,7 +644,7 @@ pub fn drag_external_send(data : DragData) -> Result[DragEffect, DragError] {
       None => Err(Failed("当前没有活动窗口"))
       Some(app) =>
         match @win.dragdnd_send(
-          app.window.id,
+          app.session.window.id,
           drag_encode(data),
           @win.DRAGDND_COPY | @win.DRAGDND_MOVE | @win.DRAGDND_LINK,
         ) {

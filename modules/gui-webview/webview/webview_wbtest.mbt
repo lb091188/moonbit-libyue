@@ -2,32 +2,10 @@
 // 真页面渲染与两种摆法由 modules/gui-examples/native-web 冒烟 + 使用者目视负责（AGENTS 规则 6）。
 
 ///|
-/// 假宿主：窗口句柄取 900 这类越界值，桩里所有 wm_*/wb_* 对越界句柄早退，
-/// 于是「构造 + 未挂载状态」可以完全不碰平台。
+/// 假宿主：窗口句柄取越界值（桩里所有 wm_*/wb_* 对越界句柄早退），
+/// 经 `@core.test_app(@core.fake_session(..))` 通道构造（App 字段已不对外）。
 fn fake_app() -> @core.App {
-  let w : @win.Window = { id: 900L, width: 10, height: 10 }
-  let root = @core.Widget::new()
-  {
-    window: w,
-    sched: @core.Loop::new(),
-    root,
-    focus: @core.FocusStack::new(),
-    host: @core.make_overlay_host(root),
-    wid: 1,
-    primary: true,
-    closed: false,
-    dirty: false,
-    running: true,
-    last_preedit: ("", 0),
-    ime_focus: 0,
-    hover_id: -1,
-    capture: -1,
-    cursor_kind: 0,
-    canvas: None,
-    key_fallthrough: [],
-    dirty_rect: None,
-    dirty_full: false,
-  }
+  @core.test_app(@core.fake_session(900, 1, true, 10, 10))
 }
 
 ///|

@@ -20,7 +20,7 @@ let g_native_passes : Ref[Map[Int, Int]] = Ref(Map([]))
 /// 该不该走原生档：当前窗有已挂载的原生子件就走。无宿主/无窗一律走图层。
 pub fn overlay_native_tier() -> Bool {
   match host_active() {
-    Some(a) => a.window.has_child_surfaces()
+    Some(a) => a.window().has_child_surfaces()
     None => false
   }
 }
@@ -100,7 +100,7 @@ fn overlay_content_size(app : App) -> (Int, Int) {
 pub fn overlay_fit_pass(app : App) -> Unit {
   let hits : Array[Int] = []
   for cid, pop in g_native.val {
-    if pop.wid == app.wid {
+    if pop.session.wid == app.session.wid {
       hits.push(cid)
     }
   }
@@ -113,16 +113,16 @@ pub fn overlay_fit_pass(app : App) -> Unit {
       None => ()
       Some(pop) => {
         let (w, h) = overlay_content_size(pop)
-        let (cw, ch) = pop.window.size()
+        let (cw, ch) = pop.session.window.size()
         if passes >= 3 {
           if w > cw || h > ch {
-            pop.window.set_size_pixels(w.max(cw), h.max(ch))
+            pop.session.window.set_size_pixels(w.max(cw), h.max(ch))
           }
           continue
         }
         g_native_passes.val.set(cid, passes + 1)
         if w > 1 && h > 1 && (w != cw || h != ch) {
-          pop.window.set_size_pixels(w, h)
+          pop.session.window.set_size_pixels(w, h)
         }
       }
     }
@@ -155,7 +155,7 @@ pub fn overlay_on_lost_focus(app : App) -> Unit {
   }
   let mut top = 0
   for cid, pop in g_native.val {
-    if pop.wid == app.wid {
+    if pop.session.wid == app.session.wid {
       top = if cid > top { cid } else { top }
     }
   }

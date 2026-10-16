@@ -6,31 +6,18 @@
 
 ///|
 fn fake_win_app() -> App {
-  let w : @win.Window = { id: 900L, width: 200, height: 200, }
   let root = Widget::new()
-  let a : App = {
-    window: w,
-    sched: host_loop(),
+  {
+    session: fake_session(900, host_new_wid(), false, 10, 10),
     root,
     focus: FocusStack::new(),
     host: make_overlay_host(root),
-    wid: host_new_wid(),
-    primary: false,
     closed: false,
-    dirty: false,
-    running: true,
-    last_preedit: ("", 0),
-    ime_focus: 0,
-    hover_id: -1,
-    capture: -1,
-    cursor_kind: 0,
     canvas: None,
     key_fallthrough: [],
     dirty_rect: None,
     dirty_full: false,
   }
-  host_add(a, host_window_count() == 0)
-  a
 }
 
 ///|

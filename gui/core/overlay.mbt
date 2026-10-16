@@ -231,7 +231,7 @@ pub fn overlay_show_full(content : Node) -> Int {
         match host_active() {
           None => return 0
           Some(a) => {
-            let (sw, sh) = a.window.size()
+            let (sw, sh) = a.window().size()
             if overlay_native_open(
               cid,
               content,

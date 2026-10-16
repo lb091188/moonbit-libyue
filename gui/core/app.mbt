@@ -15,19 +15,15 @@
 
 ///|
 pub(all) struct App {
-  window : @win.Window
-  sched : Loop
+  /// 壳层窗（G9 Batch 2）：平台窗口、共用的 `Loop`、窗号与退出位、
+  /// 悬停/捕获/光标/输入法去重缓存与帧脏标志。webview / 3D 路线只吃这一半。
+  mut session : @shell.Session
   root : Widget
   focus : FocusStack
   /// 本窗的浮层宿主（图层挂在 root 上；多窗时浮层开在当前窗的那层）
   host : OverlayHost
-  /// 注册表里的窗号（见 host.mbt）
-  mut wid : Int
-  /// 主窗：注册表里的第一扇，关掉它即整体退出
-  mut primary : Bool
   /// 已拆过窗（close_window/shutdown 幂等）
   mut closed : Bool
-  mut dirty : Bool
   /// 脏区（窗口坐标，None = 整窗）：事件路由只并涉事控件的小矩形，浮层
   /// 打开与结构性变更走 `schedule_paint` 整窗兜底；paint_frame 消费后清空
   mut dirty_rect : Rect?
@@ -35,18 +31,6 @@ pub(all) struct App {
   /// 区分不开,故整窗请求单独占一位。置位后同批内的局部置脏不收窄脏区,
   /// `paint_frame` 取走这一帧的裁剪框后复位。
   mut dirty_full : Bool
-  mut running : Bool
-  /// 上一次投递给焦点控件的组合串（相同内容不重复投递，避免每拍置脏）
-  mut last_preedit : (String, Int)
-  /// 上一轮输入法服务的控件焦点 id（0 = 无）；换焦点时用来清掉旧控件的组合串
-  mut ime_focus : Int
-  /// 悬停归属与按下捕获（控件 id，-1 = 无）。按下后到松手之前，移动与抬起
-  /// 都投给被按下的控件（`Widget::dispatch_pointer_to`），指针离开它也不会
-  /// 卡住按下态，拖选/拖动插入点才有依据
-  mut hover_id : Int
-  mut capture : Int
-  /// 已下发给窗口的光标形状（只在变了时再走一次 FFI）
-  mut cursor_kind : Int
   /// 按窗复用的帧位图：尺寸没变就不重新分配（每帧 new 是 MB 级分配+清零；
   /// 平台桩在 present 时同步拷贝像素，MoonBit 侧缓冲无延迟读，复用安全）
   mut canvas : @render.Bitmap?
@@ -73,6 +57,7 @@ pub fn App::add_key_fallthrough(self : App, f : (KeyEvent) -> Bool) -> Unit {
 /// 重复安装没有副作用（无头测试自装的静态宿主会在下一扇窗建好时被接管）。
 fn install_host_hooks() -> Unit {
   set_repaint_hook(fn() { host_repaint_all() })
+  @shell.set_repaint_sink(fn() { host_repaint_all() })
   set_overlay_provider(fn() -> OverlayHost? {
     match host_active() {
       Some(a) => Some(a.host)
@@ -97,8 +82,9 @@ fn install_host_hooks() -> Unit {
 }
 
 ///|
-/// 建一扇窗并登记进注册表：注册表还空即主窗，否则是附窗（共用同一个 `Loop`
-/// 与平台泵）。平台后端与窗口都建起来才算成功，无显示服务返回 None。
+/// 建一扇窗并挂上根控件：先开壳层窗（`@shell.session_open`——后端/平台窗
+/// 建不起来给 None），再铺缺省底色、装进程级挂钩，并登记进两半本账。
+/// 注册表还空即主窗，否则是附窗（共用同一个 `Loop` 与平台泵）。
 fn app_window(
   width : Int,
   height : Int,
@@ -106,12 +92,9 @@ fn app_window(
   popup_of : @win.Window?,
   place : (Int, Int)?,
 ) -> App? {
-  if !@win.init_backend() {
-    return None
-  }
-  match @win.Window::new(width, height, title) {
+  match @shell.session_open(width, height, title, popup_of, place) {
     None => None
-    Some(window) => {
+    Some(session) => {
       let root = Widget::new()
       // 缺省底色：宿主先铺一层主题页面色，最小示例不必自己写 on_draw 才有背景
       // （要别的底色/图案照常覆盖 root.on_draw 即可）
@@ -120,50 +103,23 @@ fn app_window(
         p.fill_rect(0.0, 0.0, r.w, r.h)
       })
       let app : App = {
-        window,
-        sched: host_loop(),
+        session,
         root,
         focus: FocusStack::new(),
         host: make_overlay_host(root),
-        wid: host_new_wid(),
-        primary: false,
         closed: false,
-        dirty: true,
-        running: true,
-        last_preedit: ("", 0),
-        ime_focus: 0,
-        hover_id: -1,
-        capture: -1,
-        cursor_kind: 0,
         canvas: None,
         key_fallthrough: [],
         dirty_rect: None,
         dirty_full: false,
       }
-      // 弹层形态要在 show 之前定（类型提示与 transient 关系在映射时生效）
-      match popup_of {
-        None => ()
-        Some(o) => window.set_popup(Some(o))
-      }
-      match place {
-        None => ()
-        Some(p) => window.move_to(p.0, p.1)
-      }
-      host_add(app, host_window_count() == 0)
-      window.show()
-      window.request_focus()
+      host_add_app(app)
       install_host_hooks()
-      // 建窗即挂系统投放目标（W23a）：后端不可用（非 Windows / OLE 起不来）时
-      // 这一步静默失败，应用内拖放照常
-      if @win.dragdnd_supported() {
-        let _ = @win.dragdnd_enable(window.id)
-      }
       Some(app)
     }
   }
 }
 
-///|
 /// 首个宿主入口（主窗）。再要一扇窗用 `App::open_window`，或在本表已空时
 /// 再调一次本函数（那扇又成主窗）。
 pub fn App::new(width : Int, height : Int, title : String) -> App? {
@@ -195,12 +151,12 @@ pub fn App::active_window(self : App) -> App? {
 ///|
 /// 本窗窗号与是否主窗。
 pub fn App::wid(self : App) -> Int {
-  self.wid
+  self.session.wid
 }
 
 ///|
 pub fn App::is_primary(self : App) -> Bool {
-  self.primary
+  self.session.primary
 }
 
 ///|
@@ -209,7 +165,7 @@ pub fn App::is_primary(self : App) -> Bool {
 /// 取 `@win.Window` 自己调——`@win` 是公开包，方法即公开 API。关窗后的调用
 /// 由 win 层自消化（no-op），不需调用方判空。
 pub fn App::window(self : App) -> @win.Window {
-  self.window
+  self.session.window
 }
 
 ///|
@@ -219,7 +175,7 @@ pub fn App::set_fullscreen(self : App, on : Bool) -> Unit {
   if self.closed {
     return
   }
-  self.window.set_fullscreen(on)
+  self.session.window.set_fullscreen(on)
 }
 
 ///|
@@ -308,7 +264,7 @@ pub fn App::enable_root_scroll(self : App) -> Unit {
 /// 标脏并唤醒等待中的平台泵（供控件回调与定时器使用）。整窗语义：浮层
 /// 打开、结构性变更（重挂/换页/主题）与一切拿不准的回退都走这里。
 pub fn App::schedule_paint(self : App) -> Unit {
-  self.dirty = true
+  self.session.dirty = true
   self.dirty_full = true
   self.dirty_rect = None
   @win.wake()
@@ -333,7 +289,7 @@ fn dirty_clip(full : Bool, rect : Rect?) -> Rect? {
 ///|
 /// 局部置脏：把一个控件的绝对矩形并入脏区并唤醒。
 fn App::mark_widget_rect(self : App, w : Widget) -> Unit {
-  self.dirty = true
+  self.session.dirty = true
   self.dirty_rect = accept_widget_rect(self.dirty_full, self.dirty_rect, w.rect)
   @win.wake()
 }
@@ -385,7 +341,7 @@ fn App::mark_focus_id_rect(self : App, focus_id : Int) -> Unit {
 ///|
 /// 相对延时定时器（转派 `Loop::timer`，返回可取消的句柄）。
 pub fn App::timer(self : App, delay_ms : Int, work : () -> Unit) -> Int {
-  self.sched.timer(delay_ms, work)
+  self.session.timer(delay_ms, work)
 }
 
 ///|
@@ -396,27 +352,25 @@ pub fn App::cancel_timer(self : App, id : Int) -> Bool {
   if self.closed {
     return false
   }
-  self.sched.cancel(id)
+  self.session.sched.cancel(id)
 }
 
 ///|
 /// 推迟一拍执行（回调里不做重活的旧链路纪律）。
 pub fn App::task(self : App, work : () -> Unit) -> Unit {
-  self.sched.post_task(work)
+  self.session.task(work)
 }
 
 ///|
 /// 退出：只停派发，不拆对象（拆除由调用方在 `run` 返回后做）。`Loop` 是各窗
 /// 共用的，所以任一窗调它即整体退出。
 pub fn App::quit(self : App) -> Unit {
-  self.sched.quit()
-  self.running = false
-  @win.wake()
+  self.session.quit()
 }
 
 ///|
 pub fn App::is_running(self : App) -> Bool {
-  self.running && self.sched.is_running()
+  !self.closed && self.session.is_running()
 }
 
 ///|
@@ -430,7 +384,7 @@ fn App::flush_ime_for_switch(self : App, prev : Int?) -> Unit {
     Some(id) => {
       let mut more = true
       while more {
-        match self.window.take_commit() {
+        match self.session.window.take_commit() {
           Some(t) => {
             if self.root.dispatch_commit(id, t) {
               self.schedule_paint()
@@ -439,15 +393,15 @@ fn App::flush_ime_for_switch(self : App, prev : Int?) -> Unit {
           None => more = false
         }
       }
-      if self.last_preedit.0.length() > 0 {
+      if self.session.last_preedit.0.length() > 0 {
         self.root.dispatch_preedit(id, "", 0)
-        self.last_preedit = ("", 0)
+        self.session.last_preedit = ("", 0)
       }
     }
     None => ()
   }
-  self.window.im_reset()
-  self.ime_focus = 0
+  self.session.window.im_reset()
+  self.session.ime_focus = 0
 }
 
 ///|
@@ -468,7 +422,7 @@ pub fn App::move_focus(self : App, backward : Bool) -> Unit {
   if next != prev {
     self.flush_ime_for_switch(prev)
   }
-  self.window.request_focus()
+  self.session.window.request_focus()
   // 焦点环只在旧/新两控件上走，局部置脏；flush 里若整窗置脏则并集即整窗
   self.mark_focus_rect(prev)
   self.mark_focus_rect(next)
@@ -525,7 +479,7 @@ pub fn raw_to_event(
 ///|
 fn App::route(self : App, ev : @win.InputEvent) -> Unit {
   // 谁被操作谁就是当前窗（浮层与工具提示跟着它，见 host.mbt）
-  host_mark_active(self)
+  host_mark_active(self.session)
   match raw_to_event(
     ev.code,
     ev.keysym,
@@ -537,11 +491,11 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
   ) {
     Ignored => ()
     Pointer(pev) => {
-      let old_hover = self.hover_id
-      let old_cap = self.capture
-      let r = route_pointer(self.root, pev, self.hover_id, self.capture)
-      self.hover_id = r.0
-      self.capture = r.1
+      let old_hover = self.session.hover_id
+      let old_cap = self.session.capture
+      let r = route_pointer(self.root, pev, self.session.hover_id, self.session.capture)
+      self.session.hover_id = r.0
+      self.session.capture = r.1
       // 光标形状随悬停路径走（拖动期间被捕获，形状停在起手那档）
       let wants_cursor = match pev.kind {
         Move => true
@@ -549,9 +503,9 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
       }
       if wants_cursor {
         let want = self.root.cursor_at(pev.x, pev.y)
-        if want != self.cursor_kind {
-          self.cursor_kind = want
-          self.window.set_cursor(want)
+        if want != self.session.cursor_kind {
+          self.session.cursor_kind = want
+          self.session.window.set_cursor(want)
         }
       }
       match pev.kind {
@@ -562,7 +516,7 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
           // 做这件事，而焦点一旦被网页子件拿走就再也不回来——真机实测症状是
           // 「点进网页再点回输入框，打字毫无反应」（键全被 webview 收走，
           // 连 Ctrl+Z 这类快捷键也进网页）。无条件要一次，代价只是重复 grab 同一个控件。
-          self.window.request_focus()
+          self.session.window.request_focus()
           // 命中可聚焦控件时切焦点栈（栈里没有该 id 时不改焦点栈）
           match self.root.focusable_at(pev.x, pev.y) {
             Some(id) =>
@@ -593,9 +547,9 @@ fn App::route(self : App, ev : @win.InputEvent) -> Unit {
           self.schedule_paint()
         } else {
           self.mark_state_chain(old_hover)
-          self.mark_state_chain(self.hover_id)
+          self.mark_state_chain(self.session.hover_id)
           self.mark_state_chain(old_cap)
-          self.mark_state_chain(self.capture)
+          self.mark_state_chain(self.session.capture)
         }
       }
     }
@@ -664,18 +618,18 @@ pub fn App::pump_ime(self : App) -> Unit {
     Some(id) => id
     None => 0
   }
-  if cur != self.ime_focus {
+  if cur != self.session.ime_focus {
     // 兜底：上层直接改了焦点栈（没走 move_focus / 点击接管）时，旧控件画着的
     // 组合串要清掉，去重缓存一并复位。真正的前置清理见 flush_ime_for_switch。
-    if self.ime_focus != 0 && self.last_preedit.0.length() > 0 {
-      self.root.dispatch_preedit(self.ime_focus, "", 0)
+    if self.session.ime_focus != 0 && self.session.last_preedit.0.length() > 0 {
+      self.root.dispatch_preedit(self.session.ime_focus, "", 0)
     }
-    self.ime_focus = cur
-    self.last_preedit = ("", 0)
+    self.session.ime_focus = cur
+    self.session.last_preedit = ("", 0)
     // 输入法焦点门同步给后端：焦点控件是输入框才让 IM 过滤按键——ibus 一类
     // 会话里 IM 会把字符键全吃进 commit 通道，非输入框焦点时按键事件就只剩
     // 修饰键（真机症状：键盘回显恒 65507 = Control_L）
-    self.window.set_im_active(self.root.im_context_of(cur) is Some(_))
+    self.session.window.set_im_active(self.root.im_context_of(cur) is Some(_))
   }
   if cur == 0 {
     return ()
@@ -683,9 +637,9 @@ pub fn App::pump_ime(self : App) -> Unit {
   match self.root.im_context_of(cur) {
     None => ()
     Some((text, caret)) => {
-      self.window.set_im_surrounding(text, caret)
+      self.session.window.set_im_surrounding(text, caret)
       match self.root.im_cursor_of(cur) {
-        Some(r) => self.window.set_im_cursor(
+        Some(r) => self.session.window.set_im_cursor(
           r.x.floor().to_int(),
           r.y.floor().to_int(),
           r.w.ceil().to_int(),
@@ -695,7 +649,7 @@ pub fn App::pump_ime(self : App) -> Unit {
       }
       let mut more = true
       while more {
-        match self.window.take_commit() {
+        match self.session.window.take_commit() {
           Some(t) =>
             // 提交文本画在焦点控件自己的盒内，局部置脏（entry 这类提交后
             // 有跨控件反应的组件自己会 invalidate 整窗兜底）
@@ -708,9 +662,9 @@ pub fn App::pump_ime(self : App) -> Unit {
           None => more = false
         }
       }
-      let st = self.window.preedit()
-      if st.text != self.last_preedit.0 || st.caret != self.last_preedit.1 {
-        self.last_preedit = (st.text, st.caret)
+      let st = self.session.window.preedit()
+      if st.text != self.session.last_preedit.0 || st.caret != self.session.last_preedit.1 {
+        self.session.last_preedit = (st.text, st.caret)
         self.root.dispatch_preedit(cur, st.text, st.caret)
         match self.root.by_id(cur) {
           Some(w) => self.mark_widget_rect(w)
@@ -747,11 +701,11 @@ pub fn App::paint_frame(self : App) -> Unit {
   text_batch_init()
   // 帧号先进一格：被画到的控件在这一格里记账，自转组件据此判断「这帧有没有我」
   let _ = bump_paint_epoch()
-  self.dirty = false
+  self.session.dirty = false
   let clip = dirty_clip(self.dirty_full, self.dirty_rect)
   self.dirty_full = false
   self.dirty_rect = None
-  let (w, h) = self.window.size()
+  let (w, h) = self.session.window.size()
   if w < 1 || h < 1 {
     return ()
   }
@@ -799,7 +753,7 @@ pub fn App::paint_frame(self : App) -> Unit {
   @text.flush_pending()
   p.end()
   let t2 = @win.now_ms()
-  self.window.present(bm.data, bm.width, bm.height)
+  self.session.window.present(bm.data, bm.width, bm.height)
   let t3 = @win.now_ms()
   // 分段账本：位图分配计入 total 不计入单段，避免把「分配」混进「布局」
   prof_record(t1 - t0, t2 - t1, t3 - t2, t3 - t0)}
@@ -813,14 +767,8 @@ pub fn App::step(self : App) -> Bool {
   if !self.is_running() {
     return false
   }
-  let budget = self.sched.wait_budget(@win.now_ms())
-  let _ = @win.wait(
-    match budget {
-      Some(ms) => ms
-      None => -1
-    },
-  )
-  let _ = self.sched.advance(@win.now_ms())
+  // 泵的「等 + 到期任务」段归壳层（webview/3D 路线只吃这一半就能跑起来）
+  @shell.session_pump_advance()
   // 遍历一律走快照：排空途中关窗会改注册表
   for a in host_windows() {
     a.drain_events()
@@ -836,7 +784,7 @@ pub fn App::step(self : App) -> Bool {
   }
   for a in host_windows() {
     a.pump_ime()
-    if a.dirty {
+    if a.session.dirty {
       a.paint_frame()
     }
     // 原生档浮层：首帧后按内容实测尺寸收框（最多三帧，见 overlay_native.mbt）
@@ -850,7 +798,7 @@ pub fn App::step(self : App) -> Bool {
 fn App::drain_events(self : App) -> Unit {
   let mut keep = true
   while keep && self.is_running() {
-    match self.window.poll_event() {
+    match self.session.window.poll_event() {
       @win.Closing => {
         self.close_window()
         keep = false
@@ -869,7 +817,7 @@ fn App::drain_events(self : App) -> Unit {
         // 必须把自绘控件的焦点清掉，否则输入框继续亮边框、闪光标，看着像还能
         // 往里打字，而键其实全进了网页。整窗失焦（切到别的应用/别的窗）不清，
         // 回到本窗时焦点照旧——这一档是使用者认过的行为。
-        match self.window.focus_owner() {
+        match self.session.window.focus_owner() {
           @win.ChildSurface => {
             self.focus.drop_current()
             self.schedule_paint()
@@ -878,7 +826,7 @@ fn App::drain_events(self : App) -> Unit {
         }
       }
       @win.Input => {
-        match self.window.take_input() {
+        match self.session.window.take_input() {
           Some(ev) => self.route(ev)
           None => ()
         }
@@ -897,12 +845,14 @@ pub fn App::close_window(self : App) -> Unit {
     return
   }
   self.closed = true
-  self.running = false
+  self.session.running = false
+  let session = self.session
   let remaining = host_window_count() - 1
-  host_deregister(self)
-  self.window.close()
-  if host_close_action(self.primary, remaining) {
-    self.sched.quit()
+  host_remove_app(self.wid())
+  host_deregister(session)
+  session.window.close()
+  if host_close_action(session.primary, remaining) {
+    self.session.sched.quit()
     @win.wake()
   }
 }
@@ -918,15 +868,15 @@ pub fn App::run(self : App) -> Unit {
 /// 注册表随之复位。已拆过的窗句柄是 -1，`wm_close` 幂等，重复调无害。
 pub fn App::shutdown(self : App) -> Unit {
   for a in host_windows() {
-    a.running = false
+    a.session.running = false
     a.closed = true
-    a.window.close()
+    a.session.window.close()
   }
   overlay_close_all_native()
-  self.running = false
+  self.session.running = false
   if !self.closed {
     self.closed = true
-    self.window.close()
+    self.session.window.close()
   }
   host_reset()
 }

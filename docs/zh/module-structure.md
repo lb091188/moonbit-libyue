@@ -173,6 +173,14 @@ moonbit-native-gui/                          # 根 workspace
 
 **迁移顺序**：每步独立可编译、可回滚。
 
+0c. **步骤 2·乙核心手术（2026-10-17 已交付）**：`gui/shell/session.mbt` 落地 `Session`（平台窗 + 共用 `Loop` + 窗号/主窗/退出位 + 悬停/捕获/光标/IM 去重缓存 + 整窗 `dirty` 标志 + 泵推进 `session_pump_advance` + 定时器/quit/close 裁决），`host.mbt` 瘦身为「窗号 → 挂了内容的 App」的 widget 侧半本账（`g_apps : Map[Int, App]`），`App = { session, root, focus, host, canvas, dirty_rect, dirty_full, key_fallthrough }`。实测五条：
+   ① **`App` 的字段不再对外**（原 `pub(all)`）——外部模块的无头回归（gui-webview 造假宿主）改走新增的 `@core.test_app(@core.fake_session(..))` 通道；仓内三份假窗 wbtest 同步改走 `fake_session`。
+   ② **事件词汇留在 widget 层**：`PointerKind` 的 `Down/Up/Move/Leave` 有约 290 处 `@core.` 裸变体用法，而工具链**别名不导出构造子**（实测），把事件类型搬进 shell 会当场断掉这批调用点；shell 的泵因此做成「无参 handler 注入」形态，`step` 的排空/输入法/绘制循环留在 widget 层（`@shell.session_pump_advance()` 是泵里唯一归壳层的段）。
+   ③ `host_add_app` 对没进壳层账本的窗（手搓假窗）补 `@shell.host_add`，生产路径仍由 `session_open` 建好即入册——不重复推。
+   ④ 空 Map 字面量口径：`Map[]` 解析不过，`Map::of([])` 弃用且仍报错，**`Map([])` 才编得过**（本工具链实测）。
+   ⑤ 重绘广播经 `@shell.set_repaint_sink`（widget 装配时注入 `host_repaint_all`），与 `set_repaint_hook` 进程级单槽同形——壳层不认识控件树。
+   验证：库 15 包 `test` 967/967、`moon check --deny-warn` 零警告；全 workspace 1194/1194；hello/showcase/browser 重链并本机真窗冒烟（hello 存活 ~1 分钟优雅退出、showcase 15 页 26 秒无 panic、`kill -TERM` 自退）。
+
 0b. **步骤 2·乙首批（2026-10-17 已交付）**：`loop.mbt` 与四个只读探针（now_ms/sys_color_scheme/sys_accent/local_ymd）进 shell；core 用 `pub type Loop = @shell.Loop` + 函数转调门面化，下游 `@core.set_timeout` 等零改动。**卡点定案**：`host.mbt` 不能整文件进 shell——它写 `a.dirty*`、走 `a.root.by_id`+`mark_widget_rect`，App 定义处 import shell 会成包环；余下的 2·乙必须先做 Session 手术（注册表存壳层记录、绘制广播经注入 sink 转投，先例 `set_repaint_hook`）。
 
 0a. **步骤 2·甲（2026-10-17 已交付）**：`gui/shell` 收 menu/hotkey/tray/notify/reveal 五族（与控件树零耦合，只吃 win/sys/dbus）+ 五条 wbtest；core 加 `compat_shell.mbt` 转发。实测两条修正：① **枚举变体转发不了**——别名不导出构造子，且 `Unsupported`/`Failed` 在 TrayError/HotkeyError 里重名无法各自转值，所以外部消费方（showcase 的 system/window 页、menu_probe、hotkey_probe）直接改 `@shell.MenuRole::Copy` 这类全限定写法，这也是终态写法；② **drag.mbt 不在本刀**——它的 `drag_window_root_of`/`set_drag_root` 吃 Widget，留 core 随 widget 刀定归属。`base` 刀同批交付。

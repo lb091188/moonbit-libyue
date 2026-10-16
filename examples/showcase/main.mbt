@@ -279,7 +279,7 @@ fn main {
       // 原生菜单栏：模型翻译成原生菜单挂窗口；项点击经 WM_COMMAND 回收，
       // 100ms 轮询表派发到模型回调（托盘菜单项走同一条派发链）
       let bar = build_menu_bar(app)
-      if bar.apply_to(a.window) {
+      if bar.apply_to(a.window()) {
         let menu_tick : Ref[() -> Unit] = Ref(fn() { () })
         menu_tick.val = fn() -> Unit {
           let _ = @shell.dispatch_menu_command()

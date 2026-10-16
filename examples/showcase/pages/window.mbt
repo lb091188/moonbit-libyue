@@ -94,7 +94,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
     match app.host.val {
       Some(a) =>
         taskbar_out.set(
-          if a.window.set_taskbar_progress(v, t) { "已写进度 \{tag}" } else { "写失败（\{tag}，后端不在位？）" },
+          if a.window().set_taskbar_progress(v, t) { "已写进度 \{tag}" } else { "写失败（\{tag}，后端不在位？）" },
         )
       None => ()
     }
@@ -103,7 +103,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
     match app.host.val {
       Some(a) =>
         taskbar_out.set(
-          if a.window.set_taskbar_state(st) { "已写状态 \{tag}" } else { "写失败（\{tag}，后端不在位？）" },
+          if a.window().set_taskbar_state(st) { "已写状态 \{tag}" } else { "写失败（\{tag}，后端不在位？）" },
         )
       None => ()
     }

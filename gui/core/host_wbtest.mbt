@@ -6,24 +6,13 @@
 
 ///|
 fn fake_app() -> App {
-  let w : @win.Window = { id: 900L, width: 10, height: 10 }
   let root = Widget::new()
   {
-    window: w,
-    sched: host_loop(),
+    session: fake_session(900, host_new_wid(), false, 10, 10),
     root,
     focus: FocusStack::new(),
     host: make_overlay_host(root),
-    wid: host_new_wid(),
-    primary: false,
     closed: false,
-    dirty: false,
-    running: true,
-    last_preedit: ("", 0),
-    ime_focus: 0,
-    hover_id: -1,
-    capture: -1,
-    cursor_kind: 0,
     canvas: None,
     key_fallthrough: [],
     dirty_rect: None,
@@ -35,7 +24,7 @@ fn fake_app() -> App {
 /// 按生产口径登记一扇窗：注册表还空即主窗。
 fn fake_open() -> App {
   let a = fake_app()
-  host_add(a, host_window_count() == 0)
+  host_add_app(a)
   a
 }
 
@@ -53,7 +42,7 @@ fn empty_node() -> Node {
 /// 当前窗的窗号（无窗给 -1）；测试里反复要读，且 `App` 没有 Eq 可比。
 fn active_wid() -> Int {
   match host_active() {
-    Some(x) => x.wid
+    Some(x) => x.wid()
     None => -1
   }
 }
@@ -83,14 +72,14 @@ test "主窗与附窗：第一扇是主窗，摘掉附窗不动主窗" {
   host_reset()
   let a1 = fake_open()
   let a2 = fake_open()
-  assert_true(a1.primary)
-  assert_false(a2.primary)
+  assert_true(a1.session.primary)
+  assert_false(a2.session.primary)
   assert_eq(host_window_count(), 2)
   // 新建的窗即当前窗（它要过键盘焦点）
-  assert_eq(active_wid(), a2.wid)
-  host_deregister(a2)
+  assert_eq(active_wid(), a2.session.wid)
+  host_deregister(a2.session)
   assert_eq(host_window_count(), 1)
-  assert_eq(active_wid(), a1.wid)
+  assert_eq(active_wid(), a1.session.wid)
   host_reset()
   assert_eq(host_window_count(), 0)
   assert_eq(has_active(), false)
@@ -110,13 +99,13 @@ test "close_window：附窗只摘自己，主窗停派发；重复调用幂等" 
   let a2 = fake_open()
   a2.close_window()
   assert_eq(host_window_count(), 1)
-  assert_true(a1.running)
-  assert_false(a2.running)
+  assert_true(a1.session.running)
+  assert_false(a2.session.running)
   assert_true(a2.closed)
   // 句柄被回收成 -1，再调一次不重复摘表也不重复拆
   a2.close_window()
   assert_eq(host_window_count(), 1)
-  assert_eq(a2.window.id, -1L)
+  assert_eq(a2.session.window.id, -1L)
   a1.close_window()
   assert_eq(host_window_count(), 0)
   assert_false(a1.is_running())
@@ -128,12 +117,12 @@ test "重绘广播：invalidate 让所有在窗置脏" {
   host_reset()
   let a1 = fake_open()
   let a2 = fake_open()
-  a1.dirty = false
-  a2.dirty = false
+  a1.session.dirty = false
+  a2.session.dirty = false
   install_host_hooks()
   invalidate()
-  assert_true(a1.dirty)
-  assert_true(a2.dirty)
+  assert_true(a1.session.dirty)
+  assert_true(a2.session.dirty)
   host_reset()
 }
 
@@ -151,7 +140,7 @@ test "浮层开在当前窗：切换当前窗后新层落进另一棵树的图�
   assert_eq(a1.host.items.length(), 0)
   assert_true(a2.host.layer.visible)
   assert_false(a1.host.layer.visible)
-  host_mark_active(a1)
+  host_mark_active(a1.session)
   let id2 = overlay_show_at(empty_node(), 20.0, 20.0)
   assert_eq(a1.host.items.length(), 1)
   assert_eq(a2.host.items.length(), 1)
@@ -204,7 +193,7 @@ test "mount 升的是本窗图层，不动别的窗" {
   let a1 = fake_open()
   let a2 = fake_open()
   install_host_hooks()
-  host_mark_active(a1)
+  host_mark_active(a1.session)
   let _ = overlay_show_at(empty_node(), 0.0, 0.0)
   // a1 挂内容：图层必须回到 a1 根控件的最后；a2 的图层位置不受影响
   let a2_layer_at = a2.root.index_of(a2.host.layer)
@@ -223,13 +212,13 @@ test "shutdown 把所有还在的窗一起拆掉并复位注册表" {
   let a2 = fake_open()
   a1.shutdown()
   assert_eq(host_window_count(), 0)
-  assert_false(a1.running)
-  assert_false(a2.running)
-  assert_eq(a1.window.id, -1L)
-  assert_eq(a2.window.id, -1L)
+  assert_false(a1.session.running)
+  assert_false(a2.session.running)
+  assert_eq(a1.session.window.id, -1L)
+  assert_eq(a2.session.window.id, -1L)
   // 复位后同进程再开一窗又是主窗
   let a3 = fake_open()
-  assert_true(a3.primary)
+  assert_true(a3.session.primary)
   host_reset()
 }
 
@@ -263,14 +252,14 @@ test "invalidate_id 只标命中窗的局部脏区" {
   kid.set_size(20.0, 12.0)
   a1.root.append_child(kid)
   invalidate_id(kid.id)
-  assert_true(a1.dirty)
+  assert_true(a1.session.dirty)
   assert_false(a1.dirty_full)
   match a1.dirty_rect {
     Some(_) => ()
     None => fail("命中控件应当落下局部脏区")
   }
   // 另一扇窗没被牵连（广播式 invalidate 会给它整窗脏）
-  assert_false(a2.dirty)
+  assert_false(a2.session.dirty)
   assert_true(a2.dirty_rect is None)
   // 所有窗都没有这个 id：回退整窗广播
   invalidate_id(987_654)
@@ -334,7 +323,7 @@ test "mark_focus_rect 按焦点 id 命中，不拿它当实例 id 用" {
   }
   // 树里没有这个焦点号：整窗兜底（宁可多画不可漏画）
   a.dirty_rect = None
-  a.dirty = false
+  a.session.dirty = false
   a.mark_focus_rect(Some(4444))
   assert_true(a.dirty_full, msg="未知焦点号应回退整窗置脏")
   host_reset()

@@ -138,3 +138,43 @@ pub fn sys_accent() -> String {
 pub fn local_ymd() -> (Int, Int, Int) {
   @shell.local_ymd()
 }
+
+///|
+pub type Session = @shell.Session
+
+///|
+pub fn host_loop() -> @shell.Loop { @shell.host_loop() }
+pub fn host_new_wid() -> Int { @shell.host_new_wid() }
+pub fn host_window_count() -> Int { @shell.host_window_count() }
+pub fn host_close_action(primary : Bool, remaining : Int) -> Bool {
+  @shell.host_close_action(primary, remaining)
+}
+pub fn host_add_session(s : Session) -> Unit { @shell.host_add(s) }
+pub fn host_deregister(s : Session) -> Unit { @shell.host_deregister(s) }
+pub fn host_mark_active(s : Session) -> Unit { @shell.host_mark_active(s) }
+pub fn shell_sessions() -> Array[Session] { @shell.host_windows() }
+pub fn session_active() -> Session? { @shell.session_active() }
+
+///|
+pub fn fake_session(id : Int, wid : Int, primary : Bool, w : Int, h : Int) -> Session {
+  @shell.fake_session(id, wid, primary, w, h)
+}
+
+///|
+/// 跨模块测试通道：给一扇（假）壳层窗挂上空的根控件与浮层宿主，返回可挂载
+/// 内容的 `App`。`App` 自 G9 Batch 2 起不再对外展开字段，外部包的无头回归
+/// （gui-webview 一类）经本函数造宿主。
+pub fn test_app(s : Session) -> App {
+  let root = Widget::new()
+  {
+    session: s,
+    root,
+    focus: FocusStack::new(),
+    host: make_overlay_host(root),
+    closed: false,
+    canvas: None,
+    key_fallthrough: [],
+    dirty_rect: None,
+    dirty_full: false,
+  }
+}

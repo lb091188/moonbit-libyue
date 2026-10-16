@@ -232,7 +232,7 @@ pub fn Webview::node(
 /// 第一次拿到真实矩形时挂子件槽并把页面装进去，同时起事件泵。
 fn Webview::mount_at(self : Webview, rect : (Double, Double, Double, Double)) -> Unit {
   let k = webview_rect_key(rect)
-  match self.app.window.mount_child_surface(@win.Webview, rect) {
+  match self.app.window().mount_child_surface(@win.Webview, rect) {
     None => ()
     Some(s) => {
       self.surface = Some(s)

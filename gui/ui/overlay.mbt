@@ -809,7 +809,7 @@ pub fn toast_layer(
   let win_w = fn() -> Double {
     match @core.host_active() {
       Some(a) => {
-        let (w, _h) = a.window.size()
+        let (w, _h) = a.window().size()
         w.to_double()
       }
       None => 0.0

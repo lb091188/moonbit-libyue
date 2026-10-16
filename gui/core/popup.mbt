@@ -43,7 +43,7 @@ pub fn App::open_popup(
   screen_w? : Int = 0,
   screen_h? : Int = 0,
 ) -> App? {
-  let o = self.window.origin()
+  let o = self.session.window.origin()
   let pos = popup_place(
     o.0,
     o.1,
@@ -54,5 +54,5 @@ pub fn App::open_popup(
     screen_w,
     screen_h,
   )
-  app_window(width, height, "popup", Some(self.window), Some(pos))
+  app_window(width, height, "popup", Some(self.session.window), Some(pos))
 }

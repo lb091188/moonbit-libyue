@@ -3,24 +3,13 @@
 
 ///|
 fn fake_host_app() -> App {
-  let w : @win.Window = { id: 900L, width: 400, height: 300 }
   let root = Widget::new()
   {
-    window: w,
-    sched: Loop::new(),
+    session: fake_session(900, 1, true, 400, 300),
     root,
     focus: FocusStack::new(),
     host: make_overlay_host(root),
-    wid: 1,
-    primary: true,
     closed: false,
-    dirty: false,
-    running: true,
-    last_preedit: ("", 0),
-    ime_focus: 0,
-    hover_id: -1,
-    capture: -1,
-    cursor_kind: 0,
     canvas: None,
     key_fallthrough: [],
     dirty_rect: None,
@@ -32,10 +21,10 @@ fn fake_host_app() -> App {
 test "档位判定：所在窗没有已挂载子件时走图层档" {
   host_reset()
   let a = fake_host_app()
-  host_add(a, true)
+  host_add_app(a)
   set_overlay_provider(fn() -> OverlayHost? { Some(a.host) })
   // 假窗句柄越界，桩里所有 wm_* 早退 → 子件数恒 0 → 不走原生档
-  assert_eq(a.window.has_child_surfaces(), false)
+  assert_eq(a.session.window.has_child_surfaces(), false)
   assert_eq(overlay_native_tier(), false)
   assert_eq(overlay_native_count(), 0)
   // 图层档照常工作
@@ -90,7 +79,7 @@ test "内容量尺：取可见子项的右/下边界，隐藏项不算" {
 test "失焦与收框：没有原生档浮层时两条路径都是空操作" {
   host_reset()
   let a = fake_host_app()
-  host_add(a, true)
+  host_add_app(a)
   overlay_on_lost_focus(a)
   overlay_fit_pass(a)
   assert_eq(overlay_native_count(), 0)
