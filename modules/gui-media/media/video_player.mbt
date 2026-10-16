@@ -49,7 +49,7 @@ let bar_speeds : ReadOnlyArray[Double] = [1.0, 1.25, 1.5, 2.0, 0.75]
 
 ///|
 /// 第 i 次点击对应的档位（i 可任意增长，含负数）。
-pub fn player_speed_at(i : Int) -> Double {
+pub fn bar_speed_at(i : Int) -> Double {
   let n = bar_speeds.length()
   let k = i % n
   bar_speeds[if k < 0 { k + n } else { k }]
@@ -102,7 +102,7 @@ fn bar_clamp01(f : Double) -> Double {
 /// 控制条的命中分区：返回 (分区名, 比例 0..1)。分区名是
 /// `"pause"|"step_back"|"step_fwd"|"speed"|"seek"|"volume"|""`（空串=不响应区）。
 /// 纯函数，独立于绘制与事件投递，方便无头断言。
-pub fn player_bar_hit(
+pub fn bar_hit(
   x : Double,
   _y : Double,
   w : Double,
@@ -128,11 +128,43 @@ pub fn player_bar_hit(
 }
 
 ///|
+/// 打不开媒体时的说明板（`video` 与 `audio` 共用）：铺满底色、
+/// 红字写原因，不抛异常——探测 + 降级不静默。
+fn media_error_board(
+  msg : String,
+  width : Double,
+  height : Double,
+  handle : (@core.Widget) -> Unit,
+) -> @core.Node {
+  let w = @core.Widget::new()
+  w.set_size(width, height)
+  w.on_draw = Some(fn(
+    _w : @core.Widget,
+    p : @render.Painter,
+    r : @core.Rect,
+  ) -> Unit {
+    p.set_fill_color(@theme.theme_bg_page())
+    p.fill_rect(0.0, 0.0, r.w, r.h)
+    p.flush()
+    let _ = @text.draw_text_at(
+      p,
+      8.0,
+      8.0,
+      msg,
+      13.0,
+      @theme.theme_danger(),
+    )
+  })
+  handle(w)
+  @core.node_of(w)
+}
+
+///|
 /// 播放器控件。`subtitle` 传**已读好的字幕文本**（SRT/VTT，外部文件的读取归调用方，
 /// 本组件不碰使用者的磁盘路径）；留空时组件会试一次**容器内嵌轨**（那是媒体文件
 /// 自己的内容，走解码器不是走 IO）。打不开媒体时不抛异常——画一块说明板并把原因
 /// 经 `on_error` 交出去（探测 + 降级不静默）。
-pub fn player_t(
+pub fn video(
   path : String,
   subtitle? : String = "",
   width? : Double = 640.0,
@@ -160,27 +192,12 @@ pub fn player_t(
     Ok(p) => p
     Err(e) => {
       on_error(e)
-      let w = @core.Widget::new()
-      w.set_size(width, height)
-      w.on_draw = Some(fn(
-        _w : @core.Widget,
-        p : @render.Painter,
-        r : @core.Rect,
-      ) -> Unit {
-        p.set_fill_color(@theme.theme_bg_page())
-        p.fill_rect(0.0, 0.0, r.w, r.h)
-        p.flush()
-        let _ = @text.draw_text_at(
-          p,
-          8.0,
-          8.0,
-          "打不开媒体：" + e,
-          13.0,
-          @theme.theme_danger(),
-        )
-      })
-      handle(w)
-      return @core.node_of(w)
+      return media_error_board(
+        "打不开媒体：" + e,
+        width,
+        height,
+        handle,
+      )
     }
   }
   // 字幕两条来源：调用方给的外部文本优先（那是明确意图）；没给才试容器的内嵌轨。
@@ -338,7 +355,7 @@ pub fn player_t(
   ) -> Bool {
     match ev.kind {
       @core.Down => {
-        let hit = player_bar_hit(ev.x, ev.y, bar_w.val, 34.0)
+        let hit = bar_hit(ev.x, ev.y, bar_w.val, 34.0)
         if hit.0 == "pause" {
           if engine.is_playing() {
             engine.pause()
@@ -352,7 +369,7 @@ pub fn player_t(
           @core.invalidate()
         } else if hit.0 == "speed" {
           speed_i.val = speed_i.val + 1
-          let v = player_speed_at(speed_i.val)
+          let v = bar_speed_at(speed_i.val)
           engine.set_speed(v)
           on_speed(v)
           @core.invalidate()
@@ -369,11 +386,11 @@ pub fn player_t(
       }
       @core.Move => {
         if dragging.val {
-          let hit = player_bar_hit(ev.x, ev.y, bar_w.val, 34.0)
+          let hit = bar_hit(ev.x, ev.y, bar_w.val, 34.0)
           drag_frac.val = hit.1
           @core.invalidate()
         } else if vol_drag.val {
-          let hit = player_bar_hit(ev.x, ev.y, bar_w.val, 34.0)
+          let hit = bar_hit(ev.x, ev.y, bar_w.val, 34.0)
           engine.set_volume(hit.1)
           @core.invalidate()
         }

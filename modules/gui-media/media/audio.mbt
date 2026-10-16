@@ -17,6 +17,11 @@ pub(all) enum ApState {
 let ap_high_water : Int = 40000
 
 ///|
+/// 组件层的 tick 周期（毫秒）：`audio` 按它排 `pump`，静音降级模式
+/// 的位置近似也按它算——两处必须是同一个数，否则无设备环境的进度会漂。
+let ap_tick_ms : Int = 33
+
+///|
 /// 音量钳制（有效区间 [0,1]；NaN 按 0 处理）。
 fn media_clamp_volume(v : Double) -> Double {
   let x = if v != v {
@@ -115,7 +120,7 @@ pub(all) struct AdevBox {
 
 ///|
 /// 音频播放器：make 打开文件（ffmpeg Demuxer）与输出设备；组件层
-/// 以 50ms 定时器调 pump 推进。duration 来自容器头。
+/// 以 `ap_tick_ms` 定时器调 pump 推进。duration 来自容器头。
 pub(all) struct AudioPlayer {
   demuxer : @ffmbt.Demuxer
   dev : Ref[MbtAdev?]
@@ -165,9 +170,9 @@ pub fn AudioPlayer::current(self : AudioPlayer) -> Double {
           t
         }
       } else {
-        // 哑设备：每 tick 解一帧（一帧 ≈ 25ms）近似推进
-        self.pos_base.val + self.muted_ticks.val.to_double() * 0.025 *
-          self.speed.val
+        // 哑设备：每 tick 解一帧（一帧 ≈ 一个 tick）近似推进
+        self.pos_base.val + self.muted_ticks.val.to_double() *
+          ap_tick_ms.to_double() / 1000.0 * self.speed.val
       }
     None => 0.0
   }
@@ -361,7 +366,7 @@ pub fn AudioPlayer::pump(self : AudioPlayer) -> Unit {
           }
         }
       } else {
-        // 哑设备：解一段丢一段，按基准位置+tick×25ms 近似推进，到时长转态
+        // 哑设备：解一段丢一段，按基准位置+tick×ap_tick_ms 近似推进，到时长转态
         match self.demuxer.decode_pcm() {
           Some(_) => ()
           None => self.eof.val = true

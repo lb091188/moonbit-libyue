@@ -10,10 +10,13 @@
 
 ## 包布局
 
-| 包 | 内容 | 状态 |
-|---|---|---|
-| `NoahLiu/gui-media/media` | **新栈引擎**：ffmpeg 解码 + miniaudio 设备直出，帧以 RGBA 字节交出；含 `player_t` 播放器组件与字幕层 | 现行 |
-| `NoahLiu/gui-media/src` | 旧链声明式播放器组件（`AudioPlayer`/`VideoPlayer`/`*_player_t`），挂在 0.5.11 旧链上 | 待 `systemprobe` 媒体页迁移后下线（见 `TODO.md`） |
+本模块只有一个包：
+
+| 包 | 内容 |
+|---|---|
+| `NoahLiu/gui-media/media` | ffmpeg 解码 + miniaudio 设备直出的引擎（`AudioPlayer` / `VideoPlayer` / `Demuxer` 之上的字幕层），以及两个节点组件 `player_t`（视频，含音轨与字幕叠加）与 `audio_player_t`（纯音频） |
+
+两条时钟不同轴：`player_t` 的位置是墙钟 + 帧时间戳，`audio_player_t` 的是设备已消费字节。所以带视频轨的文件走前者、纯音频走后者，组件之间不互相代打。
 
 ## 安装
 
@@ -35,30 +38,33 @@ moon add NoahLiu/gui-media
 
 ## 快速上手
 
-音频播放：
+组件层（节点组件，自带控制条；名字对齐 HTML 的 `<audio>` / `<video>`）：
 
 ```moonbit
-let player = @yuemedia.AudioPlayer::make("music.mp3")!
+// 纯音频：播放/进度/-5s·+5s 跳转/音量/倍速
+let a = @media.audio("music.mp3", width=560.0, auto_play=true, on_error=fn(e) { .. })
+
+// 视频：画面 + 音轨 + 字幕叠加（subtitle 传已读好的 SRT/VTT 文本，留空则试容器内嵌轨）
+let v = @media.video("demo.mp4", width=640.0, height=360.0, auto_play=true)
+```
+
+两个组件都返回 `@core.Node`，直接挂进声明式树即可；观测口 `on_tick`/`on_speed`/`on_subtitle` 给位置、档位、字幕来源，调用方不必读引擎内部状态。打不开时不抛异常——画说明板并把原因经 `on_error` 交出去。
+
+引擎层（不用组件、自己驱动时钟时）：
+
+```moonbit
+let player = @media.AudioPlayer::make("music.mp3")!
 player.play()
-```
+// 组件定时器里每 33ms 调一次 player.pump()
 
-视频播放：
-
-```moonbit
-let vp = @yuemedia.VideoPlayer::make("demo.mp4")!
+let vp = @media.VideoPlayer::make("demo.mp4")!
 vp.play()
-```
-
-接入声明式 UI（节点组件，带进度/控制条）：
-
-```moonbit
-@yuemedia.audio_player_t(player, style=[("width", 360.0)], on_event=fn(ev) { .. })
-@yuemedia.video_player_t(vp, style=[("width", 640.0), ("height", 360.0)])
+// 每 33ms 调一次 vp.tick()，帧从 vp.current_frame() 取 RGBA 字节
 ```
 
 ## 示例
 
-完整用法见 [gui-examples](https://github.com/lb091188/moonbit-native-gui/tree/master/modules/gui-examples) 的 systemprobe（媒体页）。
+完整用法见 [gui-examples](https://github.com/lb091188/moonbit-native-gui/tree/master/modules/gui-examples) 的 `audio`（播放列表 + 选文件/选目录扫描）与 `video`（侧栏列表 + 字幕双来源）两个示例。
 
 ## 许可
 

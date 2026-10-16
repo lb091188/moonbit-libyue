@@ -1019,10 +1019,10 @@
 - **素材路径口径变了**：native 测试的可执行文件 cwd 是**工作区根**，不是包目录（旧包在 `modules/gui-media/src` 时写的是 `../ffmpeg-mbt/src/testdata/`）。新包写 `modules/ffmpeg-mbt/src/testdata/av_1s.mp4` 才对，判据是报错里原样打印的那个相对路径。
 - **帧回灌的字节序**：ffmpeg 的 sws 目标是 `AV_PIX_FMT_RGBA`（R,G,B,A），而 `render` 的 `Bitmap` 内部是 Cairo `ARGB32` 的小端布局（B,G,R,A、预乘）。所以灌帧必须换 R/B；不透明像素下预乘等于非预乘，alpha 直接写 255。这条在 `rgba_to_bitmap` 里逐字节钉住（wbtest 断言 `10 20 30 00 → 30 20 10 ff`），真窗口回证是 testsrc 彩条颜色不错位。
 - **本工具链没有 `FixedArray::of_list` / `Array::freeze` / `Bytes::of_list`**：造测试字节只能 `FixedArray::make(n, b'\x00')` + 按下标写 + `Bytes::from_array`。另外 `String::split` 给的是 **`StringView` 迭代器**（要 `to_owned()` 才拿到 `String`）、`replace` 是带标签参数（`old=`/`new=`）、`StringBuilder()` 才是构造形态（`Buffer::new` 不存在）、`y` 这类未用形参要写 `_y`。
-- **UI 与引擎的分层**：`player_t` 放在 `yue/media`（包内 import `@core`/`@render`/`@text`/`@theme`），**不放进 `ui`**——否则每个只用按钮的应用都要链 ffmpeg 与 miniaudio。引擎文件（`audio.mbt`/`video.mbt`/`subtitle.mbt`）保持零 UI 依赖，媒体层不依赖 webview，两者只依赖窗口/布局/事件层（积木原则第 1 条）。
+- **UI 与引擎的分层**：`video` 放在 `yue/media`（包内 import `@core`/`@render`/`@text`/`@theme`），**不放进 `ui`**——否则每个只用按钮的应用都要链 ffmpeg 与 miniaudio。引擎文件（`audio.mbt`/`video.mbt`/`subtitle.mbt`）保持零 UI 依赖，媒体层不依赖 webview，两者只依赖窗口/布局/事件层（积木原则第 1 条）。
 - **时钟与重绘**：引擎的 `tick()`（原 `vp_tick`，本批开成公开口 `tick` + 新增 `frames_decoded()`）由 `@core.set_timeout(33, ...)` 自续驱动，**不在绘制里推进**；每 tick 调 `on_tick(位置, 帧数, 是否在播)` 观测口，示例用它证明「帧在推进、时钟在走」而不是一张贴图。图片对象按 `frames_decoded()` 变化才重建（每帧重建 Image 会把 cairo surface 反复建掉）。
 - **seek 防抖做成了分区纯函数**：`player_bar_hit` 把控制条切成「最左 34px 播放键 / 右侧 150px 时间文字 / 中间进度轨」，拖动期间只更新显示位置、**抬手才真 seek**——旧链的坑是每次拖动都 seek，关键帧距离长时画面卡一整拍。断言里两条边界值得记：轨道两端是钳制而非越界（449px 处 >0.99 而不是 ==1.0），负坐标落进播放键区（先分区再算比例）。
-- **打不开媒体不静默**：`player_t` 的 `make` 失败时画一块说明板并把原因经 `on_error` 交出去（探测 + 语义化降级），示例的 `err=''` 就是「没有降级发生」的回证。
+- **打不开媒体不静默**：`video` 的 `make` 失败时画一块说明板并把原因经 `on_error` 交出去（探测 + 语义化降级），示例的 `err=''` 就是「没有降级发生」的回证。
 - **本批未做（记在 TODO，不假装完成）**：倍速（音频侧要时间拉伸，只做视频侧会破坏音画同步——正是本档反复警告的那条）、内嵌字幕轨（mov_text/ass，本批只吃外挂 SRT/VTT 文本）、全屏、音量条 UI（引擎有 `set_volume`，控件没画）、逐帧步进。
 - **验证**：`moon test -p NoahLiu/native-gui/yue/media` **18/18**（15 条平移：音频播放/pump/seek/循环、视频解码/时钟/时长/帧尺寸/无音轨静音推进；新增 3 条：字幕四段（时间戳两种写法、SRT/VTT 通吃、行内标记剥离、命中边界含起止与多条拼接）、帧回灌字节序与短包尾像素、控制条分区）；`moon check yue/media`/`./examples/native-web` `--deny-warn` 零警告；core 70/70、ui 110/110、web 11/11、render 43/43、text 29/29 未掉；全仓红点仍 287 errors / 68 warnings。真窗口回证（`examples/native-web` 的「开一扇播放器窗」= 第三扇窗播 `av_1s.mp4` + 内联 SRT）：`NATIVE-WEB-MEDIA frames=10 pos_ms=1000 playing=0 err=''`（1 秒片解满 10 帧、时钟走到 1000ms、播完自动停、无降级），截图见彩条画面颜色不错位 + 白字「第二条字幕（0.6~1.0 秒）」叠在画面上 + 控制条进度满格与 `0:01 / 0:01`。**待使用者肉眼复验**：有声播放是否真出声（本机有 miniaudio 设备）、拖动进度条的 seek 手感、长片倍速与逐帧（本批未做）。
 
@@ -1059,7 +1059,7 @@
 - **必须另开一份容器读**：字幕解码器若与视频/音频共用 `AVFormatContext`，两边都在推进同一个 `av_read_frame` 游标——读完字幕后视频就从中间开始、或直接 EOF。所以 `subtitle_cues` 内部自己 open 一份、读完就关，代价是一次额外的容器打开（字幕是稀疏的、一次读完，比逐帧查便宜），换来的是**播放中途调用也不搅动主时间轴**——这条写成了无头断言（读完字幕后再开一份继续解，帧 pts 照常推进）。
 - **一条时长谎报（真数据抓到，不是猜）**：mov_text 解出来的 `AVSubtitle.end_display_time` **恒为 2000ms**（解码器不填条目时长时的默认值），照它读，第一条字幕会压住第二条、并在应该消失之后还挂着一秒。判据是打印出来的表：`0.2..2.2 / 0.6..2.6`（错）对 `0.2..0.6 / 0.6..1.0`（素材本意）。修法取**「包时长」与「end_display_time」里较短的那个**（包时长要在 `av_packet_unref` 之前取，之后会被清零）——mp4 的 sample duration 是权威的，实测落回素材本意。
 - **ASS 整行前缀在 FFI 层剥**：部分文本字幕解码器（mov_text 即其一）不填 `rect->text`、只给整行 ASS 对话 `ReadOrder,Layer,Style,Name,MarL,MarR,MarV,Effect,文本`——那是解码器输出的**形状**不是内容，所以归一化属于搬运（`subtitle_ass_text`）。判据保守：至少八个逗号、`ReadOrder` 是非空数字、三个边距字段是数字或空才剥；样式名/人名/特效是自由文本，不能当判据，否则正文里恰好带八个逗号的字幕会被切掉半句（这条有正反用例钉着）。排版标记（`{\an8}`、`<c.xxx>`）仍归 `yue/media` 的 `strip_cue_tags`，与外部字幕同一条清洗路——两种来源在渲染侧完全同形。
-- **播放器两条来源 + 一个观测口**：`player_t` 的 `subtitle` 传了就用（明确意图优先），留空才试容器内嵌轨；`on_subtitle(条数, 是否内嵌)` 与既有 `on_tick`/`on_speed` 同构，示例把两个值写进退出行（`NATIVE-WEB-MEDIA ... subs=2 emb=1`、`NATIVE-WEB-LOCAL ... subs=0`），「这条片没字幕轨」与「字幕轨解不开」在回证里分得开——后者会经 `on_error` 报出原因而不是静默给空表。
+- **播放器两条来源 + 一个观测口**：`video` 的 `subtitle` 传了就用（明确意图优先），留空才试容器内嵌轨；`on_subtitle(条数, 是否内嵌)` 与既有 `on_tick`/`on_speed` 同构，示例把两个值写进退出行（`NATIVE-WEB-MEDIA ... subs=2 emb=1`、`NATIVE-WEB-LOCAL ... subs=0`），「这条片没字幕轨」与「字幕轨解不开」在回证里分得开——后者会经 `on_error` 报出原因而不是静默给空表。
 - **验证**：`moon test -p NoahLiu/ffmpeg-mbt/src` **6/6**（新增 2 条：`subtitle_ass_text` 的剥前缀与三种「不该剥」的反例、真容器 `av_1s_subs.mp4` 整条读出 + 起止秒 + 中文文本 + 不搅动主时间轴 + 「无轨=Ok([])」与「打不开=Err」分开）；`moon test -p NoahLiu/native-gui/yue/media` **24/24**（新增 2 条：内嵌轨转 `Cue` 的搬运与清洗口径对齐、端到端按位置命中）；`yue/media`/`web`/`core`/`ui`/`ffmpeg-mbt` 与 `examples/native-web` `--deny-warn` 零警告，全仓红点仍 287 errors / 68 warnings。测试素材是仓库内自带的 13KB 三流片（`av_1s.mp4` 流拷贝 + 两条 mov_text，`ffmpeg -map 0:v -map 0:a? -map 1:0 -c copy -c:s mov_text`）。**使用者已真机复验（2026-10-12）**：内嵌字幕窗两条字幕按 0.2~0.6 / 0.6~1.0 出现与消失、外挂那条窗行为不变、长素材窗 `subs=0` 不报错。
 - **本批未做（不假装完成）**：ASS 的样式渲染（颜色/定位/多轨选择，目前只按文本叠加）、字幕轨列表与切换（多轨容器只取 `av_find_best_stream` 选中的那条）、倍速下的听感复验。
 
@@ -1070,7 +1070,7 @@
 - **换速要把时钟基准重钉一次**：`set_speed` 先读当前位置、再改倍速、然后把 `base_pts/pos_base` 设成这个位置、`wall0/played_base` 设成当下——不重钉的话位置会按新旧倍速差跳一下。音频位置口径跟着变：队列里是重采样后的样本，所以「消费 N 个样本 = 走过 N×speed 个源样本」，`AudioPlayer::current()` 里那一项要乘 speed。
 - **无时间戳的流不假装支持**：回退路径（每 tick 一帧、按流帧率步进）没有 pts 可追，倍速只影响时钟不影响画面，这一点写在 `tick` 的注释里而不是藏在代码里。
 - **档位取自表而不是就地加减**：`bar_speeds = [1.0, 1.25, 1.5, 2.0, 0.75]`，点击只推进下标（`player_speed_at(i)`，含负数与回绕），所以不存在 `+= 0.25` 累加漂出档位的可能；钳制在引擎侧（`media_clamp_speed`，[0.25,4.0]，NaN 回 1.0 而不是最快/最慢档）。控制条多出第六个分区（`speed`），轨道起点随之从 114px 挪到 154px，音量条让位阈值从 400 抬到 440——**绘制与命中读同一组常量**这条判据在这批第二次发挥作用。
-- **观测口而不是猜**：`player_t` 加 `on_speed(v)`（与既有 `on_tick`/`on_error` 同构），示例把档位写进退出行 `NATIVE-WEB-MEDIA ... speed=1.5x`，回证不必去读引擎内部状态。
+- **观测口而不是猜**：`video` 加 `on_speed(v)`（与既有 `on_tick`/`on_error` 同构），示例把档位写进退出行 `NATIVE-WEB-MEDIA ... speed=1.5x`，回证不必去读引擎内部状态。
 - **本批未做（不假装完成）**：内嵌字幕轨（mov_text/ass 要 `ffmpeg-mbt` 先暴露字幕流）、真出声与听感复验（倍速下是否仍同步、音高随动是否可接受）。
 - **验证**：`moon test -p NoahLiu/native-gui/yue/media` **22/22**（新增 3 条：倍速档位表含回绕与负下标 + 标签短写法、`media_clamp_speed` 与 `vp_target_pts` 三条算式、`media_resample_s16` 的 2 倍/0.5 倍样本数与插值中点与双声道不串位及三种原样返回情形；另在真机解码那条里加 `get_speed` 钳制回环；控制条分区测试改到六段）；`moon check yue/media`/`./examples/native-web` `--deny-warn` 零警告。真窗口回证（`examples/native-web`「开一扇播放器窗」→ 在控制条倍速区连点两下：1x→1.25x→1.5x）：`NATIVE-WEB-MEDIA frames=10 pos_ms=1000 playing=0 speed=1.5x err=''`——档位由 `on_speed` 观测口报出（不是读引擎内部），1 秒片在 1.5 倍速下仍解满 10 帧并走到 1000ms 后自停、无降级；截图见控制条 `▶ |< >| 1.5x` + 进度满格 + 音量条 + `0:01 / 0:01`。**使用者已真机复验（2026-10-12）**：倍速下音画仍同步、音高随动可接受、音量条拖动确实变响。
 
@@ -1791,6 +1791,16 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - 修复:① 显式增加 `VpEnded` 态(对标 AudioPlayer 的 `ApEnded`),EOF 非循环转 VpEnded;`play()` 对 VpEnded 先走 `vp_restart`(双 demuxer seek(0) + pos/base_pts/frame_no 归零 + 音频队列重填)再起播;② `stop()` 补音频 demuxer seek(0);③ `seek()` 把 VpEnded 迁移到 VpPaused——播完态拖进度后再 play 从落点续播,不被误判成重播(重播语义只属于「停在末尾直接再 play」)。
 - 设计取舍:**用显式态而非 `pos>=duration` 启发式**——播放中 target 超时长但尚未 EOF 时 pos 会被 clamp 到 duration(启发式假阳性,「暂停在末尾再播放」会被误判成重播回 0);且容器无时长头(duration=0)时启发式完全失效,显式态两种场景都对。
 - 验证:白盒对照——把 video_player.mbt 暂存回修复前跑 `moon test -p gui-media`,新增两条用例精确失败(播完→play 的 is_playing 断言、stop→play 的音轨 decode_pcm 断言),恢复修复后 11/11 通过;全仓 `moon check --deny-warn` 零警告 + `moon test` 641 全绿(较此前 636 新增 5 条:循环 EOF→vp_restart、播完→play、播完态 seek→play、stop→play、音量钳制)。真机交互(播完再点播放、stop 后重播的观感)由用户复验。
+
+### 纯音频在组件层被拒（播放器只挂视频引擎）与组件名去 `_t` 尾巴（2026-10-16 用户真机反馈）
+
+- 环境：Ubuntu 24.04 + X11 + XFCE，`modules/gui-examples/audio` 载入 `assets/1.mp3`。
+- 现象：右侧红字「打不开媒体：视频解码器打开失败：解码失败：无视频流」，音频示例一首都放不出来。
+- 根因（两层，此前只修过下层）：Demuxer 层 2026-10 已改成「open 只探测流、解码器按需开」，纯音频不再在 `Demuxer::open` 被拒（`ffmpeg_wbtest.mbt` 有断言）；但**组件层**的播放器组件无条件走 `VideoPlayer::make`，而该引擎的时钟是墙钟 + 帧时间戳，`open_video_decoder` 在无视频流时直接 `Err(DecodeFailed("无视频流"))`。`AudioPlayer`（设备已消费字节时钟）作为引擎一直存在且功能完整，**全仓没有任何 UI 用它**——示例头注释「纯音频文件同样走它，引擎自动识别无视频轨」是一句没实现的话。
+- 为什么不把纯音频塞进 `VideoPlayer`：`vp_tick` 在无视频流时首拍 `decode_rgba()→None` 就判 EOF 转 `VpEnded`，要让它有声等于在视频引擎里重做一套设备时钟——就是抄一遍 `AudioPlayer`。两条时钟不同轴，分开是对的。
+- 修复：① 新增音频组件 `media/audio_player.mbt`，控制条与视频组件共用同一套分区常量与命中判据（`BAR_*` / `bar_hit` / `bar_speed_at`），逐帧键在音频侧换成 ±5 秒跳转（`ap_skip`：时长未知时只钳下界，否则 `vp_clamp_t` 会把任何落点打回 0）；组件被外层撑高时多出的高度归舞台区，无输出设备的降级说明写在那块，频谱动画也落这块。② `VideoPlayer::make` 探测到无视频流时给可行动文案（「纯音频文件请用 audio」），不再让解码器报「无视频流」。③ tick 周期归一为 `ap_tick_ms`：原先组件注释写 50ms、静音降级的位置近似按 25ms 算，两处不是一个数，无设备环境进度会漂。
+- 命名口径：按 `docs/zh/design.md` §2 改名批的既定方向去掉 `_t`（历史 themed 变体尾巴）并对齐 Web 元素——播放器组件 `player_t` → `video`，新组件叫 `audio`（gui-media 0.1.0 未发布过，改名零破坏）；共用件 `player_bar_hit`/`player_speed_at` 随之叫 `bar_hit`/`bar_speed_at`。**注意 `audio_player_t`/`video_player_t` 是已删旧链（`modules/gui-media/src`）的组件名**、签名收引擎实例，与本轮无关，本文与 `system-capabilities.md` 里那些历史条目保持原样不改名。
+- 验证：`moon test ./media` **25/25**（新增 `ap_skip` 用例）；`modules/gui-media` 与 `modules/gui-examples` 的 `moon check --deny-warn` 零警告、两示例 native 构建通过；全仓 `moon test` **1179/1179**。真机观感（是否出声、-5s/+5s 落点、倍速听感、换曲）由用户复验。
 
 ### Store 内建去重与 `T : Eq` 限定实现（2026-10-13，前端化 P3 第 0 步）
 

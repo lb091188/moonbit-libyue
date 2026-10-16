@@ -1,9 +1,9 @@
-// 视频播放示例：gui-media 的 player_t 全包组件（引擎/控制条/字幕叠加），
+// 视频播放示例：gui-media 的 video 全包组件（引擎/控制条/字幕叠加），
 // 视频区为主、右侧栏是播放列表与信息。载入路径三条——默认资产
 // （modules/gui-examples/assets/1.mp4，路径对 cwd 稳健解析）、文件对话框
 // 选视频、目录对话框选文件夹后扫描成播放列表。字幕双来源：不给外挂文本时
 // 组件自动读**容器内嵌轨**；「选外挂 .srt」读文本后经 subtitle 参数传入
-// （外部文件读取归调用方）。换曲走 holder clear_children + 重挂 player_t；
+// （外部文件读取归调用方）。换曲走 holder clear_children + 重挂 video；
 // 打开失败经 on_error 落错误横幅，引擎不在位时组件画说明板（不静默）。
 
 ///|
@@ -143,7 +143,7 @@ fn main {
     match player_holder.val {
       Some(h) => {
         h.clear_children()
-        let node = @media.player_t(
+        let node = @media.video(
           path,
           subtitle=sub_text.val,
           width=760.0,

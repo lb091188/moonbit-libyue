@@ -58,7 +58,7 @@ test "AudioPlayer 冒烟：播放/pump/seek/循环" {
       }
     }
     if ticks == 6 {
-      // pump 一拍后位置仍从 seek 点推进（真设备=0.3+消费，哑设备=0.3+0.025）
+      // pump 一拍后位置仍从 seek 点推进（真设备=0.3+设备消费，哑设备=0.3+每拍近似）
       if p.current() < 0.29 {
         fail("seek 后 pump 位置不应回落，实为 \{p.current()}")
       }

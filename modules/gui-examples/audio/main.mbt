@@ -1,10 +1,11 @@
-// 音频播放示例：gui-media 的 player_t 音视频一体组件（纯音频文件同样走它，
-// 引擎自动识别无视频轨），控制条（播放/进度/音量/倍速）由组件自带。
+// 音频播放示例：gui-media 的 audio 音频组件（ffmpeg 解码 + miniaudio
+// 设备直出），控制条（播放/进度/音量/倍速/-5s·+5s 跳转）由组件自带。
 // 布局：左侧播放列表（当前曲目高亮、点击换曲），右侧播放器与状态区；
 // 载入路径三条——默认资产（modules/gui-examples/assets/1.mp3，路径对 cwd
 // 稳健解析）、文件对话框选音频、目录对话框选文件夹后扫描成播放列表。
-// 换曲走 holder clear_children + 重挂 player_t；打开失败经 on_error 落
+// 换曲走 holder clear_children + 重挂 audio；打开失败经 on_error 落
 // 错误横幅，解码引擎不在位时组件画说明板（探测 + 降级，不静默）。
+// 带视频轨的文件走 video，见同模块的 video 示例。
 
 ///|
 /// 音频扩展名（目录扫描与文件对话框过滤共用）。
@@ -136,18 +137,15 @@ fn main {
     match player_holder.val {
       Some(h) => {
         h.clear_children()
-        let node = @media.player_t(
+        let node = @media.audio(
           path,
           width=560.0,
           height=220.0,
           auto_play=true,
-          on_tick=fn(t : Double, frames : Int, playing : Bool) -> Unit {
-            if frames % 8 == 0 {
-              tick_line.set(
-                (if playing { "▶ " } else { "❚❚ " }) +
-                  t.to_string() + "s · " + frames.to_string() + " 帧",
-              )
-            }
+          on_tick=fn(t : Double, playing : Bool) -> Unit {
+            tick_line.set(
+              (if playing { "▶ " } else { "❚❚ " }) + @media.vp_fmt_time(t),
+            )
           },
           on_speed=fn(v : Double) -> Unit {
             tick_line.set("倍速 \{v.to_string()}x")
@@ -280,7 +278,7 @@ fn main {
         [
           @ui.text("音频播放", role=@ui.Section),
           @ui.text(
-            "gui-media player_t（ffmpeg 解码 + 设备直出）：列表点选换曲，控制条自带播放/进度/音量/倍速。",
+            "gui-media audio（ffmpeg 解码 + 设备直出）：列表点选换曲，控制条自带播放/进度/音量/倍速与 ±5 秒跳转。",
             role=@ui.Secondary,
             max_width=860.0,
           ),

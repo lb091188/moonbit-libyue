@@ -507,6 +507,12 @@ pub fn VideoPlayer::make(
     Ok(d) => d
     Err(e) => return Err("FFI 打开失败：\{e}")
   }
+  // 纯音频文件在这里就拒掉，而不是让解码器报「无视频流」：本引擎的时钟是
+  // 墙钟 + 帧时间戳，没有帧就没有时钟，硬撑等于把 AudioPlayer 抄一遍。
+  if !demuxer.has_video() {
+    demuxer.close()
+    return Err("无视频流：纯音频文件请用 audio")
+  }
   match demuxer.open_video_decoder(width~, height~) {
     Ok(_) => ()
     Err(e) => {
