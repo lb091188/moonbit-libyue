@@ -131,6 +131,8 @@ Windows 上构建出的 exe 是 GUI 子系统二进制——双击运行不弹�
 
 `native-gui` 以 [MIT 许可](LICENSE)发布。
 
+第三方资产的授权与来源：见仓库根 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)（FFmpeg LGPL-3、WebView2 MIT、miniaudio 公有领域、mooncakes 依赖 MIT/Apache-2.0）。
+
 ## 参考
 
 - [MoonBit 文档](https://docs.moonbitlang.cn/)

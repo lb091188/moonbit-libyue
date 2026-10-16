@@ -131,6 +131,8 @@ The full process for adding widgets, CI and releases is in [AGENTS.md](AGENTS.md
 
 `native-gui` is released under the [MIT License](LICENSE).
 
+Third-party assets and their licenses: see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) at the repo root (FFmpeg LGPL-3, WebView2 MIT, miniaudio public domain, mooncakes deps MIT/Apache-2.0).
+
 ## References
 
 - [MoonBit docs](https://docs.moonbitlang.cn/)

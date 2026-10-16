@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -43,13 +44,25 @@ WEB_PACKAGE = "NoahLiu/native-gui/web"
 WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"
 
 # ---------------------------------------------------------------------------
-# vendor 大文件改走 GitHub Release 资产（2026-10-14 起，仓库不再入库）：
-# WebView2 静态 Loader 与 SDK 头体积大且基本不更新，留在 git 里只会永久占用
-# 历史体积。构建时缺失即从 Release 下载并校验 sha256；离线环境可提前手工
-# 放置文件（本函数只做「缺失才下载」，已存在不动）。下载失败不中断 prebuild
-# （只报错），让后面的链接期给出明确的缺文件错误。
+# vendor 大文件走 Release 资产（2026-10-14 起仓库不再入库）：WebView2 静态
+# Loader 与 SDK 头体积大且基本不更新，留在 git 里只会永久占用历史体积。构建时
+# 缺失即下载并校验 sha256；离线环境可提前手工放置（只「缺失才下载」，已存在
+# 不动）。下载失败不中断 prebuild（只报错），让后面的链接期给出缺文件错误。
+#
+# 镜像**按序尝试，不做延迟探测**：sha256 一致才落盘，所以任何镜像都可验证，
+# 顺序只影响快慢、不影响正确性；而「先测哪个快再下」会让两台机器从不同源取，
+# 拿可复现性换一个不确定收益。单源超时 20 秒而不是 180 秒——实测本机 GitHub
+# Release 直连 15 秒 0 字节，快速切下一个源比干等一个源有用得多。
+# 加镜像 = VENDOR_BASES 加一行；外部源（内网 / 离线目录）用环境变量
+# NATIVE_GUI_VENDOR_BASE 覆盖（单个 base 或逗号分隔列表），排在列表最前。
 # ---------------------------------------------------------------------------
-RELEASE_BASE = "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1"
+VENDOR_BASES = [
+    "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1",
+    "https://gitee.com/lb091188/moonbit-native-gui/releases/download/vendor-v1",
+]
+
+VENDOR_TIMEOUT = 20
+
 VENDOR_FILES = [
     (
         "web/lib/WebView2LoaderStatic.lib",
@@ -62,28 +75,43 @@ VENDOR_FILES = [
 ]
 
 
-def ensure_release_files() -> None:
+def vendor_bases() -> list[str]:
+    """镜像候选列表：环境变量给的排最前，再按 VENDOR_BASES 顺序。"""
+    env = os.environ.get("NATIVE_GUI_VENDOR_BASE", "")
+    extra = [b.strip().rstrip("/") for b in env.split(",") if b.strip()]
+    return extra + VENDOR_BASES
+
+
+def fetch_vendor_file(name : str, sha : str) -> "bytes | None":
+    """按镜像列表取一个 vendor 文件：sha256 过了才返回字节，全失败给 None。"""
     import hashlib
     import urllib.request
 
+    for base in vendor_bases():
+        url = f"{base}/{name}"
+        try:
+            print(f"prebuild: 取 vendor {url} ...", file=sys.stderr)
+            data = urllib.request.urlopen(url, timeout=VENDOR_TIMEOUT).read()
+        except Exception as e:  # noqa: BLE001——任何网络/URL 错误都换下一个镜像
+            print(f"prebuild: 镜像失败（{e}）", file=sys.stderr)
+            continue
+        if hashlib.sha256(data).hexdigest() != sha:
+            print(f"prebuild: {name} 在该镜像上 sha256 不符，换下一个", file=sys.stderr)
+            continue
+        return data
+    return None
+
+
+def ensure_release_files() -> None:
     for rel, sha in VENDOR_FILES:
         dest = MODULE_ROOT / rel
         if dest.exists():
             continue
-        url = f"{RELEASE_BASE}/{dest.name}"
-        try:
-            print(f"prebuild: 下载 vendor 文件 {dest.name} ...", file=sys.stderr)
-            data = urllib.request.urlopen(url, timeout=180).read()
-        except Exception as e:  # noqa: BLE001——任何网络/URL 错误都只报错不炸
+        data = fetch_vendor_file(dest.name, sha)
+        if data is None:
             print(
-                f"prebuild: 下载失败：{url}（{e}）\n"
-                f"  离线环境请手动下载后放到 {dest}",
-                file=sys.stderr,
-            )
-            continue
-        if hashlib.sha256(data).hexdigest() != sha:
-            print(
-                f"prebuild: {dest.name} sha256 校验不符，拒绝写入（文件损坏或版本不对）",
+                f"prebuild: 全部镜像都没取到 {dest.name}\n"
+                f"  离线环境可手工放置，或用 NATIVE_GUI_VENDOR_BASE 指到自己的源",
                 file=sys.stderr,
             )
             continue

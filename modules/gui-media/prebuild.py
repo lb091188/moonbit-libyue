@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import sys
 import urllib.request
@@ -28,9 +29,21 @@ from pathlib import Path
 MEDIA_PACKAGE = "NoahLiu/gui-media/media"
 SYS_LIBS = ["-lpthread", "-ldl", "-lm", "-lstdc++", "-latomic"]
 
-# miniaudio.h 自 2026-10-14 起不再入库，改挂 GitHub Release 资产：构建时
-# 缺失即下载并校验 sha256；离线环境可提前手工放置（已存在不动）。
-_RELEASE_BASE = "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1"
+# miniaudio.h 自 2026-10-14 起不再入库，改挂 Release 资产：构建时缺失即下载并
+# 校验 sha256；离线环境可提前手工放置（已存在不动）。
+#
+# 镜像按序尝试、不做延迟探测，单源超时 20 秒——理由与主模块
+# `gui/scripts/prebuild.py` 的同名逻辑逐字相同（sha256 过了才落盘，任何镜像都
+# 可验证；先测快慢会让两台机器从不同源取，丢掉可复现性）。两处**刻意各留一份**：
+# 本模块要能独立发布，不能反向依赖主模块的 scripts/。
+# 外部源用环境变量 NATIVE_GUI_VENDOR_BASE 覆盖（单个 base 或逗号分隔列表）。
+_VENDOR_BASES = [
+    "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1",
+    "https://gitee.com/lb091188/moonbit-native-gui/releases/download/vendor-v1",
+]
+
+_VENDOR_TIMEOUT = 20
+
 _VENDOR_MINIAUDIO = (
     "miniaudio.h",
     Path(__file__).resolve().parent / "media" / "miniaudio.h",
@@ -42,25 +55,31 @@ def ensure_miniaudio() -> None:
     name, dest, sha = _VENDOR_MINIAUDIO
     if dest.exists():
         return
-    url = f"{_RELEASE_BASE}/{name}"
-    try:
-        print(f"gui-media(prebuild): 下载 vendor 文件 {name} ...", file=sys.stderr)
-        data = urllib.request.urlopen(url, timeout=180).read()
-    except Exception as e:  # noqa: BLE001——网络/URL 错误只报错不炸
-        print(
-            f"gui-media(prebuild): 下载失败：{url}（{e}）\n"
-            f"  离线环境请手动下载后放到 {dest}",
-            file=sys.stderr,
-        )
+    env = os.environ.get("NATIVE_GUI_VENDOR_BASE", "")
+    bases = [b.strip().rstrip("/") for b in env.split(",") if b.strip()] + _VENDOR_BASES
+    for base in bases:
+        url = f"{base}/{name}"
+        try:
+            print(f"gui-media(prebuild): 取 vendor {url} ...", file=sys.stderr)
+            data = urllib.request.urlopen(url, timeout=_VENDOR_TIMEOUT).read()
+        except Exception as e:  # noqa: BLE001——网络/URL 错误换下一个镜像
+            print(f"gui-media(prebuild): 镜像失败（{e}）", file=sys.stderr)
+            continue
+        if hashlib.sha256(data).hexdigest() != sha:
+            print(
+                f"gui-media(prebuild): {name} 在该镜像上 sha256 不符，换下一个",
+                file=sys.stderr,
+            )
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        print(f"gui-media(prebuild): 已就位 {dest}（sha256 校验通过）", file=sys.stderr)
         return
-    if hashlib.sha256(data).hexdigest() != sha:
-        print(
-            f"gui-media(prebuild): {name} sha256 校验不符，拒绝写入", file=sys.stderr
-        )
-        return
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
-    print(f"gui-media(prebuild): 已就位 {dest}（sha256 校验通过）", file=sys.stderr)
+    print(
+        f"gui-media(prebuild): 全部镜像都没取到 {name}\n"
+        f"  离线环境可手工放置到 {dest}，或用 NATIVE_GUI_VENDOR_BASE 指到自己的源",
+        file=sys.stderr,
+    )
 
 
 def link_configs() -> dict:

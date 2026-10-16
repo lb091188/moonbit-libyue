@@ -35,6 +35,30 @@ Then `moon build` / `moon test` recompiles the stub and links a fresh exe.
 
 **Why it's worth "reproduce on a main target first"**: a brand-new target is always linked fresh — if "main is fine, the test crashes", you can almost conclude the test binary linked a stale archive, not a logic bug. This and the finer platform records (stepped on separately under GTK / Win32 / macOS) are in [adaptation.md](adaptation.md).
 
+## 5. Vendored large files and mirrors
+
+Three third-party files are kept out of git (committing them would permanently bloat the
+history) and are fetched by prebuild **only when missing**: `WebView2.h`,
+`WebView2LoaderStatic.lib`, `miniaudio.h` — about 18.6 MB in total.
+
+- **Verification first**: a file is written only if its sha256 matches the constant in the
+  two prebuild scripts, so any mirror is verifiable;
+- **Mirrors are tried in order** (GitHub → Gitee) with no latency probing: measuring first
+  would make two machines fetch from different sources and cost us reproducibility, while
+  the order only ever affects speed;
+- **20 s per source**: a direct GitHub Release asset fetch from a CN network was measured at
+  "15 s, 0 bytes", so failing over fast beats waiting on one source;
+- **Adding a source**: one line in `VENDOR_BASES` in `gui/scripts/prebuild.py` and
+  `modules/gui-media/prebuild.py` (two copies on purpose — `gui-media` must publish
+  standalone and cannot reach back into the main module's `scripts/`);
+- **Intranet and offline**: set `NATIVE_GUI_VENDOR_BASE` to a single base URL or a
+  comma-separated list (tried first), or place the files at their target paths by hand —
+  prebuild never touches files that already exist;
+- If every source fails, prebuild does not abort: it prints the manual-placement hint and
+  lets the link step report the missing file.
+
+Licenses and provenance: [`THIRD-PARTY-NOTICES.md`](../THIRD-PARTY-NOTICES.md) at the repo root.
+
 ## 4. Related
 
 - Platform adaptation pitfalls and verification: [adaptation.md](adaptation.md)
