@@ -119,7 +119,66 @@ moonbit-native-gui/                          # 根 workspace
 | `modules/*` 版本脱节 | 发布前同一批递增版本号（参照 0.1.1 重发流程）；CI 测试清单扩展到新模块 |
 | prebuild 复制劳动 | 考虑抽 shared library（如 `scripts/shared_prebuild.py`），先解决功能再抽象 |
 
-## 6. 未决问题
+## 6. 可执行细案（2026-10-16 勘察，行号按当日文件）
+
+### 6.1 Batch 1：`gui/web` → `modules/gui-webview`
+
+**文件清单（实测）**：11 个源/桩文件 + 2 个 vendor 目录，vendor 合计 **14 MB**（`lib/` 11 MB + `include/` 2.9 MB）。
+
+- MoonBit：`webview.mbt` 20 KB、`scheme.mbt` 6.4 KB、`dom.mbt` 4.7 KB、`ffi.mbt` 4.1 KB，加 `webview_wbtest` / `scheme_wbtest` / `dom_wbtest` 三条与 `moon.pkg`
+- C 桩：`webkit_stub.c` 32 KB、`webview2_stub.c` 72 KB
+- 资产：`include/`（`WebView2.h` 等）、`lib/`（`WebView2LoaderStatic.lib`）
+
+**消费者（实测）**：全仓只有 **一处** import `NoahLiu/native-gui/web`——`examples/browser/moon.pkg`。§4 步骤 6 里「确认没有遗留消费者」这条已经量掉，迁移面比原估更小。
+
+**prebuild 改动点**（`gui/scripts/prebuild.py`）：
+
+| 位置 | 现状 | 去向 |
+|---|---|---|
+| `:40` | `WEB_PACKAGE = "NoahLiu/native-gui/web"` | 删 |
+| `:43` | `WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"` | 移进新模块 |
+| `:47-67` | `VENDOR_FILES`（WebView2 lib + h，带 sha256） | 整块移进新模块 |
+| `:69` | vendor 下载与校验循环 | 移 |
+| `:193-215` | Linux：探 webkit2gtk-4.1 → 编 `webkit_stub.c` → 给 `WEB_PACKAGE` 下发 link_configs | 移；主仓不再编 webkit 桩 |
+| `:295-310` | Windows：WebView2 静态 Loader + 头 + link_configs | 移 |
+
+新模块骨架照 `gui-media` 的形态：`modules/gui-webview/moon.mod`（`NoahLiu/gui-webview` 0.1.0 + `--moonbit-unstable-prebuild`）、`prebuild.py`（三分支：Linux WebKitGTK / Windows WebView2 / 其余空 link_configs）、`webview/` 子包装源与桩。
+
+**接口口径（把 §7 未决 #1 定死）**：现在 `webview_new(app : @core.App, …)` 与 `Webview::node(…)` 都吃 core 的 `App`/`Node`。**建议 Batch 1 保持 import `NoahLiu/native-gui/core`**——「出模块」与「去 GUI 核心依赖」是两件事：Batch 1 只搬 14 MB vendor 与 WebKitGTK 探测，去核心依赖等 Batch 2 的 `ShellApp` 定案后再做，否则 Batch 1 会卡在未决接口上做不完。
+
+**验收判据**：`cd gui && moon check --deny-warn` 零警告（主模块再无 web）；`cd modules/gui-webview && moon check --deny-warn` 零警告 + `moon test`；`cd examples && moon build browser` 通过；真机 `moon run examples/browser` 出页（用户执行）；CI 矩阵加一条（Linux 装 `libwebkit2gtk-4.1-dev`、Windows 拉 vendor）；`moon.work` 增成员。
+
+**回滚点**：整批 = 一次 `git mv` + 两个 prebuild 编辑 + 一处 import 改名，单提交，`revert` 即回。
+
+### 6.2 Batch 2：`core` 三刀
+
+`core/app.mbt` 实测 **976 行、46 个顶层定义**。分段依据（按归属计数）：
+
+| 归属 | 定义数 | 代表定义（行号） |
+|---|---|---|
+| `shell` | 26 | `app_window`(131)、`App::new`(198)、`open_window`(206)、`close_window`(939)、`run`(956)、`step`(856)、`drain_events`(894)、`route`(570)、`raw_to_event`(535)、`timer`(431)、`quit`(455)、`set_fullscreen`(247)、`move_focus`(508)、`add_key_fallthrough`(66)、`install_host_hooks`(103)、`follow_system_theme`(261) |
+| `widget` | 13 | `mount`(286)、`enable_root_scroll`(300)、`schedule_paint`(339)、`paint_frame`(790)、`mark_widget_rect`(379)、`mark_state_chain`(389)、`mark_focus_rect`(410)、`rect_union`(348)、`accept_widget_rect`(367)、`dirty_clip`(373)、`text_batch_init`(776)、`sync_focus`(502)、`flush_ime_for_switch`(472) |
+| `base` | 4 | `now_ms`(72)、`sys_color_scheme`(77)、`sys_accent`(82)、`local_ymd`(89)——平台只读探针转发，也可归 `shell`，定案时一并拍 |
+
+**三个真难切点**（写码前必须先定接口，否则中途编不过）：
+
+1. **`App` 是一个跨三层的 struct**（`:17`）。字段里 `window`/`sched`/`host` 属 shell、`root`/`canvas`/`dirty*` 属 widget、`focus` 属 base、`hover_id`/`capture`/`cursor_kind`/`last_preedit`/`ime_focus` 散在 shell 与 widget。§3.1 说「shell 暴露 `ShellApp`（不含 Painter）」——**意味着 `App` 必须一分为二**：`ShellApp`（泵 + 窗 + 焦点栈）与 `App = { shell : ShellApp, root, 脏区, canvas, … }`。这才是本批的真实工作量，不是 import 改名。
+2. **`route`（570-693，124 行）同时做三件事**：事件分类（shell）、焦点投递（base/shell）、脏区标记（widget）。切法：shell 只做到「原始事件 → 分类 → 交给注入的 sink」，`mark_*` 与 `dispatch_*` 整段进 widget，sink 由 widget 层装配时注入（进程级单槽有先例：`set_repaint_hook` / `set_timer_hooks`）。
+3. **`pump_ime`（706-768）跨 `win` + `text` + `root` 三层**：IME 门控调 `@win`、文本批量初始化调 `text`、preedit/commit 投递调 root。建议 IME 整块留 widget（它服务的就是编辑控件），shell 只在 `step` 里调注入的 `on_frame`。
+
+**迁移顺序**（每步独立可编译、可回滚）：
+
+1. 建 `base/`：搬 `signal`/`store`/`effect`/`keys`/`focus`/`list_store`/`prof`/`tick`/`node` 九文件 + 对应 wbtest。
+2. 建 `shell/`：搬 `loop`/`host`/`menu`/`hotkey`/`tray`/`notify`/`reveal`/`drag` + `app.mbt` 的 26 个 shell 定义；此步 `App` 一分为二、`ShellApp` 落地。
+3. 建 `widget/`：搬 `widget`/`overlay`/`overlay_native` + `app.mbt` 剩余 13 个定义。
+4. 集中改 import：`ui`/`chart`/`mdview` + **模块外消费者**（`modules/gui-media`、`modules/gui-examples`、`examples/*`、`experiment/*`），一次一批包。
+5. 门禁：`cd gui && moon check --deny-warn` + 分包 `moon test` + 各模块 `--deny-warn` + 示例构建。
+
+**过渡形态（把 §7 未决 #2 定死）**：本工具链**没有 `pub use` 再导出**（实测：`moon.pkg` 也不能给依赖包配短名，见 design.md §1.6 表），所以「过渡期 re-export」只能做成**聚合包** `GuiCore = { base | shell | widget }`（新写一个只 import 三者、把公共面薄转发一层的面子包），或者干脆一步到位全量改 import。判据：调用点总数——`@core.` 在 `gui/` + `examples/` + `experiment/` + `modules/` 的 `.mbt` 里出现 **3528 次**（实测 grep 计数，含注释与文档行；只算主模块 `gui/` 是 2302 次），全量改是数千处机械编辑加四轮编译报错驱动，聚合包则多一层长期维护的面子包。**建议**：先按这个量级拍，别默认「过渡包更省事」。
+
+**风险红线**：步骤 1-3 期间 `core` 与三个新包并存、调用点不动；**不要在步骤 1 就删 `core`**——那是唯一会让全仓中途编不过的做法。每步一个提交，出问题 revert 该步。
+
+## 7. 未决问题
 
 - `webview_new(app : @core.App, ...)` 的接口签名要换成什么？`ShellApp`？还是 `Node` 形态的 `Webview::bare()` 统一入口？取决于 Batch 2 做完后 `ShellApp` 的公开面。
 - 现有 consumer（showcase、native-app）import `@core.*` 的数量较多，是否需要过渡期 re-export？
