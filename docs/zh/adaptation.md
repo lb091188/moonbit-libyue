@@ -916,6 +916,7 @@
 - **未 run 的 chooser 查结果会段错误（本机实测）**：`gtk_file_chooser_get_uri` 在内部文件系统模型未初始化时直接 SIGSEGV——桩加 `wm_dlg_accepted` 标记，只在 `gtk_dialog_run` 返回 ACCEPT 后放行查询，其余一律空串。同因 GTK 断言：`set_current_name`（set_filename）只对 SAVE 动作合法，OPEN 对话框上调用打 Gtk-CRITICAL。
 - **无显示环境的退化路径**：`wm_file_dialog_new` 先 `gtk_init_check`，失败返回 0 句柄（wbtest 无 X 连接、CI 场景）——全接口对 0 句柄 no-op 不崩；有显示（本机）则真建对象，测试走双路径断言。
 - **「改桩不重链」的第三处案发现场**：改 gtk_stub.c 后 `moon test` 报 undefined reference——`build/libyue_win_stub.a` 的 mtime 比源码新（同批测试产物也没重链），判据是比对 `build/*.a` 与测试 exe 的 mtime，双删 `_build/native/debug/test/.../gui/sys` 与桩库强制重编。与 G 批次的桩教训同源，moon 的增量对「C 源码改动」不可靠是常态了。
+- **`get_uri` 回的是百分号编码串，中文目录必翻车（2026-10-16 用户真机反馈）**：`wm_file_dialog_get_result` 原先取 `gtk_file_chooser_get_uri` 再手工剥 `file://` 前缀，选「下载」目录回给 `/home/lkyh/%E4%B8%8B%E8%BD%BD`，示例拿它去 `fsx_list_dir` 直接 `FsError::OpenFailed`（含空格 / `#` / `%` 的路径同理，且保存对话框回填初始目录也会踩）。改取 `gtk_file_chooser_get_filename`——GTK 已解好码的本地 UTF-8 路径；回收站/远端 URI 拿不到本地文件名时返回空串，与 Windows 侧 `SIGDN_FILESYSPATH` 同口径。上一条的 `wm_dlg_accepted` 守卫保留（未 run 就查结果仍会段错误）。**验证**：`moon test ./sys` **187/187**，并按「改桩不重链」那条核过 mtime（`gui/build/libyue_win_stub.a` 新于 `gui/win/stub.c`、sys 测试 exe 又新于该 `.a`）；真机复验=选中文目录与含空格目录 → 播放列表出条目。
 - **验证**：`moon test -p NoahLiu/native-gui/sys` **30/30**（新增 1：对话框建/配/释放双路径——有显示真建对象配置后销毁、无显示全接口 no-op；模态 run 与真选文件留真机复验）；`moon check sys --deny-warn` 零警告、全仓红点仍 287/68。**真机复验清单**：应用内触发打开对话框 → 选文件 → 结果路径正确；保存对话框初始名生效；filters 下拉分组正确。
 
 ### MoonBit 原生 GUI 栈 · sys 批 1（`sys`：fsx / envx / procrun）

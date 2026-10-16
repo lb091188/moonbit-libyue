@@ -5852,27 +5852,26 @@ int32_t wm_file_dialog_run_for_window(int64_t id, int64_t parent_id) {
 
 /* 用户选中的路径（未确认/多选时取首个；空串 = 无）。
  * 只在 run 后用户确认过才查——未 run 的 chooser 内部文件系统模型
- * 未初始化，get_uri 会段错误（本机实测），提前返回空串。 */
+ * 未初始化，取结果会段错误（本机实测 get_uri），提前返回空串。
+ * 取 filename 而不是 uri：`get_uri` 给的是百分号编码串（中文目录回来是
+ * `/home/x/%E4%B8%8B%E8%BD%BD`、空格是 `%20`），原样喂给文件 API 必失败；
+ * `get_filename` 已经是本地 UTF-8 路径。回收站/远端 URI 拿不到本地文件名，
+ * 返回空串——与 Windows 侧 `SIGDN_FILESYSPATH` 同口径。 */
 void *wm_file_dialog_get_result(int64_t id) {
   GtkFileChooser *fc = GTK_FILE_CHOOSER(wm_dlg_of(id));
   if (fc == NULL || !wm_dlg_accepted[id - 1]) {
     return moonbit_make_bytes(0, 0);
   }
-  gchar *uri = gtk_file_chooser_get_uri(fc);
-  if (uri == NULL) {
+  gchar *name = gtk_file_chooser_get_filename(fc);
+  if (name == NULL) {
     return moonbit_make_bytes(0, 0);
   }
-  // file:// 前缀剥除（与 master 的 FilePath 语义一致，返回本地路径）
-  const char *p = uri;
-  if (g_str_has_prefix(p, "file://")) {
-    p += 7;
-  }
-  size_t len = strlen(p);
+  size_t len = strlen(name);
   void *out = moonbit_make_bytes((int)len, 0);
   if (len > 0) {
-    memcpy(out, p, len);
+    memcpy(out, name, len);
   }
-  g_free(uri);
+  g_free(name);
   return out;
 }
 

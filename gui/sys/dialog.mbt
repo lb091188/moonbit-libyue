@@ -1,6 +1,6 @@
-// 文件打开/保存对话框（sys 线）：GTK 端在 win/gtk_stub.c（wm_file_*
-// 前缀，句柄槽表与窗口桩同制），本层经 extern 直链——对话框要挂 GTK
-// 父窗口，桩归窗口侧编译（prebuild 静态库），sys 只做语义薄封装。
+// 文件打开/保存对话框（sys 线）：GTK 端在 `gui/win/stub.c` 的 GTK 分支
+// （`wm_file_*` 前缀，句柄槽表与窗口桩同制），本层经 extern 直链——对话框要挂
+// GTK 父窗口，桩归窗口侧编译（prebuild 静态库），sys 只做语义薄封装。
 // run_for_window 的 parent 传 win 的窗口 id（0 = 无父窗口）。
 
 ///|
@@ -93,7 +93,8 @@ pub fn FileDialog::run_for_window(self : FileDialog, parent : Int64) -> Bool {
 }
 
 ///|
-/// 用户选中的路径（file:// 前缀已剥；未确认为空串）。
+/// 用户选中的本地路径（UTF-8，不做 URI 百分号编码；远端/回收站项与未确认
+/// 都给空串）。
 pub fn FileDialog::get_result(self : FileDialog) -> String {
   @utf8.decode_lossy(ffi_file_dialog_get_result(self.id))
 }
