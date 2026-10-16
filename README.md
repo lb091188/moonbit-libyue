@@ -18,7 +18,7 @@ English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/mas
 
 **🖥 Desktop-grade system integration** — tray (SNI / NSStatusItem / Shell_NotifyIcon), notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, idle detection, MPRIS media control (Linux), plus OS queries (volume, power, wallpaper, monitors, printers, browser history, installed apps…) behind one `@sys` / `@core` API — capability probing with semantic fallbacks, never silent.
 
-**🎨 Lightweight self-drawing, one theme everywhere** — rendered by the library's own pure-MoonBit software rasterizer (optional Cairo backend) with no Skia-class engine; the `hello` minimal window ships as a **1.1 MB** release binary that shows a window in ~0.5 s (measured on Linux; the 15-page `showcase` is 5.5 MB / ~1 s). Widgets look the same on every platform; light/dark and the system accent colour are followed by default, and the theme is a plain value you can override.
+**🎨 Lightweight self-drawing, one theme everywhere** — rendered by the library's own pure-MoonBit software rasterizer (optional Cairo backend) with no Skia-class engine; the `hello` minimal window ships as a **1.1 MB** release binary that shows a window in ~0.1 s (measured on Linux; the 15-page `showcase` is 5.5 MB / ~1 s). Widgets look the same on every platform; light/dark and the system accent colour are followed by default, and the theme is a plain value you can override.
 
 **📊 Charts & rich content** — charts (line / bar / pie / gauge / scatter plus radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst, map and more, with a cross-cutting interactive layer), a Markdown view and an embedded WebView share the same rasterizer and layout tree as regular widgets.
 

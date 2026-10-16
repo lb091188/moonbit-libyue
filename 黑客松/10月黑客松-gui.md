@@ -14,7 +14,7 @@
 native-gui 是 MoonBit 生态的**轻量原生跨平台 GUI 库**，主攻三个方向：**系统接口丰富、轻量、开箱即用**。
 
 - **系统接口：** —— 托盘、桌面通知、全局快捷键、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、媒体控制，以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询
-- **轻量：** —— 渲染、布局、控件纯 MoonBit 自绘，不依赖 Skia；`hello` release **1.1 MB** / 约 0.5 s 出窗，`showcase` 15 页 **5.5 MB** / 约 1 s（Linux 实测）；重能力拆独立模块
+- **轻量：** —— 渲染、布局、控件纯 MoonBit 自绘，不依赖 Skia；`hello` release **1.1 MB** / 约 0.1 s 出窗，`showcase` 15 页 **5.5 MB** / 约 1 s（Linux 实测）；重能力拆独立模块
 - **开箱即用：** —— `moon add` 后零配置直接 `moon run`；组件库、14 种图表 + 交互层、Markdown 视图、内嵌 WebView 都是库内成品
 
 平台状态：**🟩 Windows / 🟩 Linux / 🟨 macOS ** 
@@ -25,14 +25,14 @@ native-gui 是 MoonBit 生态的**轻量原生跨平台 GUI 库**，主攻三个
 
 与 MoUI、Sun 零代码依赖，直接依赖只有 MoonBit 标准库与系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）。定位互补：MoUI 走多端共享逻辑，Sun 是渲染底层，本库专注桌面系统集成——这是独立重建的立足点。
 
-## 差异化用户收益：同一界面的操作案例
+## 差异化：同一界面的操作案例
 
 **场景**：一个音乐播放器。窗口本身（列表 / 按钮 / 进度条）任何 GUI 库都画得出来；差别在**窗口之外**。
 
-用 native-gui，以下行为全部是库内置 API（Windows / Linux / macOS 同一套代码）：
+用 native-gui，以下行为全部是库内置接口（Windows / Linux / macOS 同一套代码）：
 
 ```moonbit
-// 关窗后驻留系统托盘：Linux SNI / macOS NSStatusItem / Windows Shell_NotifyIcon
+// 关窗后驻留系统托盘
 let ic = @win.icon_from_bgra(icon_pixels, 32, 32)
 match @core.Tray::new("my-player", icon=ic) {
   Ok(tray) => {
@@ -42,22 +42,20 @@ match @core.Tray::new("my-player", icon=ic) {
   Err(e) => show_reason(e) // 结构化错误：无后端 / 图标失败，不静默
 }
 
-// 桌面通知带进度：freedesktop Notifications / Windows 气泡 / macOS 用户通知
+// 桌面通知带进度
 @core.notify_send("MyPlayer", "正在下载", "专辑封面 3/10", progress=30)
 
-// 开机自启：XDG autostart / Windows 注册表 Run 键 / macOS LaunchAgents
+// 开机自启
 @sys.autostart_enable("com.example.my-player")
 ```
 
-操作走查：点关闭 → 图标驻留托盘，左键点回主窗口；切去别的应用 → 桌面通知汇报后台进度；重启系统 → 应用自动拉起。走的是真实桌面协议（SNI / freedesktop Notifications / XDG autostart），Linux 上还可经 D-Bus 枚举与控制 MPRIS 播放器。
-
-这些能力在库内是同构门面：能力探测（`notify_supported()` / `Tray::is_supported()` 等）+ 结构化错误（`Unsupported` / `Failed` 两档），调用方据此适配 UI，不静默失败。
+操作走查：点关闭 → 图标驻留托盘，左键点回主窗口；切去别的应用 → 桌面通知汇报后台进度；重启系统 → 应用自动拉起。
 
 ## 10 月工作
 
-- **macOS 平台批（`mac` 分支，①–⑰）**：Cocoa 窗口后端（事件循环 / 输入法 / 文件对话框 / 剪贴板 / 菜单 / 托盘 / 通知 / Carbon 热键）、CoreText 文字、ImageIO 图片解码、WKWebView（自定义协议 / JS 互操作 / cookie）、系统能力族（launcher / sysinfo / 音量 / 壁纸 / 自启 / 空闲 / 打印机 / 应用查找 / 显示器）、媒体线（ffmpeg + CoreAudio）；CI 三平台全绿，含真实 macOS runner 上的读数环与建窗存活冒烟
-- **全面原生化**：删除 libyue 绑定包与 vendored 二进制（52 MB），框架主体纯 MoonBit 自绘，模块更名 `NoahLiu/native-gui`
-- **库按功能分层**：14 个库包各自成包、按需取用；媒体引擎与 Flexbox 布局引擎拆独立模块
+- **macOS**：真机实测
+- **全面原生化**：删除 libyue 绑定包与 vendored 二进制（52 MB），框架主体纯 MoonBit 调用系统原生渲染，模块更名 `NoahLiu/native-gui`
+- **库按功能分层**：组件库各自成包、按需取用；媒体引擎、Flexbox 布局引擎、webview拆独立模块
 - **跨平台系统集成**：托盘、通知、原生菜单栏、全局快捷键（Windows / macOS 已落，Linux 的 X11 路线在近期计划）、消息框、窗口图标与运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、空闲检测、开机自启、任务栏进度（Windows）
 - **系统能力探测页（showcase 第 15 页）**：五段只读探针（系统桌面 / 显示器窗口 / 应用文件 / 浏览器数据 / 剪贴板电源总线），每段可重新探测
 - **内嵌 WebView**：与自绘控件同树混排、导航与历史、JS 互操作（执行 / 注入 / 双向绑定）、DOM 抓取、cookie 与 profile 持久化、新窗 / 权限 / 下载策略、自定义协议、崩溃回报
