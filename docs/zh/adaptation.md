@@ -2467,3 +2467,25 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 2. 中英两份(本文与 docs/adaptation.md)同批同步。
 3. 影音与桌面控制批次的落点:`影音与桌面控制命令路线`(Linux 系统能力数据层下)、`系统信息与系统级安全边界`、`目录枚举与进程内环境变量`(跨平台通用下)、`通用 D-Bus 调用层`(DBus 线路协议下)、`地图与飞线的投影方案`(自绘画布与图表渲染下);浏览器侧结论进 `Firefox places.sqlite` 小节。
 4. 功能批次内不跑 `moon fmt`:当前工具链的重排口径与本仓既有风格不一致(一轮改到 287 个文件),要统一格式另开一批,并先确认口径一致。
+
+### 前端化批次真机反馈修复集（2026-10-14，2026-10-16 自 TODO 迁入）
+
+> 这批是「用户真机报障 → 定位 → 修」的一条一因记录，原先只存在于 TODO.md；按「全景在 roadmap、未完成在 TODO、过程在 adaptation」的分工整段迁入此处，TODO 侧删除。
+
+- [x] **描边口径统一（2026-10-14，真机反馈「色板边框偏移」）**：门面契约是「`stroke_rect` 落在矩形**内侧**」（两后端同实现），但全仓 28 处调用点按居中习惯给 `(0.5, 0.5, w-1, h-1)` ⇒ 环整体往右下偏 1px（左/上露一条色底）。换算 `(x-lw/2, y-lw/2, w+lw, h+lw)` 并全仓切过（ui + chart + 示例）；按钮焦点环那条测试原本照着错几何采第 1 列，改采第 0 列，另加色板四边对称钉桩。
+- [x] **非 Windows 侧编不过**（2026-10-14）：sys 电源方案批把两条带 `GUID` 形参的 `static` helper 写在所有守卫外（`static` 未调用也要过类型检查），Linux 上 `unknown type name 'GUID'` 直接炸掉整仓构建；两条 helper 圈进 `#if defined(_WIN32)`。口径：类型来自平台头的函数整段进守卫，改完 C 至少跑一次非目标平台编译。
+- [x] **穿梭框面板太小**（2026-10-14，真机反馈）：默认 160×min 60 小得不像可操作列表 ⇒ 默认 200×160，并开 `height?` 参数（项多了仍自己长高，不裁行）。
+- [x] **表格悬停只亮一格 + 「添加一行」无反应**（2026-10-14，真机反馈）：① 悬停是父链语义，但宿主只标「旧/新悬停那颗」的矩形 ⇒ 行画整行底色、重绘窗口只有一格。新增 `App::mark_state_chain` 沿命中链标脏，祖先仅在自己带状态桶时标（`@style.apply` 落 `Widget.paints_state`，core 不认样式层只读布尔）；无状态祖先时代价仍是一格。② Store 内建去重按值比，示例把「会被原地 push 的那个数组」存进 Store ⇒ 新旧同对象必相等、通知被吞；初值改存快照。口径见 adaptation 同批条。
+- [x] **时间线连接线断成几截**（2026-10-14）：行间隙是容器 `row_gap` 给的、不属于任何控件 ⇒ 线在每处间隙断开。改成间距画进本行（非末行 marker 与行盒长到 `height+gap`），并加「间隙必须有线」的像素断言。跨行连续的装饰（连接线/轴/分隔线/轨道）都不能靠容器间距留白。
+- [x] **面包屑点击不导航**（2026-10-14）：「当前项」按位置（末项）判而不是按导航状态判 ⇒ 末项不是当前页时永远点不动。改按 `selected.get() == mine` 判可点与配色。
+- [x] **描边口径统一**（2026-10-14）：`stroke_rect` 契约是内侧描边，全仓 28 处按居中习惯给 `(0.5, 0.5, w-1, h-1)` ⇒ 环整圈往右下偏 1px（色板最明显）。换算 `(x-lw/2, y-lw/2, w+lw, h+lw)` 全仓切过，焦点环用例改采第 0 列、加色板四边对称钉桩。
+- [x] **表单页三件**（2026-10-14，真机反馈）：① 输入框默认吃不到键盘焦点（`focus_id?` 默认 0 = 宿主判「不可聚焦」）⇒ `input`/`textarea` 未给号时自动分配（1000000 起，显式号仍优先）；② 焦点变化标脏把**焦点 id** 当**实例 id** 查树（`mark_focus_rect`→`mark_id_rect`）⇒ 新增 `mark_focus_id_rect` 走 `find_by_focus_id`；③ `input` 补 `clearable`（EP 同名，默认关，悬停/聚焦出 ✕，点它清空回写）；④ 步进器 `[-] 值 [+]` 改共框（外框由行容器画一次，格内只画悬停底+分隔线；旧形态三圈边框看着没粘住，实测三格本就同高）。
+- [x] **表单族控件键盘可及性**（2026-10-15，用户反馈「非输入框都 Tab 不上、没键盘交互」）：button/checkbox/radio/switch/stepper/slider/rate/select/color_picker/date_picker/date_range/time_field/dropdown/segmented 全量默认自动领焦点号（`auto_focus_id`，2026-10-14 那条「刻意 opt-in」口径就此翻转）；空格/回车激活，radio/segmented 方向键按焦点项下标换选、slider/stepper/rate 方向键调值（slider 带 Home/End）、select/color_picker/dropdown 弹层 ↑↓ 高亮 + 回车取 + Esc 收、日期/时间字段开合层（日历内部方向键导航未做）；焦点环走「描边转主题色」与内圈两式。`moon test ui` 176/176、库 934/935（1 红为 Windows 基线）、真机复验归 S22。
+- [x] **Windows 全屏与尺寸切换无效**（2026-10-15，真机反馈）：`gui/win/stub.c` Windows 分支的 `wm_window_set_size`/`wm_window_set_fullscreen` 是带符号空壳桩（GTK 分支早接了真实现），链接不断、调用静默无效。补 Win32 真实现：set_size 按当前样式把客户区物理像素外扩成整窗再 `SetWindowPos`，全屏记样式 + `WINDOWPLACEMENT` 现场、剥装饰换 `WS_POPUP` 摆到最近显示器整屏、退屏原样还原；`WM_SIZE` 既有记账让 MoonBit 侧照常收 `Resized`。`experiment/window_probe` 的 C 探针新增两节（尺寸读回 + 全屏进退现场还原，全量 `WIN-ENHANCE-OK`），真机复验归 S23。
+- [x] **全局快捷键按了没反应**（2026-10-15，真机反馈）：库侧链路（RegisterHotKey → 泵截 WM_HOTKEY → poll）是好的，坏在 showcase 轮询表挂错时机——「零尺寸挂载钩子」写在 `node_of_new` 的 finish 里（构造期执行），页面函数求值早于建窗，第一拍跑在空 timer 通道上且 `app.host` 还是 None、循环不再重排当场死掉（与图表页推点同坑第 2 处）。改挂 `Node::on_mount`；window_probe 新增热键节（PostThreadMessageW 打 WM_HOTKEY 同路验截获/取出/去重/排他/注销）`WIN-ENHANCE-OK`，真机复验归 S24。
+- [x] **图表页一直「暂无数据」**（2026-10-14，真机反馈）：`set_timeout` 的进程级通道由 `App::new` 装，无宿主时空操作返回 0；而 `page_charts(app)` 是 `mount_window` 的实参、求值早于建窗 ⇒ 构造期排的第一拍永不触发。改成挂在 `handle`（`mount_children` 之后跑）上；页内代码示例同步改口径。同批：段说明补 `wrap=true`（原来是一条 900px 不折行的文本，尾部整片裁字）。
+- [x] **yoga-mbt 自由空间漏减行间隙**（2026-10-14，真机反馈「复制按钮还是有问题」）：§9.7 分配里 `initial_free` / `remaining` / auto-margin `free` / justify `free2` 只减子项外框和、没减 `gap x (n-1)`，而定位又逐项加 gap ⇒ grow 项多吃间隙、整行溢出容器（判据：行宽 100 + gap 10 + [固定 30, grow 1] 应为 60，修前 70）。四处统一先减 `gap_total`。
+- [x] **段条「超宽自动换行」是假口径**（2026-10-14）：`ui` 从不写 `flex_wrap`、样式层也没这条属性 ⇒ 任何容器都是 NoWrap，段一多就横向溢出被裁。按「属性名 = CSS 属性名」给 `Style` 补 `flex_wrap`（工厂/merge/apply 全接线）。真换行还差两条配套：段条要放在**列**里（row 交叉轴不拉伸 → 换行容器按内容定宽，段折成六七行），并且**换行容器与父链每层显式 `min_height/min_width=0`**（规范 §4.5 列内子项 min:auto = min-content 高 = 全部堆叠，实测段条 224px、正文从 646 掉到 476；引擎符合规范）。修完量数：段条 54、正文 646、代码文档页视口 652/内容 808 可滚。
+- [x] **滚动容器滚不动**（2026-10-14，真机反馈）：`scroll_view` 视口没写 `min-height`，Yoga flex 子项默认 min-size=auto ⇒ 视口被内容顶到自然高、`max()` 恒 0（实测 240×140 父里 viewport=676=content）。库级补 `min_height/min_width=0`，所有调用点（showcase 段正文与侧栏、native-app、virt_list 宿主）一起受益；显式 `height=` 不受影响。判据与对照读数见 adaptation 同批条。
+- [x] **Markdown 页两处缺陷**（2026-10-14，真机反馈）：① 富文本区间按 UTF-16 code unit 出、`AttributedText` 契约是 UTF-8 字节下标 ⇒ 中英混排样式整体前移、端点切进字符（豆腐块 + 压字）；② `md_rich_label` 从不折行、节点宽=整段自然宽（一段 656px 撑进 480 文档）⇒ 右边缘裁字、代码区「复制」被推出可视区。修：`md_byte_len` 出区间 + 构造期贪心折行（中文逐字/拉丁逐词/`\n` 硬换行/超长单元按字符硬切），一行一个 AttributedText，删除线与链接命中按行换算，列表/引用/脚注/表格单元格按各自可用宽收窄（`md_narrow`）。判据与「换回旧单位当场红」的对照实验见 `docs/zh/adaptation.md` 同批条。**待真机**：豆腐块/裁字/复制按钮是否消失、内容区纵向滚动是否恢复。
+

@@ -90,9 +90,54 @@ MoonBit 生态的**原生桌面 GUI 库**——目标位置是 GTK / WinForms / 
 | 模块拆分 | ⏳ | `modules/` | 判据与批次见 [module-structure.md](module-structure.md)；`gui/web` 出成 `gui-webview`、`core` 三刀 `base`/`shell`/`widget`，排期在 TODO §1「G9」 |
 | 窗口内按键路由补齐 | ⏳ | `core/app.mbt`、`ui` | 抬起事件投递、焦点链与兜底的优先级、方向键归属表、IM 门控复验——TODO §1「G10」 |
 
-### 控件与组件
+### 绘图与资源
 
-（逐节续写：绘图与资源 / 表单与交互 / 展示与导航 / 表格与列表 / 浮层与弹层 / 图表 / Markdown / 系统能力 / webview / 媒体 / 交付面 / 跨平台能力面。）
+| 功能点 | 状态 | 落点 | 成什么样 |
+|---|---|---|---|
+| 绘制门面与光栅 | ✅ | `render` | 路径/曲线/弧/变换/裁剪/25 种混合模式/线性与径向渐变；Cairo 后端与纯软件光栅两路径逐像素一致，无 Cairo 时降级 |
+| 图片与离屏画布 | ✅ | `render` | `Image`（文件 / PNG / 位图 / resize / 槽位）、`Canvas` 离屏与 PNG 落盘、子表面限制采样域防串色、blit 尊重混合模式 |
+| GIF 动画 | ✅ | `render`、`ui/gif.mbt` | `Animation`（迭代器 + 与真实时间同速的虚拟时钟）与 `gif` 组件（自转/暂停/继续，静图退回一帧） |
+| 图像解码后端 | 🚧 | `render` 桩 | Linux GdkPixbuf（PNG/JPEG/GIF 首帧）、Windows WIC（静态首帧 + 动图逐帧 disposal）；**macOS 解码后端未接** |
+| 矢量图标 | ✅ | `icons` | 803 条定点路径 + 解释器 + `IconKind`/`icon_name`/`all_icons` + `draw_icon`；`icon` / `icon_button` 随主题取色 |
+| 字体与富文本 | ✅ | `text` | 族名/字号/9 档字重/斜体；对齐、换行、省略；区间属性（UTF-8 字节下标）；字体枚举与 CSS 列表回退；混排行高 = max ascent + max descent |
+| 文字后端 | 🚧 | `text` 桩 | Pango（Linux）+ DirectWrite（Windows，含行高 K 地板与按平台探缺省字族）；**macOS CoreText 未接** |
+| 文本绘制口径 | ✅ | `text` | 新门面**不提供** `Painter::draw_text`，文本一律走 `text`，两后端走等价通道 |
+
+### 组件层与前端化
+
+| 功能点 | 状态 | 落点 | 成什么样 |
+|---|---|---|---|
+| 组件命名对齐 Web / Element Plus | ✅ | `ui` | 映射表全部落地、`_t` 尾巴清零、事件统一 `on_*`、散参数改名 `background_color`/`color`/`font_size`，34 个组件收 `class?` |
+| 样式通道逐组件收口 | ✅ | `ui` | 逐族 `on_draw` 改读 resolved Style 并按状态选桶（基础/展示/表单/导航/浮层/表格与虚拟列表/日期时间/消息框/输入框）；语义色存 token 名，随主题现取 |
+| 展示类信号版组件 | ✅ | `ui` | `text_dyn`/`tag_dyn`/`badge_count_dyn`/`avatar_dyn`/`statistic_dyn` 等；静态与信号两条入口共用一份画法 |
+| CSS 属性生效面 | 🚧 | `ui`、`style` | `text_align`/`white_space`/`line_height`/`text_decoration`/`box_shadow` 已接真路径（含测量联动）；**`letter_spacing` 未接**（要文本层先开字距接口） |
+| 响应式补强 | ✅ | `core`、`ui` | `ListStore` keyed 差分、`effect`/`watch`、帧末合并重绘、`for_list`/`when`、`mount_window` 的 `render` 槽、`Store` 内建去重 |
+| 全局 alpha 与硬阴影 | ✅ | `render`、`style` | 前端化 P4 绘制能力 |
+| 过渡动画 | ✅ | `style/transition.mbt` | 前端化 P5：帧驱动复用进程级延时通道，只给活动中的控件局部置脏 |
+
+### 控件与组件清单
+
+| 家族 | 状态 | 落点 | 内容 |
+|---|---|---|---|
+| 基础原语 | 🚧 | `ui` | 容器 `view`/`row`/`col`、`separator`/`divider`、`text`、`image`、`icon`、`button`（五档 variant）；剩余见 TODO §2「控件」 |
+| 文本族 | ✅ | `ui` | `text`/`text_dyn`/`link`/`bind`/`bind_label`/`text_source` |
+| 表单族 | ✅ | `ui` | 15 件：`input`/`textarea`/`checkbox`/`radio_group`/`switch`/`slider`/`stepper`/`rate`/`select`/`color_picker`/`date_picker`/`time_range_picker`/`datetime_range_picker`/`form`/`form_item` |
+| 输入框全语义 | ✅ | `ui/entry.mbt`、`ui/textarea.mbt` | 选区、剪贴板、撤销、光标闪烁、IME 内联、占位符、禁用态 |
+| 显示族 | ✅ | `ui` | 16 件：`tag`/`badge`/`avatar`/`statistic`/`descriptions`/`result`/`timeline`/`progress`/`empty`/`alert`/`card`/`carousel`/`code_view`… |
+| 日期族 | ✅ | `ui/datepicker.mbt` | `calendar`/`date_picker`/`date_range_picker`/`time_range_picker`/`datetime_range_picker`（区间三件已去 `_t`） |
+| 导航族 | ✅ | `ui/nav.mbt` | 10 件：`tabs`/`menu`（含分节）/`tree`/`transfer`/`steps`/`breadcrumb`/`pagination`/`collapse`/`segmented` |
+| 表格与列表 | ✅ | `ui/table.mbt`、`ui/virtlist.mbt` | `table`（排序/斑马纹/悬停整行）、`table_v`、`virt_list`、`sticky_list` |
+| 浮层族 | ✅ | `core/overlay*`、`ui` | `tooltip`/`popover`/`dialog`/`message_box`/`toast_layer`，含**原生档**（有网页区时整层走真窗口） |
+| 容器与滚动 | ✅ | `ui/scroll.mbt`、`ui/split.mbt` | 垂直滚动 + 自绘滚动条、`hsplit`/`vsplit`、`enable_root_scroll` |
+| 键盘可及性 | ✅ | `ui` | 表单族与按钮全部进 Tab 链、空格/回车激活、焦点环按变体可见 |
+
+### 系统集成
+
+| 功能点 | 状态 | 落点 | 成什么样 |
+|---|---|---|---|
+| 系统托盘 | ✅ | `dbus`（SNI + DBusMenu） | 真实总线与真实面板协议已回证；观感由使用者复验 |
+
+（本节其余族——系统能力门面 `@sys` 二十余族、D-Bus 能力模块、Wayland、全局热键/通知/菜单——待下一轮从 TODO §2「系统集成」与 §6 迁入。）
 
 ## 承诺与版本
 
