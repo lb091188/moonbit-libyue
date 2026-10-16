@@ -6,7 +6,7 @@
 |---|---|---|---|
 | FFmpeg（Windows 开发包） | LGPL-3 | `modules/ffmpeg-mbt/vendor/`：5 个导入库 `.lib` + 头文件，**入库存档**；取自 BtbN/FFmpeg-Builds 的 win64 **lgpl-shared** 构建，版本串 `n9.0.2-27-g7e93014c5b-20261012` | ✅ `modules/ffmpeg-mbt/vendor/FFMPEG-LICENSE.txt` |
 | FFmpeg（Linux / macOS 运行期） | LGPL-3 | **不随我们分发**——动态链系统包，构建期 pkg-config 探测 | 由发行版附带 |
-| WebView2 SDK（Microsoft） | MIT | `gui/web/include/WebView2.h` + `gui/web/lib/WebView2LoaderStatic.lib`，**不入库**，构建时从 Release 资产 `vendor-v1` 下载并校验 sha256；NuGet 包 `Microsoft.Web.WebView2` 1.0.4258.31 | ✅ `gui/web/include/SDK-LICENSE.txt`（入库） |
+| WebView2 SDK（Microsoft） | MIT | `modules/gui-webview/webview/include/WebView2.h` + `modules/gui-webview/webview/lib/WebView2LoaderStatic.lib`，**不入库**，构建时从 Release 资产 `vendor-v1` 下载并校验 sha256；NuGet 包 `Microsoft.Web.WebView2` 1.0.4258.31 | ✅ `modules/gui-webview/webview/include/SDK-LICENSE.txt`（入库） |
 | miniaudio（mackron） | 公有领域（Unlicense / CC0）与 MIT 双许可 | `modules/gui-media/media/miniaudio.h`，**不入库**，构建时下载并校验 sha256 | 文件头即授权声明；此处登记 |
 | `moonbitlang/x`、`moonbitlang/async` | Apache-2.0 | mooncakes 依赖（`moon install` 拉取，不入库） | 各自包内 `LICENSE` |
 | `mizchi/markdown`、`mizchi/syntree` | MIT | 同上 | 包内 `LICENSE` |

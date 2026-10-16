@@ -64,7 +64,7 @@ def main() -> int:
         inc_norm = inc.replace("\\", "/")
         # 各库路径单独加双引号：link_flags 会被按 shell 词法拆分，而用户名含
         # 单引号的机器（如 noah'liu）里路径自带未配对引号，整条 link_flags 会被
-        # 静默丢弃（与 gui/web 的 WEB_PACKAGE 同一个坑，根因与判据见
+        # 静默丢弃（与 webview 桩原 WEB_PACKAGE 同一个坑，根因与判据见
         # docs/zh/adaptation.md「同族第二条·撇号路径让整条 link_flags 静默消失」）。
         link_flags = " ".join(
             f'"{p}"'

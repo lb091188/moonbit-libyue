@@ -66,14 +66,14 @@ GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github
 | `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge: tray SNI, notifications, logind / upower, media, network, screensaver |
 | `.../native-gui/chart` | `@chart` | Charts and the cross-cutting interaction layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
-| `.../native-gui/web` | `@web` | Embedded WebView |
 | `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values, with state classes and transitions |
 
 Heavier optional capabilities live in **separate modules**, so a plain `moon add` never pulls them in:
 
 | Module | Contents |
 |---|---|
-| `NoahLiu/gui-media` | Audio/video engine and the player component. |
+| `NoahLiu/gui-media` | Audio/video engine and the player component.
+| `NoahLiu/gui-webview` | Embedded WebView (WebKitGTK / WebView2), extracted from the main module's `web` subpackage on 2026-10-16. |
 | `NoahLiu/gui-examples` | Standalone example module; depends on `gui-media`. |
 
 Two kinds of "optional" are at work: a sub-package you do not import costs nothing in your binary, because the `moon.pkg` import is the compile and link boundary; a module you do not depend on is never resolved or prebuilt, because the `moon.mod` import sets the dependency closure.

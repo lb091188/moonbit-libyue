@@ -13,7 +13,7 @@ A **lightweight cross-platform desktop GUI framework for MoonBit** — native-di
 - **Desktop-grade system integration** — tray, notifications, native menus, global shortcuts, message boxes, file dialogs, drag & drop (in-app and cross-application), clipboard, autostart, idle detection and OS queries (volume, power, monitors, browser history, installed apps…) behind one `@sys` / `@core` facade.
 - **Content batteries included** — 20 chart types with a cross-cutting interactive layer, a GFM Markdown view, multi-language code highlighting, an embedded WebView (JS interop, custom protocols, DOM capture, policy hooks) and an audio/video engine with subtitles and speed control.
 - **Honest degradation** — every capability family exposes a probe and returns a structured `Unsupported` / `NotFound` on environments that lack it, instead of crashing or pretending success.
-- **Pay only for what you import** — 14 packages in this module; an unimported package never enters your binary. Heavier optional capabilities (the media engine) live in their own modules, outside the default dependency closure entirely.
+- **Pay only for what you import** — 13 packages in this module; an unimported package never enters your binary. Heavier optional capabilities (the media engine) live in their own modules, outside the default dependency closure entirely.
 
 ## Usage
 
@@ -65,7 +65,6 @@ Each showcase page is its own source file under `examples/showcase/pages/` — t
 | `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge (tray SNI, notifications, logind / upower, media, network…) |
 | `.../native-gui/chart` | `@chart` | Charts plus the interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
-| `.../native-gui/web` | `@web` | Embedded WebView |
 | `.../native-gui/style` | `@style` | Style layer: stylesheets as MoonBit values — `Style` rule blocks, hover / active / focus states, transitions |
 
 Optional capabilities in **separate modules** (a plain `moon add` of this module never drags them in):
@@ -73,6 +72,7 @@ Optional capabilities in **separate modules** (a plain `moon add` of this module
 | Module | Contents |
 |---|---|
 | `NoahLiu/gui-media` | Audio/video engine (ffmpeg decode + miniaudio output) and the player component |
+| `NoahLiu/gui-webview` | Embedded WebView (WebKitGTK / WebView2), extracted from this module's `web` subpackage on 2026-10-16 |
 | `NoahLiu/gui-examples` | Standalone example module (audio / video players) depending on `gui-media` |
 
 ## Platform support

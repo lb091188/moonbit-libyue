@@ -1,7 +1,7 @@
 # 模块结构：按路线拆模块、按层级切子包
 
-> **状态**：规划中（2026-10-15）  
-> **跟踪**：TODO.md §1「G9 模块拆分」（Batch 1/2 逐步落账）
+> **状态**：Batch 1 已交付（2026-10-16），Batch 2 规划中  
+> **跟踪**：TODO.md §1「G9 模块拆分」（Batch 2 落账）
 
 ## 1. 背景与目标
 
@@ -59,7 +59,7 @@ moonbit-native-gui/                          # 根 workspace
 
 ### 3.2 `NoahLiu/gui-webview` 模块
 
-从 `gui/web/` 平移：`dom.mbt`、`scheme.mbt`、`webview.mbt`、`webview_wbtest.mbt`、`scheme_wbtest.mbt`、`dom_wbtest.mbt`、FFI 声明、`webkit_stub.c`、`webview2_stub.c`、include/lib/vendor。
+从 `gui/web/` 平移（2026-10-16 已交付，落位 `modules/gui-webview/webview/`）：`dom.mbt`、`scheme.mbt`、`webview.mbt`、`webview_wbtest.mbt`、`scheme_wbtest.mbt`、`dom_wbtest.mbt`、FFI 声明、`webkit_stub.c`、`webview2_stub.c`、include/lib/vendor。
 
 关键改动：
 
@@ -121,7 +121,7 @@ moonbit-native-gui/                          # 根 workspace
 
 ## 6. 可执行细案（2026-10-16 勘察，行号按当日文件）
 
-### 6.1 Batch 1：`gui/web` → `modules/gui-webview`
+### 6.1 Batch 1：`gui/web` → `modules/gui-webview`（2026-10-16 已交付）
 
 **文件清单（实测）**：11 个源/桩文件 + 2 个 vendor 目录，vendor 合计 **14 MB**——`lib/` 11 MB、`include/` 2.9 MB。
 
@@ -149,6 +149,11 @@ moonbit-native-gui/                          # 根 workspace
 **验收判据**：`cd gui && moon check --deny-warn` 零警告，主模块再无 web；`cd modules/gui-webview && moon check --deny-warn` 零警告 + `moon test`；`cd examples && moon build browser` 通过；真机 `moon run examples/browser` 出页，由用户执行；CI 矩阵加一条，Linux 装 `libwebkit2gtk-4.1-dev`、Windows 拉 vendor；`moon.work` 增成员。
 
 **回滚点**：整批 = 一次 `git mv` + 两个 prebuild 编辑 + 一处 import 改名，单提交，`revert` 即回。
+
+**交付实录（2026-10-16）**：判据全过——库 `check --deny-warn` 零警告（13 包）、`gui-webview` 模块 check 零警告 + `moon test` 1194/1194（全 workspace 闭包）、`examples/browser` 全量重链通过 + 本机冒烟起进程 26 秒优雅退出。三条细案没预见的实测：
+1. **prebuild 的 stdin 只给 `paths.module_root` 与 `paths.out_dir`**（探针实测），没有依赖模块路径——webkit 真实现引用主模块 win 桩的 `wm_surface_container()`，新模块定位 `libyue_win_stub.a` 只能按「workspace 兄弟目录 → `$MOON_HOME` 依赖缓存 → 当前工作区 `_build` glob」三处探，探不到就退占位分支（探测返回不可用，不断链）。**registry 消费方（非 workspace）那条路径未经实测**，发布前要在最小工程验一次或改契约。
+2. **消费方模块必须在自己 `moon.mod` 的 `import` 里声明 `NoahLiu/gui-webview@0.1.0`**——只改包 import 不声明模块，moon 报「containing module is not imported」（`examples/moon.mod` 已补）。
+3. **vendor 的 `WebView2.h`/`WebView2LoaderStatic.lib` 本就不入库**（Release 资产 + .gitignore），`git mv` 只搬了 `SDK-LICENSE.txt` 与 `WebView2EnvironmentOptions.h`；下载清单与 .gitignore 路径已同步改到 `modules/gui-webview/webview/`。
 
 ### 6.2 Batch 2：`core` 三刀
 

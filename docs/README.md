@@ -20,14 +20,14 @@
 | `.../native-gui/dbus` | `@dbus` | Linux D-Bus bridge: tray SNI, notifications, logind / upower, media, network, screensaver |
 | `.../native-gui/chart` | `@chart` | Charts and the cross-cutting interactive layer |
 | `.../native-gui/mdview` | `@mdview` | Markdown rendering view |
-| `.../native-gui/web` | `@web` | Embedded WebView |
 | `.../native-gui/style` | `@style` | Style layer: stylesheets written as MoonBit values, with state classes and transitions |
 
 Heavier optional capabilities live in separate modules, and `moon add NoahLiu/native-gui` never pulls them in:
 
 | Module | Contents |
 |---|---|
-| `NoahLiu/gui-media` | Audio/video engine and the player component. |
+| `NoahLiu/gui-media` | Audio/video engine and the player component.
+| `NoahLiu/gui-webview` | Embedded WebView (WebKitGTK / WebView2), extracted from the main module's `web` subpackage on 2026-10-16. |
 | `NoahLiu/gui-examples` | Standalone example module that depends on `gui-media`. |
 
 Don't confuse the two kinds of "optional": a sub-package you don't import stays out of your binary — the `moon.pkg` import is the compile/link boundary; a module you don't depend on is not even resolved or prebuilt — the `moon.mod` import decides the dependency closure. For a capability to reach the latter, it must live in its own module.

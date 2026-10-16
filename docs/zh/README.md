@@ -20,14 +20,14 @@
 | `.../native-gui/dbus` | `@dbus` | Linux D-Bus 桥：托盘 SNI、通知、logind / upower、媒体、网络、屏保 |
 | `.../native-gui/chart` | `@chart` | 图表与横切交互层 |
 | `.../native-gui/mdview` | `@mdview` | Markdown 渲染视图 |
-| `.../native-gui/web` | `@web` | 内嵌 WebView |
 | `.../native-gui/style` | `@style` | 样式层：样式表写成 MoonBit 值，含状态类与过渡 |
 
 较重的可选能力放在独立模块，`moon add NoahLiu/native-gui` 不会把它们拉进来：
 
 | 模块 | 内容 |
 |---|---|
-| `NoahLiu/gui-media` | 音视频引擎与播放器组件。 |
+| `NoahLiu/gui-media` | 音视频引擎与播放器组件。
+| `NoahLiu/gui-webview` | 内嵌 WebView（WebKitGTK / WebView2），2026-10-16 起从主模块 `web` 子包出成。 |
 | `NoahLiu/gui-examples` | 独立示例模块，依赖 `gui-media`。 |
 
 两种「可选」不要混：没 import 的子包不进二进制——`moon.pkg` 的 import 是编译与链接边界；没依赖的模块连解析和 prebuild 都不发生——`moon.mod` 的 import 决定依赖闭包。能力要选后者，就必须住在自己的模块里。

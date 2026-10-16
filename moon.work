@@ -6,4 +6,5 @@ members = [
   "modules/yoga-mbt",
   "modules/gui-examples",
   "modules/gui-media",
+  "modules/gui-webview",
 ]

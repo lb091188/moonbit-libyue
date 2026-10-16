@@ -22,8 +22,8 @@
 
 # vendor 大文件改走 GitHub Release 资产(2026-10-14 起,prebuild 缺失时自动
 # 下载并校验 sha256,勿入库——入库会永久占用 git 历史体积)
-/gui/web/lib/WebView2LoaderStatic.lib
-/gui/web/include/WebView2.h
+/modules/gui-webview/webview/lib/WebView2LoaderStatic.lib
+/modules/gui-webview/webview/include/WebView2.h
 /modules/gui-media/media/miniaudio.h
 
 # Python 缓存(moon package 与 git 同样排除)

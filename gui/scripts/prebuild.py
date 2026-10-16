@@ -10,6 +10,10 @@
 2. 输出 link_configs，按当前系统给出 pkg-config 探到的 GTK3/Pango/X11 参数。
    新栈自己的平台后端（win）落地后，链接参数继续从这里传播。
 
+webview（原 `NoahLiu/native-gui/web`）已于 G9 Batch 1 出成独立模块
+`NoahLiu/gui-webview`（本仓 `modules/gui-webview/`）：WebKitGTK 探测、WebView2
+vendor 资产与链接参数改由该模块自己的 prebuild 下发，本脚本不再管 web。
+
 约束：stdout 只允许输出 JSON，进度信息走 stderr。
 """
 
@@ -38,88 +42,6 @@ SYS_PACKAGE = "NoahLiu/native-gui/sys"
 WIN_PACKAGE = "NoahLiu/native-gui/win"
 RENDER_PACKAGE = "NoahLiu/native-gui/render"
 TEXT_PACKAGE = "NoahLiu/native-gui/text"
-WEB_PACKAGE = "NoahLiu/native-gui/web"
-# webview 引擎只能动态链（方案 §4.8：WebKitGTK 无静态库），运行期依赖发行版包。
-# 缺包不算错：桩改编「无宏」的占位分支，wb_* 符号仍在、探测返回不可用。
-WEBKIT_PKG_CONFIG = "webkit2gtk-4.1"
-
-# ---------------------------------------------------------------------------
-# vendor 大文件走 Release 资产（2026-10-14 起仓库不再入库）：WebView2 静态
-# Loader 与 SDK 头体积大且基本不更新，留在 git 里只会永久占用历史体积。构建时
-# 缺失即下载并校验 sha256；离线环境可提前手工放置（只「缺失才下载」，已存在
-# 不动）。下载失败不中断 prebuild（只报错），让后面的链接期给出缺文件错误。
-#
-# 镜像**按序尝试，不做延迟探测**：sha256 一致才落盘，所以任何镜像都可验证，
-# 顺序只影响快慢、不影响正确性；而「先测哪个快再下」会让两台机器从不同源取，
-# 拿可复现性换一个不确定收益。单源超时 20 秒而不是 180 秒——实测本机 GitHub
-# Release 直连 15 秒 0 字节，快速切下一个源比干等一个源有用得多。
-# 加镜像 = VENDOR_BASES 加一行；外部源（内网 / 离线目录）用环境变量
-# NATIVE_GUI_VENDOR_BASE 覆盖（单个 base 或逗号分隔列表），排在列表最前。
-# ---------------------------------------------------------------------------
-VENDOR_BASES = [
-    "https://github.com/lb091188/moonbit-native-gui/releases/download/vendor-v1",
-    "https://gitee.com/lb091188/moonbit-native-gui/releases/download/vendor-v1",
-]
-
-VENDOR_TIMEOUT = 20
-
-VENDOR_FILES = [
-    (
-        "web/lib/WebView2LoaderStatic.lib",
-        "e66284970876a616c82e7dcda75a17fd46d04827f9de81d4299b8862d34d25d6",
-    ),
-    (
-        "web/include/WebView2.h",
-        "dff1e3181ec7ec203a34ef6efa966590e0ef0ba1a5c3fe3b69da6508c2f8a02e",
-    ),
-]
-
-
-def vendor_bases() -> list[str]:
-    """镜像候选列表：环境变量给的排最前，再按 VENDOR_BASES 顺序。"""
-    env = os.environ.get("NATIVE_GUI_VENDOR_BASE", "")
-    extra = [b.strip().rstrip("/") for b in env.split(",") if b.strip()]
-    return extra + VENDOR_BASES
-
-
-def fetch_vendor_file(name : str, sha : str) -> "bytes | None":
-    """按镜像列表取一个 vendor 文件：sha256 过了才返回字节，全失败给 None。"""
-    import hashlib
-    import urllib.request
-
-    for base in vendor_bases():
-        url = f"{base}/{name}"
-        try:
-            print(f"prebuild: 取 vendor {url} ...", file=sys.stderr)
-            data = urllib.request.urlopen(url, timeout=VENDOR_TIMEOUT).read()
-        except Exception as e:  # noqa: BLE001——任何网络/URL 错误都换下一个镜像
-            print(f"prebuild: 镜像失败（{e}）", file=sys.stderr)
-            continue
-        if hashlib.sha256(data).hexdigest() != sha:
-            print(f"prebuild: {name} 在该镜像上 sha256 不符，换下一个", file=sys.stderr)
-            continue
-        return data
-    return None
-
-
-def ensure_release_files() -> None:
-    for rel, sha in VENDOR_FILES:
-        dest = MODULE_ROOT / rel
-        if dest.exists():
-            continue
-        data = fetch_vendor_file(dest.name, sha)
-        if data is None:
-            print(
-                f"prebuild: 全部镜像都没取到 {dest.name}\n"
-                f"  离线环境可手工放置，或用 NATIVE_GUI_VENDOR_BASE 指到自己的源",
-                file=sys.stderr,
-            )
-            continue
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(data)
-        print(f"prebuild: 已就位 {dest}（sha256 校验通过）", file=sys.stderr)
-
-
 def pkg_config(args: list[str], flag: str) -> list[str] | None:
     """探包配置：返回 None 表示包不存在，返回空列表表示存在但该 flag 无输出
     （`--cflags x11` 就是合法的空输出，当成缺失会让所有主包退避）。"""
@@ -182,7 +104,6 @@ def compile_stub(
 
 def link_configs() -> dict:
     entries: list[dict] = []
-    ensure_release_files()
     system = platform.system()
     if system == "Linux":
         libs = []
@@ -214,34 +135,6 @@ def link_configs() -> dict:
                 "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_win_stub "
                 + " ".join([*libs, *sys_libs]),
             })
-        # webview（web）：WebKitGTK 只能动态链。缺开发包时不报错——编「无宏」
-        # 的占位分支（wb_available() 返回 0），于是 MoonBit 层按探测降级，
-        # 而不是链接期缺一堆符号。顺序上 -lyue_web 在前：它引用 win 桩的
-        # wm_surface_container。
-        webkit_cflags = pkg_config([WEBKIT_PKG_CONFIG], "--cflags")
-        webkit_libs = pkg_config([WEBKIT_PKG_CONFIG], "--libs")
-        if webkit_cflags is None or webkit_libs is None:
-            print(
-                f"prebuild: 缺 {WEBKIT_PKG_CONFIG}，webview 走占位实现（探测返回不可用）",
-                file=sys.stderr,
-            )
-            webkit_cflags = []
-            webkit_libs = []
-        if win_lib:
-            web_lib = compile_stub(
-                MODULE_ROOT / "web" / "webkit_stub.c",
-                "libyue_web.a",
-                extra_cflags=[
-                    *(["-DWB_HAVE_WEBKIT"] if webkit_cflags else []),
-                    *webkit_cflags,
-                ],
-            )
-            if web_lib:
-                entries.append({
-                    "package": WEB_PACKAGE,
-                    "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_web -lyue_win_stub "
-                    + " ".join([*libs, *webkit_libs, *sys_libs]),
-                })
         # 媒体引擎已迁出主模块（本仓 `modules/gui-media/media`）：它要的
         # 系统库链接参数（miniaudio 的设备线程与 dlopen 后端）不再由这里下发，
         # 改由该模块自己的 prebuild 按包名 `NoahLiu/gui-media/media` 下发。
@@ -320,30 +213,6 @@ def link_configs() -> dict:
             "package": TEXT_PACKAGE,
             "link_flags": "dwrite.lib d2d1.lib windowscodecs.lib ole32.lib uuid.lib gdi32.lib",
         })
-        # webview（web）Windows：WebView2（平台批）。头文件与静态 Loader 是
-        # MIT 的 Microsoft.Web.WebView2 SDK（1.0.4258.31）vendor 进
-        # web/include/ 与 web/lib/（许可全文见 web/include/SDK-LICENSE.txt）：
-        # 头由 native-stub 相对源文件路径自取（native-stub 拿不到外部 include
-        # 路径，同 win 桩 GTK 的教训），所以这里只下发链接输入——静态 Loader
-        # 免运行期分发 DLL（Evergreen Runtime 本机已有，探测在 C 桩里做）。
-        # 静态 Loader 的系统库依赖按官方 CMake 清单补（shlwapi 等）。
-        wv2_lib = MODULE_ROOT / "web" / "lib" / "WebView2LoaderStatic.lib"
-        if wv2_lib.exists():
-            # 路径整体加双引号：link_flags 会被按 shell 词法拆分，而用户名含单引号
-            # 的机器（如 noah'liu）里路径自带未配对引号，整条 link_flags 会被丢弃
-            # —— 实测症状是 web 包 5 条里唯一含路径的这条从未出现在链接命令行，
-            # 于是 shlwapi.lib 与静态 Loader 一起消失（LNK2019）。根因与判据见
-            # docs/zh/adaptation.md「同族第二条·撇号路径让整条 link_flags 静默消失」。
-            entries.append({
-                "package": WEB_PACKAGE,
-                "link_flags": f'"{wv2_lib.as_posix()}" shlwapi.lib ole32.lib '
-                "oleaut32.lib uuid.lib user32.lib gdi32.lib advapi32.lib",
-            })
-        else:
-            print(
-                "prebuild: 缺 web/lib/WebView2LoaderStatic.lib，webview 走占位实现（探测返回不可用）",
-                file=sys.stderr,
-            )
     return {"link_configs": entries}
 
 
