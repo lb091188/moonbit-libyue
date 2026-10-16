@@ -137,6 +137,12 @@
   - [ ] **macOS 全局热键后端**（Carbon `RegisterEventHotKey`，或 `NSEvent.addGlobalMonitorForEvents` + 辅助功能授权）：同门面未接，前置=有 mac 真机，与 tray/notify 的 mac 档同批。
   - ~~**探针对齐**~~（2026-10-16 已交付：`hotkey_probe` 组合换 `Ctrl+Alt+H/J`（Fn 系是 VT 保留域），② 注册/幂等注销/槽位复用 + ③ 新增门面轮询段——`xdotool` 注入 6 秒内 `HOTKEY-CORE-FIRE` 即回证；组合被占走 `Err(Failed)` 门面已有）
 
+#### W23 · 窗口显隐：`Window::hide`（与既有 `show` / `request_focus` 对称）
+
+- [ ] **`Window::hide` 三平台门面**：X11 `XWithdrawWindow`（unmap+WM 撤管；注意区别于 `XIconifyWindow` 的最小化语义，且重新 map 后 WM 会重新摆放，唤起侧须接 `move_to` 复位位置——启动器类「Esc 隐藏驻留 + 唤回原位」的正解）；Windows `ShowWindow(SW_HIDE)`，唤起侧 `SW_SHOW` + `SetForegroundWindow`；macOS `orderOut:` / `makeKeyAndOrderFront:`（mac 档与 W22 的 mac 批同批，前置=有 mac 真机）。
+  - 动机：旗舰应用 moon-launcher（`lb091188/moon-launcher`）已把「Esc 隐藏驻留托盘」挂为其 README「已知边界」——发布包 0.1.1 只有 `show` 无 `hide`，启动器现在只能「Esc 清空→退出」。
+  - 验收判据：启动器 Esc 后窗口隐藏且托盘/DBus 单实例存活，Wake 或托盘点击唤回**原位置**并自动聚焦输入框；`hide` 幂等、hide 后 `request_focus` 不异常，三平台同一门面。
+
 ### 6.3 与既有 §1/§2 的接缝（不改口径，仅指向）
 
 - **§2「系统集成」里已有的跨平台能力**（剪贴板、文件对话框、`open_url`/`reveal`、浏览器历史/书签、`sysinfo`、主题跟随系统）**Windows 后端已落**（W14/W14e/W16），无需重开；**只差真机观感复验**（见 6.4）。
