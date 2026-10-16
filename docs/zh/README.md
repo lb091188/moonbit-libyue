@@ -66,6 +66,7 @@ moon run examples/browser        # 内嵌 WebView 浏览器（演示菜单 + 状
 | [build.md](build.md) | 构建与链接：prebuild 全权托管链接参数、改 C 桩不重链这一条坑的判别与处理（旧 relink 的新栈后继文） |
 | [roadmap.md](roadmap.md) | 对外路线图：定位、现在能拿到什么、平台支持矩阵、承诺与版本、下一阶段方向、待定决策、明确不做 |
 | [design.md](design.md) | 前端化设计口径：样式表（MoonBit 的 `Style` 值 + 具名 class 常量，CSS 作导入通道）、组件前端化命名映射、响应式补强四项、视图层定案（`render` 函数替代模板） |
+| [module-structure.md](module-structure.md) | 模块结构规划（规划中）：按路线拆模块、按层级切子包的判据与目标布局；`gui/web` 出成 `gui-webview`、`core` 三刀拆 `base`/`shell`/`widget` 两个批次、模块化代价与风险（跟踪在 `TODO.md` §1「G9 模块拆分」） |
 | [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论（持续更新） |
 | [autostart.md](autostart.md) | 开机自启动：Linux 写 XDG .desktop、Windows 写 HKCU Run 键，is_enabled / enable / disable 统一语义 |
 | [tray.md](tray.md) | Linux 托盘方案：SNI 协议栈设计、架构、后端降级、桌面兼容性 |

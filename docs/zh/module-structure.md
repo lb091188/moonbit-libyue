@@ -1,7 +1,7 @@
 # 模块结构：按路线拆模块、按层级切子包
 
 > **状态**：规划中（2026-10-15）  
-> **跟踪**：TODO.md §「模块拆分」
+> **跟踪**：TODO.md §1「G9 模块拆分」（Batch 1/2 逐步落账）
 
 ## 1. 背景与目标
 
@@ -77,8 +77,13 @@ moonbit-native-gui/                          # 根 workspace
 
 **因此只有真正踩线的才开模块**。
 
-## 4. 执行批次
+### 3.4 已有模块 `gui-media` 的依赖面（2026-10-16 控制面一批之后）
 
+- 该批给 `modules/gui-media/media` 新加了 `NoahLiu/native-gui/ui` 依赖（播放/暂停与全屏用 `ui.icon_button`、倍速与缩放用 `ui.button`），媒体层此前只依赖 `core`/`render`/`text`/`theme`/`yoga`。方向仍是 media → ui（ui 不认媒体，无环），判据不变：ui 是纯内部层，不拉外部重资产。
+- 媒体层同时吃 `@core` 的三个入口：`host_active()`（拿当前窗）、`App::add_key_fallthrough`（窗口级按键兜底）、`App::set_fullscreen`（全屏），外加 `Store`/`Signal`/`keys`/`Widget`/`invalidate`。**拆包后这些不是一次改名**：`host_active` 与 `App` 的开窗/泵段归 `shell`，`Widget`/Painter/`invalidate` 归 `widget`，`Store`/`Signal`/`keys` 归 `base`——媒体模块将来要同时 import `@base` + `@shell` + `@widget` + `ui`。
+- 因此 Batch 2 的 import 迁移清单必须含 `modules/gui-media` 与 `modules/gui-examples`（见 §4 步骤 5），并且每批改完要逐模块重跑 `--deny-warn`（经 `moon.work` 本地解析的消费者不在主模块门禁的视野里）。
+
+## 4. 执行批次
 ### Batch 1：`gui-webview` 出模块（小改、立刻见效）
 
 | 步骤 | 改动 |
@@ -100,7 +105,7 @@ moonbit-native-gui/                          # 根 workspace
 | 2 | 创建 `gui/shell/`：平移 loop, host, menu, hotkey, tray, notify, reveal, drag；app.mbt 的「开窗/泵/子件槽/resize」段提进此包 |
 | 3 | 重排 app.mbt（914 行）：保留 root.on_draw + paint_frame 在 widget 层；shell 层暴露 `ShellApp` 类型（loop + host + resize，不含 Painter） |
 | 4 | 创建 `gui/widget/`：平移 widget, overlay, overlay_native, app 剩余部分；改用 `@base` 和 `@shell` |
-| 5 | 更新所有下游包的 import：ui, chart, mdview 里 `@core` → 拆分成 `@base/@shell/@widget` |
+| 5 | 更新所有下游包的 import：`ui` / `chart` / `mdview` 里 `@core` → 拆分成 `@base`/`@shell`/`@widget`；**模块外消费者同批迁移**——`modules/gui-media`（引擎 + 两个播放器组件 + 控制条）、`modules/gui-examples`（audio/video 示例）、`examples/`（showcase/browser/sysmonitor…）、`experiment/` 各探针。漏掉模块外消费者不是编译期能发现的：它们经 `moon.work` 本地解析，改完主模块若不重跑各模块 `--deny-warn` 就是「已推送的树断链」（拆包一批踩过：systemprobe 15 处） |
 | 6 | 验证：`cd gui && moon check --deny-warn` 零警告；`cd gui && moon test` 逐包通过；示例正常编译运行 |
 
 预计成本：2-3 天（主力工作是 app.mbt 解耦和 import 迁移）。收益：Tauri 整页壳可以用 `shell` + `webview` 组合跑起来；纯 3D 同理用 `shell` + 新 `gui-3d` 模块搭地基，不碰 widget。

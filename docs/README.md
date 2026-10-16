@@ -81,6 +81,7 @@ moon run examples/browser        # embedded WebView browser (demo menu + status 
 | Document | Content |
 |---|---|
 | [zh/design.md](/zh/design.md) (Chinese) | Frontend-layer design notes: style sheets as MoonBit values (`Style` + named class constants, CSS as an import channel), component naming mapping, reactivity and view-layer decisions |
+| [zh/module-structure.md](/zh/module-structure.md) (Chinese) | Module-structure plan (draft): the criterion for "new module vs. sub-package", the target layout (`gui/web` out as `gui-webview`, `core` split into `base`/`shell`/`widget`), the two execution batches and their costs; tracked as `TODO.md` §1 "G9 模块拆分" |
 | [zh/roadmap.md](/zh/roadmap.md) (Chinese) | Public roadmap: positioning, what you can use today, platform support matrix, stability commitment and versioning, next-phase directions, open decisions, explicit non-goals |
 
 For the project overview and quick start, see the repository root [README.md](https://github.com/lb091188/moonbit-native-gui/#readme).
