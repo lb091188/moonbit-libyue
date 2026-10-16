@@ -64,9 +64,9 @@ ui 只管组件，三包职责不混。
 - **状态**：`hover` / `active` / `focus` 三个状态桶，**状态长在块上，不长在属性名上**
   （W3C 规则模型）。两条入口分工明确：工厂的状态参数收**整块**（`hover=@style.card_hover`，
   复用具名块）；状态方法 `.hover(...)` / `.active(...)` / `.focus(...)` 收**属性参数**现场
-  开块——且签名里只有绘制期属性，布局参数不在其列，布局值进状态块连编译都过不了（hover
+  开块。签名里只有绘制期属性，布局参数不在其列，布局值进状态块连编译都过不了（hover
   改布局需要布局期也选桶，随 P3 帧末 relayout 再评估）。存储端是三个嵌套 `Style` 字段，
-  绘制期按 `Widget` 已有的 `hovered` / `pressed` / `focused` 选桶，因此没有伪类字符串、
+  绘制期按 `Widget` 已有的 `hovered` / `pressed` / `focused` 选桶。因此没有伪类字符串、
   没有状态机、也不依赖事件传播。三桶可同时命中（对应 CSS 的层叠），合并/覆盖按桶内逐属性
   递归（上条）。
 - **元素级基调**：没有「元素选择器」这个机制；同名基调就是一个常量
@@ -121,7 +121,7 @@ token 名单**不另设一套**，就是 `Theme` 的 20 个颜色字段加一个
 > 形态：字段是 Option（`merge` 靠「非空才覆盖」、`apply` 靠「`None` 不动」），但**调用点不出现
 > `Some`、也不出现值类型构造名**——属性名 = CSS 属性名（连字符写下划线），值 = 基元，`Some`、
 > 单位、四边展开都关在 `style` 包里。构造走 kwargs：可选 labelled 参数（`width? : Double`）
-> 在调用点自动包 `Some`（§1.6），所以属性名即参数名、值就是基元；记录字面量要写满
+> 在调用点自动包 `Some`（§1.6）；记录字面量要写满
 > 全部字段，`with .. { }` 覆写与「裸 `T` 传显式 `T?` 参数」都不支持（§1.6）。
 
 ```moonbit
@@ -186,20 +186,18 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
   **布局散参数（`width` / `height` / `padding` / `row_gap` / `column_gap` / `grow` / `direction` /
   `align_items` / `justify_content`）走同一条折法**：折进匿名块后由 `apply` 落到 Yoga，控件节点上
   不留第二条写入路径——否则 `class` 给的宽与内边距会被散参数覆写。
-- **class 落点分两层**：组件的**主根控件**吃完整 `class`（布局属性 + 绘制属性）；内部件（勾选点、
-  滑块拇指、子行、开在浮层图层上的面板）只吃 `class` 的**绘制期投影**（`paint_subset`），布局属性
-  不外溢给标记——一个组件的 `class` 因此同时管得住整体排版与细节配色。
+- **class 落点分两层**：组件的**主根控件**吃完整 `class`（布局属性 + 绘制属性）；标记类内部件（勾选点、
+  单选环、开关滑珠、滑块拇指、星级、子行、开在浮层图层上的面板）画在**子控件**上，`class` 却落在
+  外层宿主——子控件的 `on_draw` 只读自己的样式槽，所以建树时把 `class` 里属于绘制期的那几条
+  （`color` / `background_color` / `border_color` / `border_width` / `border_radius` 与三个桶）摘出来，
+  叠在标记控件的内置基调之上（`paint_subset`）。布局属性不外溢给标记——一个组件（一个「组」）的
+  `class` 同时管得住整体排版与标记配色。
 - **状态块两条入口，分工不同**：工厂状态参数收**整块**（`hover=@style.card_hover`，具名块
   复用），状态方法 `.hover(...)` 收**属性参数**（现场开块）；状态方法签名里只有绘制期属性
   ——布局参数不在签名中，布局值进状态块编译都过不了。状态桶是绘制期消费的，布局属性混
   进去会把「画的时候」和「量的时候」搅在一起。
   几态同时命中时按 **hover < focus < active** 层叠（后并入的赢，与 CSS 的 `:active` 盖过
   `:hover` 同向）：按下必然也在悬停里，反过来的话按下反馈永远画不出来。
-- **标记控件吃 `class` 的绘制期子集**：勾选点、单选环、开关滑珠、滑块拇指、星级这类标记画在
-  **子控件**上，而 `class` 落在外层宿主；子控件的 `on_draw` 只读自己的样式槽，所以建树时把
-  `class` 里属于绘制期的那几条（`color` / `background_color` / `border_color` / `border_width` /
-  `border_radius` 与三个桶）摘出来叠在标记控件的内置基调之上（`paint_subset`）。布局属性不外溢
-  给标记——一个「组」的 `class` 同时管得住整行排版与标记配色。
 - **数据态不是状态桶**：状态桶只有 `hover` / `active` / `focus` 三条（指针与焦点态）。
   选中、勾选、当前项这类**由数据决定**的态没有对应的桶（CSS 的 `:checked` 在这里没有对应物），
   所以组件代码保留「取哪个态」的分支，态里用的**颜色**一律读样式槽；样式里没有对应属性的
@@ -244,13 +242,11 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 | `pub let g = f` 绑函数值再以 `g(width=1.0)` 调用 | ✗ | `[4117] Function with labelled arguments can only be applied directly`——带 labelled 参数的函数**不能间接调用**；转发改成显式 `f(width=width)` 又撞 `[4014] has type: Double? / wanted: Double`（体内可选参数是 `T?`，无自动 unwrap），`f(width!)` / `f(width=width?)` / `f(...)` 三种透传写法全部 `[3002]` 不解析 |
 | `pub abbrev t = S` 类型别名当工厂调用名 | ✗ | 别名只能当类型用；构造调用仍撞 [4021]（类型名不是函数），给不了工厂短名 |
 | `moon.pkg` 里给依赖包配短名（`"…/style": "st"` 键值形态） | ✗ | moon 直接报 `Parsing error: unexpected token :`——import 只收字符串数组，消费端 `@style.style(...)` 的包名缩不了 |
-
-**探针结论（2026-10-13 补测，工具链同上）**：工厂调用点定死 `@style.style(...)`，没有任何给函数起短名的通道。使用者若嫌重复，可在自己模块里手写收拢函数（如 `pub fn card_style(width? : Double) -> Style { @style.style(width=width?, padding=14.0, …) }`——显式逐参传，无 `...` 透传可用），库侧不提供这种糖。
 | **方法名与字段名同名**（`Style` 有字段 `padding`，同时有方法 `Style::padding`） | ✓ | kwargs 形态下属性名转移到参数名上（见下两条） |
 | 方法返回值当语句用（`s.set_x(v)` 单独一行） | ✗ | `[4139] its value cannot be implicitly ignored`——只能写成链，包内 setter 体固定为「赋值 + 返回 self」 |
 | 字段有 `mut` 但没有对应 setter | 警告 | `[0015] The mutability of field 'padding' is never used`——零警告门禁逼着字段与属性一一对应，留不下死字段 |
 
-调用点写 `@style.style(...)`：短名通道全部不存在（alias 是保留字、labelled 函数不可间接调用、`moon.pkg` 不支持 import 配名），P1 直接按此形态实现。
+**探针结论（2026-10-13 补测，工具链同上）**：工厂调用点定死 `@style.style(...)`——短名通道全部不存在（alias 是保留字、labelled 函数不可间接调用、`moon.pkg` 不支持 import 配名），P1 直接按此形态实现。使用者若嫌重复，可在自己模块里手写收拢函数（如 `pub fn card_style(width? : Double) -> Style { @style.style(width=width?, padding=14.0, …) }`——显式逐参传，无 `...` 透传可用），库侧不提供这种糖。
 
 ## 2. 组件层：前端化命名
 
@@ -269,7 +265,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
   图标与圆点的边长仍是 `size`（`icon` / `badge_dot` / `avatar` / `rate`），图标按钮本来就写成
   `icon_size` / `box_size`——把几何尺寸也叫 `font_size` 才是错的。
 
-`_t` 后缀是历史上的 **themed（主题化变体）** 标记，与同名基础版是两套实现
+`_t` 后缀是历史上的 **themed 变体**标记，与同名基础版是两套实现
 （`label` / `label_t`、`button` / `button_t`）。改名时**合并为单入口**，差异参数取并集。
 
 | 新名 | 旧名 | 说明 |
@@ -311,7 +307,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 
 ## 3. 响应式：内核已有，补四件
 
-**现状**：`core/signal.mbt` 的 `Signal::computed` 在求值期**自动收集依赖**（不是手工接线），
+**现状**：`core/signal.mbt` 的 `Signal::computed` 在求值期**自动收集依赖**，
 另有 `batch()` 合并通知、`sub_bag_*` 订阅回收袋防泄漏。**不重写内核**，只补上层：
 
 1. **`ListStore[T]` + keyed 差分**（Vue `v-for :key` 的对应物）：现在 table / virt_list /
@@ -345,7 +341,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
    **`when` 就是 if/else**：`else=?` 可选——不给是单支（假时显隐），给了是双支常驻切显隐
    （`swap_node` 落地，`core/node.mbt:119`）；要**销毁重建**的场合（大子树省内存、重置内部
    状态如输入光标）仍走 `bind_node`（`:77-113`），两个原语原样保留，`when` 是它们上面的糖。
-   **入参收 `Signal`，不收 `.get()`**——上面示例的 `busy` / `has_items` 直接传信号（绑定
+   上面示例的 `busy` / `has_items` 直接传信号、不是 `.get()`（绑定
    语义通则见下第 5 条）。
    **`for_list` 与「对象属性」**：JS 的 `v-for` 能枚举对象属性，MoonBit 无反射、struct 字段
    是静态的（与下条不做字符串路径同一原因），没有「动态对象」可枚举；字典数据就是
@@ -374,8 +370,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Y
 ### 4.0 数据与挂载：render 之前那两块
 
 **数据就是普通 struct**：会变的字段各自是 `Store`（§3 口径），派生值用 `computed`（依赖
-自动收集，现成实现），动作是普通函数——里面只写 `Store`，之后差分、显隐、合并重绘全是
-框架的事：
+自动收集，现成实现），动作是普通函数：
 
 ```moonbit
 struct Task {

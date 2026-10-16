@@ -16,7 +16,7 @@ irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
 <details>
 <summary>Linux（Ubuntu 24.04）环境准备</summary>
 
-本库自绘、走原生 FFI，构建只需要 C 工具链、pkg-config、Python 3（跑库的 prebuild 脚本），加上 GTK3 / Pango / FontConfig / X11 的开发包：
+本库自绘、走原生 FFI，构建只需要 C 工具链、pkg-config、Python 3 与 GTK3 / Pango / FontConfig / X11 的开发包；Python 3 用于跑库的 prebuild 脚本：
 
 ```sh
 sudo apt install build-essential pkg-config python3 \
@@ -30,7 +30,7 @@ sudo apt install build-essential pkg-config python3 \
 <details>
 <summary>Windows（10/11，x64）环境准备</summary>
 
-需要 Python 3（跑 prebuild）与 MSVC C++ 工具链（VS 2022 Build Tools 的「使用 C++ 的桌面开发」工作负载）：
+需要 Python 3 与 MSVC C++ 工具链——Python 3 跑 prebuild，工具链选 VS 2022 Build Tools 的「使用 C++ 的桌面开发」工作负载：
 
 ```powershell
 irm https://cli.moonbitlang.com/install/powershell.ps1 | iex            # MoonBit
@@ -38,7 +38,7 @@ winget install Python.Python.3.12
 winget install Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
-moon 在 Windows 上编译原生代码**开箱即用，会自行定位 MSVC 工具链**，普通 shell（PowerShell / Git Bash）直接 `moon run` 即可，不必先进「x64 Native Tools Command Prompt」或手动 `call vcvars64.bat`。（早期文档里「必须在 Native Tools 命令行里跑」「还要装 CMake 与 ATL」的口径，管的是旧的 libyue/CMake 构建链，自绘新栈不适用。）
+moon 在 Windows 上编译原生代码**开箱即用，会自行定位 MSVC 工具链**，普通 shell（PowerShell / Git Bash）直接 `moon run` 即可，不必先进「x64 Native Tools Command Prompt」或手动 `call vcvars64.bat`。早期文档「必须在 Native Tools 命令行里跑」「还要装 CMake 与 ATL」的口径管的是旧 libyue/CMake 构建链，自绘新栈不适用。
 
 </details>
 
@@ -52,11 +52,11 @@ moon add NoahLiu/native-gui
 
 `moon new` 生成的工程需要三处手工调整：
 
-- **`moon.mod`：把 `preferred_target = "wasm"` 改为 `"native"`**——本库走原生 FFI，只支持 native 后端（若模板默认已是 native 则跳过）。
+- **`moon.mod`：把 `preferred_target = "wasm"` 改为 `"native"`**——本库走原生 FFI，只支持 native 后端；模板默认已是 native 时跳过。
 
 - **入口文件改名：`my_app.mbt` → `main.mbt`**——当前版本的 moon 只把名为 `main.mbt` 的文件识别为程序入口；用模板默认文件名会报 `Missing main function`。
 
-- **`moon.pkg` 整个替换为**（注意这是 moon 的 DSL 格式，不是 JSON）：
+- **`moon.pkg` 整个替换为**——moon 的 DSL 格式，不是 JSON：
 
   ```
   import {
@@ -69,7 +69,7 @@ moon add NoahLiu/native-gui
   supported_targets = "native"
   ```
 
-  `import` 让代码能访问库：`@ui.*` 是控件与组件库加声明式入口（`mount_window` 与各节点构造器都在这），`@core.*` 是应用宿主与响应式状态（`Store` / `Signal`）。`pkgtype(kind: "executable")` 与 `supported_targets = "native"` 声明本包是可执行入口、且只出原生目标。
+  `import` 让代码能访问库：`@ui.*` 提供控件、组件与声明式入口（`mount_window` 与各节点构造器），`@core.*` 提供应用宿主与响应式状态（`Store` / `Signal`）。`pkgtype(kind: "executable")` 与 `supported_targets = "native"` 声明本包是可执行入口、只出原生目标。
 
 ## 3. 第一个窗口
 
@@ -110,7 +110,7 @@ fn main {
 moon run .
 ```
 
-窗口出现：一个标题、一个按钮、一行「已点 0 次」；点按钮，那行数字自动 +1——这就是**响应式状态**：`count` 一变，绑定点 `bind_label` 自动刷新，不写「点击后改文本」的胶水代码。界面用 `@ui.col([...])` / `@ui.text(...)` / `@ui.button(...)` 这些**节点构造器**声明成一棵树，交给 `mount_window` 一次挂载；`mount_window` 在没有窗口后端或没有显示服务时返回 `None`，示例据此结构化退出（而不是崩）。
+窗口出现：一个标题、一个按钮、一行「已点 0 次」；点按钮，数字自动 +1。这是**响应式状态**——`count` 一变，`bind_label` 自动刷新，无需「点击后改文本」的胶水代码。界面用 `@ui.col([...])` / `@ui.text(...)` / `@ui.button(...)` 等**节点构造器**声明成一棵树，交给 `mount_window` 一次挂载；`mount_window` 在没有窗口后端或没有显示服务时返回 `None`，示例据此结构化退出。
 
 ## 4. MoonBit 语法速览（只覆盖上面代码用到的）
 
@@ -160,7 +160,7 @@ moon run examples/showcase    # 14 页：基础/表单/导航/数据展示/反�
 
 ## 6. 给库贡献者的留言
 
-这个库始于一个简单的念头：用 MoonBit 写原生桌面应用。它现在覆盖自绘控件、图表、Markdown、内嵌 WebView 与系统能力，但值得做的事还很多：
+这个库的目标是用 MoonBit 写原生桌面应用，现覆盖自绘控件、图表、Markdown、内嵌 WebView 与系统能力，值得做的事还很多：
 
 - **平台兼容**：主力验证在 Ubuntu（XFCE/GNOME/KDE）与 Windows；macOS 后端在 `mac` 分支落地中、尚未合流 master——你在 mac 上跑出的任何问题都是宝贵输入。
 - **控件与能力**：还没封装的条目、各平台的适配坑，都欢迎从 issue 开始讨论。
