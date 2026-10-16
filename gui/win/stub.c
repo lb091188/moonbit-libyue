@@ -2831,7 +2831,8 @@ void wm_wakeup(void) {
 /* 注册全局快捷键：mods 用内核 MOD_* 位（1 shift/2 ctrl/4 alt/8 meta），
  * vk 是 Win32 虚拟键码。返回 id（>=1）或 0 失败（组合键被系统/别的程序占用、
  * 或表满）。RegisterHotKey 用 NULL hwnd = 线程队列。 */
-int wm_hotkey_register(int mods, int vk) {
+int wm_hotkey_register(int mods, int vk, int keysym) {
+  (void)keysym; // X11 口径，本分支不用
   int slot = -1;
   for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
     if (!wm_hotkeys[i]) {
@@ -3649,6 +3650,7 @@ int wm_clipboard_set_text(const char *text) {
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <X11/Xlib.h> // 全局热键 XGrabKey（W22 Linux 档）；x11 的 cflags/libs 已在 prebuild
 
 #define WM_MAX_WINDOWS 32
 #define WM_MAX_FDS 64
@@ -4741,18 +4743,9 @@ void wm_wakeup(void) {
   g_main_context_wakeup(g_main_context_default());
 }
 
-/* ---- 全局快捷键（W20b）GTK 分支占位：X11 用 XGrabKey 排他注册、Xkb 映射
- * 加速键串，属 Linux 后端内部事务（按新口径不进路线图）；先给可编译的失败
- * 桩，让 MoonBit 层走「注册失败」语义化路径（返回 -1）。 */
-int wm_hotkey_register(int mods, int vk) {
-  (void)mods;
-  (void)vk;
-  return 0;
-}
-
-void wm_hotkey_unregister(int id) { (void)id; }
-
-int wm_hotkey_poll(void) { return 0; }
+/* ---- 全局快捷键（W22）GTK 分支真实现见本文件末尾「全局热键（XGrabKey）」
+ * 节：X11 用 XGrabKey 排他注册、变体抓取覆盖 CapsLock/NumLock；Xkb 不用，
+ * 键码换算走 XKeysymToKeycode。 */
 
 /* ---- 原生菜单（W20a）GTK 分支占位：GTK 端的 GtkMenuBar 属 Linux 后端内部
  * 事务（按新口径不进路线图）；这里给可编译的失败桩，让 MoonBit 侧走「建菜单
@@ -5919,6 +5912,177 @@ int wm_clipboard_set_text(const char *text) {
 /* 关闭并释放对话框（run 之后调用；未 run 过也能安全释放）。 */
 void wm_file_dialog_destroy(int64_t id) { wm_dlg_free(id); }
 
+/* ---------------- 全局热键（XGrabKey，W22 的 Linux/X11 档） ----------------
+ * 与 Windows 分支三件套同形同语义：id 即槽号（1 起）、fired 位图、poll 由
+ * MoonBit 宿主泵里抽取。键码参数在 Windows 分支收 vk、这里按 win/hotkey.mbt
+ * 的两套码约定收 X11 keysym（XKeysymToKeycode 现场换键码）。
+ * grab 落在本进程自开的 X 连接上（与 GTK 主连接互不相干，被抓的 KeyPress
+ * 只进本连接队列，poll 用 XPending 非阻塞抽）。
+ * 变体抓取：CapsLock(LockMask)/NumLock(Mod2Mask) 任一状态下热键都得活着，
+ * 四个变体一次抓满；ScrollLock(Mod5Mask) 不抓变体，匹配时屏蔽。
+ * Wayland 会话恒 unsupported（WAYLAND_DISPLAY 非空即 0）：XWayland 的 grab
+ * 只在 X11 窗口持焦点时生效，拿不到真全局性——按「没做」回报，不装成功。 */
+#define WM_MAX_HOTKEYS 32
+
+static Display *wm_hk_dpy = NULL;
+static Window wm_hk_root = None;
+static int wm_hk_keycode[WM_MAX_HOTKEYS]; // 已抓键码；与 wm_hotkeys 同生命周期
+static int wm_hk_mods[WM_MAX_HOTKEYS];    // base 修饰位（X11 掩码口径）
+static int wm_hotkeys[WM_MAX_HOTKEYS];    // 1 = 已注册；下标即对外 id
+static int wm_hotkey_fired[WM_MAX_HOTKEYS]; // 1 = 本轮已触发待取
+static int wm_hotkey_fired_count = 0;
+
+static int wm_hk_error_flag = 0;
+static int wm_hk_error_trap(Display *d, XErrorEvent *e) {
+  (void)d;
+  (void)e;
+  wm_hk_error_flag = 1;
+  return 0;
+}
+
+static int wm_hk_x11_mods(int mods) {
+  int m = 0;
+  if (mods & 1) {
+    m |= ShiftMask;
+  }
+  if (mods & 2) {
+    m |= ControlMask;
+  }
+  if (mods & 4) {
+    m |= Mod1Mask; // Alt
+  }
+  if (mods & 8) {
+    m |= Mod4Mask; // Super/Meta
+  }
+  return m;
+}
+
+int wm_hotkey_supported(void) {
+  static int probed = -1;
+  if (probed >= 0) {
+    return probed;
+  }
+  probed = 0;
+  const char *wl = getenv("WAYLAND_DISPLAY");
+  if (wl && wl[0]) {
+    return probed;
+  }
+  Display *d = XOpenDisplay(NULL);
+  if (!d) {
+    return probed;
+  }
+  XCloseDisplay(d);
+  probed = 1;
+  return probed;
+}
+
+int wm_hotkey_register(int mods, int vk, int keysym) {
+  (void)vk; // Windows 口径，本分支不用
+  if (!wm_hotkey_supported()) {
+    return 0;
+  }
+  if (!wm_hk_dpy) {
+    wm_hk_dpy = XOpenDisplay(NULL);
+    if (!wm_hk_dpy) {
+      return 0;
+    }
+    wm_hk_root = DefaultRootWindow(wm_hk_dpy);
+  }
+  int base = wm_hk_x11_mods(mods);
+  if (base == 0) {
+    return 0; // 裸键拒绝：整键被抓走太霸道，与 Windows 口径一致
+  }
+  KeyCode kc = XKeysymToKeycode(wm_hk_dpy, (KeySym)keysym);
+  if (kc == 0) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+    if (!wm_hotkeys[i]) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  // XGrabKey 的错误（组合被别的程序占用给 BadAccess）是异步的：临时挂错误
+  // 陷阱 + XSync 才知道结果；任一变体失败就整体撤回、按失败回报。
+  XSync(wm_hk_dpy, False);
+  int (*old_handler)(Display *, XErrorEvent *) =
+      XSetErrorHandler(wm_hk_error_trap);
+  wm_hk_error_flag = 0;
+  const int variants[4] = {0, LockMask, Mod2Mask, LockMask | Mod2Mask};
+  for (int i = 0; i < 4; i++) {
+    XGrabKey(wm_hk_dpy, kc, (unsigned)(base | variants[i]), wm_hk_root, False,
+             GrabModeAsync, GrabModeAsync);
+  }
+  XSync(wm_hk_dpy, False);
+  XSetErrorHandler(old_handler);
+  if (wm_hk_error_flag) {
+    XUngrabKey(wm_hk_dpy, kc, AnyModifier, wm_hk_root);
+    XSync(wm_hk_dpy, False);
+    return 0;
+  }
+  wm_hotkeys[slot] = 1;
+  wm_hotkey_fired[slot] = 0;
+  wm_hk_keycode[slot] = (int)kc;
+  wm_hk_mods[slot] = base;
+  return slot;
+}
+
+/* 注销：幂等。AnyModifier 一次解掉该键码在本进程抓的所有变体。 */
+void wm_hotkey_unregister(int id) {
+  if (id <= 0 || id >= WM_MAX_HOTKEYS || !wm_hotkeys[id] || !wm_hk_dpy) {
+    return;
+  }
+  XUngrabKey(wm_hk_dpy, (KeyCode)wm_hk_keycode[id], AnyModifier, wm_hk_root);
+  XSync(wm_hk_dpy, False);
+  wm_hotkeys[id] = 0;
+  if (wm_hotkey_fired[id]) {
+    wm_hotkey_fired[id] = 0;
+    wm_hotkey_fired_count--;
+  }
+}
+
+/* 抽一个已触发的热键 id（无则 0）：先排空本连接上的事件（KeyPress 按键码
+ * + 有效修饰位匹配到槽；Lock/NumLock/ScrollLock 状态位一律屏蔽），再按
+ * 槽号序交出一个 fired。 */
+int wm_hotkey_poll(void) {
+  if (!wm_hk_dpy) {
+    return 0;
+  }
+  while (XPending(wm_hk_dpy)) {
+    XEvent ev;
+    XNextEvent(wm_hk_dpy, &ev);
+    if (ev.type != KeyPress) {
+      continue;
+    }
+    int state = (int)(ev.xkey.state &
+                      (ShiftMask | ControlMask | Mod1Mask | Mod4Mask));
+    int kc = (int)ev.xkey.keycode;
+    for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+      if (wm_hotkeys[i] && wm_hk_keycode[i] == kc && wm_hk_mods[i] == state) {
+        if (!wm_hotkey_fired[i]) {
+          wm_hotkey_fired[i] = 1;
+          wm_hotkey_fired_count++;
+        }
+      }
+    }
+  }
+  if (wm_hotkey_fired_count < 1) {
+    return 0;
+  }
+  for (int i = 1; i < WM_MAX_HOTKEYS; i++) {
+    if (wm_hotkey_fired[i]) {
+      wm_hotkey_fired[i] = 0;
+      wm_hotkey_fired_count--;
+      return i;
+    }
+  }
+  return 0;
+}
+
 #elif !defined(__linux__)
 
 /* 剪贴板三符号（占位）：macOS 走 sys 自己的 pbpaste/pbcopy 命令线。 */
@@ -6287,6 +6451,18 @@ int wm_message_box(const char *title, const char *text, int utype) {
   (void)utype;
   return 0;
 }
+
+/* W22 全局热键占位（macOS 等）：supported 恒 0、注册恒失败——符号必须在，
+ * 实现随 mac 平台批（Carbon RegisterEventHotKey）。 */
+int wm_hotkey_supported(void) { return 0; }
+int wm_hotkey_register(int mods, int vk, int keysym) {
+  (void)mods;
+  (void)vk;
+  (void)keysym;
+  return 0;
+}
+void wm_hotkey_unregister(int id) { (void)id; }
+int wm_hotkey_poll(void) { return 0; }
 
 int64_t wm_now_ms(void) {
   return 0;

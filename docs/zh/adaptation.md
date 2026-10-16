@@ -243,6 +243,16 @@
 - **回证**：`gui/core/hotkey_wbtest.mbt` 2 条（未注册 id 回查给空串；「连上了才硬断言」——后端可用时空加速串必须走 `Err(Failed)` 而不是崩或静默成功，其余平台只打印 skip）；`moon test ./gui/core` **118/118**（原 116 + 新增 2）。`examples/native-app` 的热键区块从直调 `@win.*` 切到 `@core.hotkey_*`（注册 / 轮询两处，轮询命中直接拿 spec 回显），`--deny-warn` 零警告、冒烟 100 秒无 panic 无 CRITICAL。
 - **本批未做且不假装完成**：Linux `XGrabKey` 与 macOS 热键后端（门面已就位，后端落地不改调用方）；tray/notify 两族既有 API 的统一重构（明确不做，理由见第一条）。
 
+### MoonBit 原生 GUI 栈 · Linux 全局热键后端（W22 Linux 档：X11 `XGrabKey`，2026-10-16）
+
+- **范围**：`win/stub.c` GTK 分支的 `wm_hotkey_*` 三件套从占位桩换真实现，新增 `wm_hotkey_supported`；门面（`core/hotkey.mbt`）与解析（`win/hotkey.mbt`）零语义变化——「两套码」约定本批生效：C ABI 的 register 加了第三个参数，`vk` 与 `keysym` 都传、各平台桩自己挑（Windows 取 vk、X11 取 keysym），MoonBit 侧 `register_global_shortcut` 改收 `Hotkey` 整体。
+- **自开 X 连接而不是挂 GTK 泵**：`XOpenDisplay` 一条进程级连接，`XGrabKey` 落在它的根窗上；被抓的 KeyPress 只进本连接队列，`wm_hotkey_poll` 用 `XPending` 非阻塞抽——TODO 原设想的 `gdk_window_add_filter` / 周期 `XCheckIfEvent` 都不需要，泵完全不进 GTK 主循环。
+- **变体抓取是刚需不是防御**：注册时对 `base`、`base|Lock`、`base|Mod2`、`base|Lock|Mod2` 四个变体各 `XGrabKey` 一遍。TODO 原设想「grab 时 `& ~(Mod2|Lock)`」行不通（掩码清位只是不匹配修饰，NumLock 亮时事件 state 含 Mod2、对不上就整键丢失）；真机注入事件 `state=28`（Control|Mod1|**Mod2**）直接证明——这台机器 NumLock 常开，无变体抓取则恒不触发。ScrollLock（Mod5）不抓变体、匹配时屏蔽。
+- **BadAccess 是异步的**：组合被别的客户端占用时 `XGrabKey` 不当场报错——临时 `XSetErrorHandler` 陷阱 + `XSync` 后才知道；任一变体失败整体 `XUngrabKey` 撤回、按注册失败回报（门面落 `Err(Failed)`，不静默）。裸键（无修饰）拒绝，与 Windows `RegisterHotKey` 口径一致。
+- **VT 切换保留域的坑（现象→根因）**：探针沿用 W20b 的 `Ctrl+Alt+F9`，注册成功但注入恒不触发；最小 C 复现（裸 `XGrabKey` + XTEST 注入）同样不触发；换 `Ctrl+Alt+H` 一发命中——**`Ctrl+Alt+Fn` 是 VT 切换组合，事件在被动抓取之前就被服务器消费**，grab 注册得上但永远等不到。Linux 档选默认/演示组合避开 Fn 系（Windows 无此约束）；这条也解释了 W20b 的 F9/F10 组合为什么在 Windows 侧无恙。
+- **Wayland 口径**：`WAYLAND_DISPLAY` 非空时 `wm_hotkey_supported` 恒 0——XWayland 的 grab 只在 X11 窗口持焦点时生效，拿不到真全局性，按「没做」回报不装成功；出路见 roadmap「会话轴」（portal / 桌面守护协议）。
+- **验证**（Ubuntu 24.04 + X11 + XFCE）：`moon run experiment/hotkey_probe`——① 解析七组对照 ② 注册/幂等注销/槽位复用（`Some(1)`/`Some(2)`/再注册 `Some(1)`）③ 新增门面轮询段：`xdotool key ctrl+alt+h`（XTEST 走真实投递路径）→ `HOTKEY-CORE-FIRE id=1 spec=Ctrl+Alt+H`，全链路 = 注入 → X server → 被动抓取 → 泵抽取 → 门面回查；`moon check` 零警告、库测试 982/982。顺手：`HotkeyError` 补 `Show`/`extend`（与另两族错误同构，探针才能 `\{e}` 插值）。
+
 ### MoonBit 原生 GUI 栈 · 任务栏进度（W20g：`win/taskbar.mbt`，§6.3 接缝项「任务栏进度 / dock 徽标」的 Windows 半边）
 
 - **只写不读**：Win32 的 `ITaskbarList3` **没有 getter**，`TBPF_*` 进度状态不可反读（与 W21a 通知的 kind→`NIIF_*` 映射同款「映射不可反读，由代码评审兜底」）。所以对外只有写入口（`set_taskbar_progress` / `set_taskbar_state` / `clear_taskbar_progress`），探测（`taskbar_supported`）只报「COM 实例起没起来」，不回任何当前进度值。调用方要显示当前进度，自己持有那份数（与 `notify_title` 反读是刻意不同的两档：那个有 `NIF_INFO` 的 szInfoTitle 可反读，这个没有）。

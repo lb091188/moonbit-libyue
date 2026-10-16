@@ -6,9 +6,11 @@
 //   ③ 泵钩子 `hotkey_poll()`——宿主每帧/每拍调一次，命中给 `Hotkey`。
 //
 // 后端现状：**Windows 真实现**（`RegisterHotKey` + 线程队列，W20b 已交付并验证，
-// 纯函数与探针见 `win/hotkey.mbt` / `experiment/…`）；Linux 的 X11 `XGrabKey` 与
-// macOS 的 Carbon/AppKit 热键**未接**，一律 `Err(Unsupported)`——这是「没做」而不是
-// 「失败」，与 tray 的 SNI 探测不到、notify 的 watcher 不在线同口径。
+// 纯函数与探针见 `win/hotkey.mbt` / `experiment/…`）；**Linux X11 真实现**
+// （`XGrabKey`，W22，GTK 桩的 wm_hotkey_* 三件套；Wayland 会话恒 Unsupported——
+// XWayland 的抓键拿不到真全局性）；macOS 的 Carbon/AppKit 热键**未接**，一律
+// `Err(Unsupported)`——这是「没做」而不是「失败」，与 tray 的 SNI 探测不到、
+// notify 的 watcher 不在线同口径。
 //
 // 与 win 包的分工：解析（加速串 → mods/vk）与注册/轮询都在 win 包（那里有
 // 平台纯函数与桩），本文件只做「跨平台同构的面」：字符串进出、错误统一、
@@ -17,11 +19,26 @@
 ///|
 /// 门面错误（与 `TrayError` / `NotifyError` 同构：不支持与失败分两档）。
 pub(all) enum HotkeyError {
-  /// 本平台没有后端（Linux/macOS 当前落点）
+  /// 本平台没有后端（Linux Wayland 会话 / macOS 当前落点）
   Unsupported
   /// 有后端但这次没成（加速串解析不了 / 组合被占用 / 表满）
   Failed(String)
 }
+
+///|
+pub impl Show for HotkeyError with fn output(self, logger) {
+  match self {
+    Unsupported => logger.write_string("HotkeyError::Unsupported")
+    Failed(msg) => {
+      logger.write_string("HotkeyError::Failed(")
+      logger.write_string(msg)
+      logger.write_string(")")
+    }
+  }
+}
+
+///|
+pub extend HotkeyError with Show::{to_string, output}
 
 ///|
 /// 已注册的热键：`id` 是后端注册 id，`spec` 是注册时给的归一化加速串
@@ -49,11 +66,11 @@ fn hotkey_find(id : Int) -> Hotkey? {
 }
 
 ///|
-/// 后端可用性：Windows 恒真（`RegisterHotKey` 总在），其余平台 false。
-/// 注意与「这次注册成败」是两档——不支持时 `hotkey_register` 给
-/// `Err(Unsupported)`，支持但组合被占用给 `Err(Failed)`。
+/// 后端可用性：Windows 恒真；Linux 仅 X11 会话（探测交给 win 桩）；其余
+/// 平台 false。注意与「这次注册成败」是两档——不支持时 `hotkey_register`
+/// 给 `Err(Unsupported)`，支持但组合被占用给 `Err(Failed)`。
 pub fn hotkey_supported() -> Bool {
-  @sys.sys_platform() == "windows"
+  @win.hotkey_supported()
 }
 
 ///|
@@ -68,7 +85,7 @@ pub fn hotkey_register(spec : String) -> Result[Hotkey, HotkeyError] {
   match @win.parse_accelerator(spec, is_mac) {
     None => Err(Failed("加速串无法解析：\{spec}"))
     Some(hk) =>
-      match @win.register_global_shortcut(hk.mods, hk.vk) {
+      match @win.register_global_shortcut(hk) {
         None => Err(Failed("注册失败（组合被占用或表满）：\{spec}"))
         Some(id) => {
           hotkey_registry.val.push({ id, spec })

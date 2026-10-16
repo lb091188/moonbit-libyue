@@ -197,7 +197,12 @@ extern "c" fn wm_window_origin(
 ) -> Unit = "wm_window_origin"
 
 ///|
-extern "c" fn wm_hotkey_register(mods : Int, vk : Int) -> Int = "wm_hotkey_register"
+extern "c" fn wm_hotkey_supported() -> Int = "wm_hotkey_supported"
+
+///|
+/// Windows 桩收 `vk`、X11 桩收 `keysym`（两套码的约定见 hotkey.mbt 头注），
+/// 各分支自己挑，MoonBit 侧两个都传。
+extern "c" fn wm_hotkey_register(mods : Int, vk : Int, keysym : Int) -> Int = "wm_hotkey_register"
 
 ///|
 extern "c" fn wm_hotkey_unregister(id : Int) -> Unit = "wm_hotkey_unregister"

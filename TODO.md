@@ -132,10 +132,10 @@
 #### W22 · 三族门面统一（托盘 / 通知 / 热键）中未接的后端
 
 - 交汇处托盘/通知/热键门面统一归 **W22**
-  - [ ] **Linux 全局热键后端（X11 `XGrabKey`）**：门面已就位，Linux 现在一律 `Err(Unsupported)`——属「没做」不是「失败」。实现要点（**以下按 X11/GDK 公开 API 形态推断，动手时逐条实测校正**）：加速串 → `KeySym` → `XKeysymToKeycode`，对根窗 `XGrabKey(display, keycode, mods, root, True, GrabModeAsync, GrabModeAsync)`，多屏/多根窗各 grab 一遍；修饰位与 `gtk_mods_to_mods` 同源，且 **NumLock/CapsLock 会污染 modmask**（grab 时必须 `& ~(Mod2|Lock)`，否则注册得上、按下来对不上）；命中事件在 GTK 主循环内部，本栈不拥有泵——要么 `gdk_window_add_filter` 挂原生事件过滤（最直接），要么周期 `XCheckIfEvent` 捞，捞到的 `WM_HOTKEY`-等价物喂 `hotkey_poll()`。**验收要上真机**：注册→从**另一个进程**按组合键→poll 命中；探针必须自注册自解注册（全局热键会抢走桌面按键，泄漏一条就影响使用者）。
+  - ~~**Linux 全局热键后端（X11 `XGrabKey`）**~~（2026-10-16 已交付：自开 X 连接 + 四变体抓取 + BadAccess 错误陷阱 + `XPending` 泵抽，`wm_hotkey_supported` 按 `WAYLAND_DISPLAY` 分档；XFCE+X11 真机 xdotool 注入全链路命中。TODO 原推断的三处要点被实测推翻——grab 清位掩码行不通须变体抓取、事件不进 GTK 泵无需 filter、`Ctrl+Alt+Fn` 是 VT 保留域按不到——根因与实测定案见中英 adaptation「Linux 全局热键后端」节）
   - [ ] **媒体键走同一条 grab**（`XF86AudioPlay`/`XF86AudioPrev`/`XF86AudioNext`/`XF86AudioMute`）：这是「耳机键/键盘媒体键控播放」的正解，与 G10 的**窗口内**按键是两层，别混在一个门面里；Linux 侧键码取 `XKeysymToKeycode(XK_XF86AudioPlay)`，Windows 侧对应 `VK_MEDIA_PLAY_PAUSE`（W20b 的 vk 表要不要扩到媒体键一并定）。
   - [ ] **macOS 全局热键后端**（Carbon `RegisterEventHotKey`，或 `NSEvent.addGlobalMonitorForEvents` + 辅助功能授权）：同门面未接，前置=有 mac 真机，与 tray/notify 的 mac 档同批。
-  - [ ] **探针对齐**：`experiment/hotkey_probe` 现只回证 Windows；Linux 落地时同探针补「grab → 外部按键 → 命中 → ungrab」四步，并把「抢不到（组合被桌面占用）」落成 `Err(Failed)` 而不是静默。
+  - ~~**探针对齐**~~（2026-10-16 已交付：`hotkey_probe` 组合换 `Ctrl+Alt+H/J`（Fn 系是 VT 保留域），② 注册/幂等注销/槽位复用 + ③ 新增门面轮询段——`xdotool` 注入 6 秒内 `HOTKEY-CORE-FIRE` 即回证；组合被占走 `Err(Failed)` 门面已有）
 
 ### 6.3 与既有 §1/§2 的接缝（不改口径，仅指向）
 

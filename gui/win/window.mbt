@@ -362,13 +362,21 @@ pub fn sys_accent() -> String {
 }
 
 ///|
-/// 注册一个全局快捷键（进程级，与窗口无关）。`mods` 用内核 MOD_* 位
-/// （1 shift / 2 ctrl / 4 alt / 8 meta）、`vk` 是 Win32 虚拟键码（非
-/// Windows 后端忽略）。返回注册 id（>=1）——`None` 表示注册失败：组合键
-/// 被系统或别的程序占用（X11 下 XGrabKey 排他；Win32 的 RegisterHotKey
-/// 同样会失败）、表满、或后端不支持（占位分支恒 None）。
-pub fn register_global_shortcut(mods : Int, vk : Int) -> Int? {
-  let id = wm_hotkey_register(mods, vk)
+/// 全局热键后端可用性：Windows 恒真；Linux 仅 X11 会话（Wayland 下
+/// XWayland 的抓键拿不到真全局性，恒假）；其余平台恒假。
+pub fn hotkey_supported() -> Bool {
+  wm_hotkey_supported() != 0
+}
+
+///|
+/// 注册一个全局快捷键（进程级，与窗口无关）。入参整体传 `Hotkey`：
+/// 修饰位用内核 MOD_*（1 shift / 2 ctrl / 4 alt / 8 meta），Windows 桩取
+/// `vk`、X11 桩取 `keysym`（两套码的约定见 hotkey.mbt 头注）。返回注册
+/// id（>=1）——`None` 表示注册失败：组合键被系统或别的程序占用（X11 下
+/// XGrabKey 排他；Win32 的 RegisterHotKey 同样会失败）、裸键被拒、表满、
+/// 或后端不支持（占位分支恒 None）。
+pub fn register_global_shortcut(hk : Hotkey) -> Int? {
+  let id = wm_hotkey_register(hk.mods, hk.vk, hk.keysym)
   if id <= 0 {
     None
   } else {
