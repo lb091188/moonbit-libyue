@@ -1,4 +1,6 @@
-# native-gui 项目申报书（10 月）
+# native-gui 项目申报书（10 月·重报）
+
+> 重报说明：本版补充与生态内既有 GUI 能力（MoUI / Sun）的边界与定位差异、同一界面的操作案例；平台进展更新至 10 月中（macOS 平台批 / 扩展图表 / 系统能力探测页）。
 
 ## 基本信息
 
@@ -6,58 +8,69 @@
 - 参赛者：刘斌（NoahLiu）
 - 联系方式：<lbpeter0911@163.com>
 - GitHub：<https://github.com/lb091188/moonbit-native-gui>
-- 项目方向：MoonBit 原生跨平台桌面 GUI 开发框架
+- 项目方向：MoonBit 桌面 GUI 库——丰富的桌面系统 API + 轻量自有渲染栈
 - 是否为移植项目：否
 
 ## 项目简介
 
-native-gui 是为 MoonBit 生态打造的**原生跨平台桌面 GUI 库**——绘制、布局、控件这套自绘核心**全部用纯 MoonBit 实现**，一套代码在 Windows ✅ / Linux ✅ 原生运行。`moon add NoahLiu/native-gui` 后零配置直接 `moon run`。项目从 Yue / libyue 的 MoonBit 绑定起步，现在以他们为老师，把框架主体用纯 MoonBit 重写——为的是把框架的开发体验做得更好。
+native-gui 是 MoonBit 生态的**桌面 GUI 库**，三个关键词：**系统 API 丰富、轻量、开箱即用**。
 
-- **全栈自绘**：观感跨平台一致、不依赖平台皮肤，深浅色与系统强调色默认跟随，主题是普通值可整体覆盖；平台与三方引擎收敛在窗口、文字、WebView、媒体几处 C 薄层，框架主体全部纯 MoonBit
-- **响应式与声明式**：状态放 `Store` / `Signal`，绑定点随数据自动刷新；界面以树描述、`mount_window` 一步挂载（写法见下）
-- **开箱能力齐全**：组件库、图表族、Markdown 视图、内嵌 WebView、音视频引擎与系统能力门面（托盘 / 通知 / 快捷键 / OS 查询等），全部只暴露跨平台抽象 API，能力探测 + 语义化降级
-- **按需取用**：功能各自成包、不 import 不进二进制；媒体等重能力拆独立模块、不进默认依赖闭包
+- **系统 API 丰富**——让 MoonBit 应用作为完整的桌面应用活在操作系统里：托盘（Linux SNI / macOS NSStatusItem / Windows Shell_NotifyIcon）、桌面通知、全局快捷键、开机自启、剪贴板、原生菜单、文件对话框、拖放、空闲检测、MPRIS 媒体控制（Linux），以及壁纸 / 音量 / 电源 / 打印机 / 显示器 / 浏览器历史 / 已装应用等系统查询——统一门面，能力探测 + 结构化降级，不静默失败
+- **轻量**——渲染、布局（Flexbox）、控件全为纯 MoonBit，不依赖 Skia 等重型图形引擎；`hello` 最小窗口的 release 二进制 **1.1 MB**（Linux 实测）；不 import 的包不进二进制，音视频引擎等重能力拆独立模块
+- **开箱即用**——`moon add` 后零配置直接 `moon run`，无引擎初始化预热；组件库、14 种图表 + 交互层、Markdown 视图、内嵌 WebView 都是库内成品
 
-### 写法对比
+平台状态：**Windows / Linux 已交付并经真机验证**；**macOS 后端已在 `mac` 分支落地**（Cocoa 窗口 / CoreText / ImageIO / WKWebView / 系统能力族 / 媒体线，17 个平台批，CI 三平台全绿），待真机目视复验后并线。
 
-具体功能 `examples/hello`：最小窗口直接跑起来
+## 与生态内既有 GUI 能力的关系
+
+- **零代码依赖**：与 MoUI（wzzc-dev/moui）、Sun（wzzc-dev/sun）没有任何引用或代码复用；本库直接依赖只有 MoonBit 标准库与操作系统组件（GTK / Win32 / Cocoa / Pango / DirectWrite / CoreText）
+- **定位互补**：MoUI 面向多端共享逻辑（Skia / WebGPU 渲染主线，覆盖 Web 与移动）；Sun 是图形与文本渲染底层库；native-gui 专注桌面一条线——系统集成的深度与桌面成品组件。三者问题域不同
+- **独立重建的动机**：项目从 Yue / libyue 的 MoonBit 绑定起步，绑定路线受制于上游 C++ 构建链与维护节奏；重写为纯 MoonBit 自绘栈后零 vendor、`moon add` 即用。生态内此前没有以桌面系统集成为主线的 MoonBit GUI 库——这条线是空白，不是重复
+
+## 差异化用户收益：同一界面的操作案例
+
+**场景**：一个音乐播放器。窗口本身（列表 / 按钮 / 进度条）任何 GUI 库都画得出来；差别在**窗口之外**。
+
+用 native-gui，以下行为全部是库内置 API（Windows / Linux / macOS 同一套代码）：
 
 ```moonbit
-// 声明式挂载：一个库调用完成窗口创建、控件挂载、事件循环启动
-fn main {
-  let app = match @ui.mount_window(
-    [@ui.text("Hello, MoonBit!", font_size=18.0)],
-    title="Hello, MoonBit!",
-    width=400,
-    height=300,
-  ) {
-    None => return  // 本机无窗口后端或显示服务，结构化让调用方知道
-    Some(a) => a
+// 关窗后驻留系统托盘：Linux SNI / macOS NSStatusItem / Windows Shell_NotifyIcon
+let ic = @win.icon_from_bgra(icon_pixels, 32, 32)
+match @core.Tray::new("my-player", icon=ic) {
+  Ok(tray) => {
+    tray.set_tooltip("MyPlayer", "后台播放中")
+    tray.on_click(fn() { main_window.show() })
   }
-  app.run()
+  Err(e) => show_reason(e) // 结构化错误：无后端 / 图标失败，不静默
 }
+
+// 桌面通知带进度：freedesktop Notifications / Windows 气泡 / macOS 用户通知
+@core.notify_send("MyPlayer", "正在下载", "专辑封面 3/10", progress=30)
+
+// 开机自启：XDG autostart / Windows 注册表 Run 键 / macOS LaunchAgents
+@sys.autostart_enable("com.example.my-player")
 ```
 
-**响应式状态**（`examples/hello-themed`）：状态改、UI 跟——输入框直接吃 `Store`，`bind_label` 绑定文本，`count.update` 一改绑定点自动刷新：
+操作走查：点关闭 → 图标驻留托盘，左键点回主窗口；切去别的应用 → 桌面通知汇报后台进度；重启系统 → 应用自动拉起。走的是真实桌面协议（SNI / freedesktop Notifications / XDG autostart），Linux 上还可经 D-Bus 枚举与控制 MPRIS 播放器。
 
-```moonbit
-let count : @core.Store[Int] = @core.Store::new(0)
-@ui.mount_window([
-  @ui.button("问候", on_click=fn() { count.update(fn(n) { n + 1 }) }),
-  // 订阅 count：set 即自动刷新文本，"改状态"与"UI 跟随"解耦
-  @ui.bind_label(count, fn(n) { "已点 \{n} 次" }),
-], title="hello")
-```
+这些能力在库内是同构门面：能力探测（`notify_supported()` / `Tray::is_supported()` 等）+ 结构化错误（`Unsupported` / `Failed` 两档），调用方据此适配 UI，不静默失败。
 
-## <span style="background-color:rgb(243, 245, 247)">10 月工作</span>
+## 10 月工作
 
-- **全面原生化**：删除 libyue 绑定包、vendored libyue（52MB）与全部旧链示例，模块更名 `NoahLiu/native-gui`；布局（Flexbox）、控件、光栅化等框架主体 MoonBit 自绘，窗口与文字平台层为自写 C 桩
-- **库按功能分层**：应用宿主与事件循环、控件与组件库、光栅化绘制、文字排印、主题与图标、系统能力、平台桥接、图表、Markdown 富文本视图、内嵌 WebView 各自成包、按需取用——不 import 的包不进二进制；媒体引擎、FFmpeg 解码绑定、Flexbox 布局引擎等重能力拆独立模块、不进默认依赖闭包
-- **跨平台系统集成**：系统托盘、桌面通知、原生菜单栏、全局快捷键、消息框、窗口图标、运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、用户空闲检测、开机自启
-- **内嵌 WebView**：布局树内嵌与自绘控件同树混排、导航与历史、JS 互操作（执行取回结果 / 脚本注入 / 双向绑定）、DOM 内容抓取、Cookie 与 profile 持久化、新窗 / 权限 / 下载策略（默认拦下并回报、可切换）、崩溃回报、自定义协议本地站点、能力探测与语义化降级
-- **媒体引擎**：ffmpeg 解码 + miniaudio 输出、内嵌字幕轨（外挂 / 容器内嵌双来源）、倍速音画同步
-- **示例迁移收口**：hello / hello-themed / showcase（14 页）/ sysmonitor / systemprobe 全部迁到新栈，使用方真机复验九条清单通过
-- **质量门禁**：`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛，CI 分层门禁（库包测试 / 示例构建 / release 校验）
+- **macOS 平台批（`mac` 分支，①–⑰）**：Cocoa 窗口后端（事件循环 / 输入法 / 文件对话框 / 剪贴板 / 菜单 / 托盘 / 通知 / Carbon 热键）、CoreText 文字、ImageIO 图片解码、WKWebView（自定义协议 / JS 互操作 / cookie）、系统能力族（launcher / sysinfo / 音量 / 壁纸 / 自启 / 空闲 / 打印机 / 应用查找 / 显示器）、媒体线（ffmpeg + CoreAudio）；CI 三平台全绿，含真实 macOS runner 上的读数环与建窗存活冒烟
+- **全面原生化**：删除 libyue 绑定包与 vendored 二进制（52 MB），框架主体纯 MoonBit 自绘，模块更名 `NoahLiu/native-gui`
+- **库按功能分层**：14 个库包各自成包、按需取用；媒体引擎与 Flexbox 布局引擎拆独立模块
+- **跨平台系统集成**：托盘、通知、原生菜单栏、全局快捷键（Windows / macOS 已落，Linux 的 X11 路线在近期计划）、消息框、窗口图标与运行中改标题 / 最小尺寸 / 无边框拖拽、应用内拖放、空闲检测、开机自启、任务栏进度（Windows）
+- **系统能力探测页（showcase 第 15 页）**：五段只读探针（系统桌面 / 显示器窗口 / 应用文件 / 浏览器数据 / 剪贴板电源总线），每段可重新探测
+- **内嵌 WebView**：与自绘控件同树混排、导航与历史、JS 互操作（执行 / 注入 / 双向绑定）、DOM 抓取、cookie 与 profile 持久化、新窗 / 权限 / 下载策略、自定义协议、崩溃回报
+- **媒体引擎**：ffmpeg 解码 + miniaudio 输出、字幕双来源（外挂 / 容器内嵌）、倍速音画同步；独立音视频播放示例
+- **图表扩展**：雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日九种 + 横切交互层，并入 showcase 图表页
+- **质量门禁**：`moon check` 全仓零错误零警告、`moon test` 全绿为提交门槛；CI 三平台分层门禁；平台适配坑回写 adaptation 文档（中英双语）
+
+## 近期路线
+
+- **macOS 并线**：真机目视复验（Retina 观感 / 输入法 / 通知 / 多屏 / launchctl）后合入主分支
+- **Linux 全局快捷键**：X11 XGrabKey（libyue 有成熟先例可平移）
 
 ## 核心功能范围
 
@@ -65,7 +78,7 @@ let count : @core.Store[Int] = @core.Store::new(0)
   - App 宿主与事件循环
   - 窗口挂载与访问器
   - 焦点栈 / 键盘 / 指针
-  - 菜单 / 通知 / 托盘 / 覆盖层
+  - 菜单 / 通知 / 托盘 / 热键门面 / 覆盖层
   - 拖放（会话模型）
   - Store / Signal 响应式状态
 - 控件与组件库（@ui）
@@ -79,7 +92,7 @@ let count : @core.Store[Int] = @core.Store::new(0)
 - 光栅化（@render）
   - 纯 MoonBit 软件光栅：路径 / 填充 / 混合 / 渐变
   - Cairo 后端 / 位图 / 画布 / 图片 / PNG
-- 文字（@text）：字体族 / 属性文本与区间属性（Pango / DirectWrite）
+- 文字（@text）：字体族 / 属性文本与区间属性（Pango / DirectWrite / CoreText）
 - 主题（@theme）：调色板派生 / 深浅色与强调色跟随 / 变更订阅
 - 图标（@icons）：矢量图标系统
 - 系统能力（@sys）
@@ -93,28 +106,26 @@ let count : @core.Store[Int] = @core.Store::new(0)
 - 窗口后端（@win）：平台窗口桩层——门面之下的平台实现（表面 / 图标 / IME 等），对外能力一律经跨平台门面暴露
 - 图表（@chart）：折线 / 柱状 / 饼 / 仪表 / 散点 / 雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日 + 横向交互层
 - WebView（@web）
-  - 布局树内嵌（pane 模型，与自绘控件同树混排，矩形由布局给出）
-  - 导航与历史：加载 / 重载 / 后退前进 / 可退可进查询 / 标题与 URL 读数
-  - 导航事件流水（消费式取）与结构化加载失败原因（域 / 错误码 / 地址）
-  - JS 互操作：执行并取回结果 / 用户脚本注入 / JS↔原生双向绑定
-  - DOM 内容抓取（多档快照与解析）
-  - Cookie 读取与 profile 持久化档位（持久 / 随用随弃探测）
+  - 布局树内嵌（pane 模型，与自绘控件同树混排）
+  - 导航与历史 / 导航事件流水 / 结构化加载失败原因
+  - JS 互操作：执行取回 / 脚本注入 / JS↔原生双向绑定
+  - DOM 内容抓取 / Cookie 与 profile 持久化
   - 策略面：新窗 / 权限 / 下载——默认拦截并回报、可切换
-  - 自定义协议本地内容通道（名字先预声明、根目录挂载、注销顶替）
-  - 能力探测 / web 进程崩溃回报 / 句柄存活判据
-- 媒体（gui-media）：音频 / 视频播放器组件 / 字幕轨（外挂 + 容器内嵌）/ 倍速
+  - 自定义协议本地内容通道 / 能力探测 / 崩溃回报
+- 媒体（gui-media）：音频 / 视频播放器组件 / 字幕轨 / 倍速
 - 布局（yoga-mbt）：纯 MoonBit Flexbox（W3C 规范逐条实现）
 
 ## 预期验收产物
 
 - 可运行示例（`moon run` 直接启动）：
-  - 基础：`hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（14 页）；
-  - 浏览器演示：地址栏导航与历史、自定义协议本地站点、JS↔原生互操作、DOM 抓取、新窗 / 权限 / 下载策略；
-  - 音频演示：播放 / 暂停 / 进度与音量、循环、倍速音画同步；
-  - 视频演示：进度拖拽 seek、倍速、外挂 / 内嵌字幕轨、音画同步。
-- CI 门禁：GitHub Actions 分层门禁（库包测试 / 示例构建 / release 校验），Linux + Windows 触发、结果公开可查；`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛。
+  - 基础：`hello` 最小窗口、`hello-themed` 主题控件族、`showcase` 全功能演示板（15 页，含系统能力探测页）
+  - 系统集成：showcase 系统页（托盘 / 通知 / 快捷键 / 消息框 / 任务栏进度）、系统能力探测页、`sysmonitor` 系统监控器
+  - 浏览器演示：地址栏导航与历史、自定义协议本地站点、JS↔原生互操作、DOM 抓取、新窗 / 权限 / 下载策略
+  - 音频 / 视频演示：播放 / 进度 / 倍速、外挂与内嵌字幕、音画同步
+- CI 门禁：GitHub Actions 三平台（Linux / Windows / macOS），库包测试 / 示例构建 / release 校验分层，结果公开可查；`moon check` 全仓零错误零警告、`moon test` 全仓用例全绿为提交门槛
+- `mac` 分支：CI 三平台全绿（含真实 macOS runner 上的读数环与 `hello` 建窗存活冒烟）
 
 ## 移植或参考说明
 
-- 参考对象：Yue / libyue（<https://github.com/yue/yue> ，LGPL 2.1）；Yoga（<https://github.com/facebook/yoga> ，MIT）
+- 参考对象：Yue / libyue（<https://github.com/yue/yue>，LGPL 2.1）——本库起步于它的 MoonBit 绑定，现为独立实现，仅以之为行为参考；Yoga（<https://github.com/facebook/yoga>，MIT）——Flexbox 布局的规范参照，布局引擎为独立纯 MoonBit 实现
 - 本项目许可证：MIT

@@ -4,7 +4,7 @@
 
 > **On origins** — this library started life as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. The stack is self-drawn now and depends on neither — what stays with us is what we learned from them. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A **native cross-platform desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — windows, pixels, the event loop, layout and widgets are all written in pure MoonBit. One codebase runs native windows on Windows ✅ / Linux ✅, macOS backend not yet developed; zero config after `moon add`.
+A **desktop GUI library** for the [MoonBit](https://github.com/moonbitlang) ecosystem — everything a desktop app needs from the OS (tray, notifications, shortcuts, autostart, D-Bus…) behind one API, with rendering, layout and widgets owned by a pure-MoonBit stack and no heavy engine like Skia. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch; zero config after `moon add`.
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
@@ -16,9 +16,13 @@ English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/mas
 
 ## Core highlights
 
-**🎨 Self-drawn widgets, one theme everywhere** — widgets are drawn by the library's own rasterizer, so they look the same on every platform. Light/dark and the system accent colour are followed by default, and the theme is a plain value you can override.
+**🖥 Desktop-grade system integration** — tray (SNI / NSStatusItem / Shell_NotifyIcon), notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, idle detection, MPRIS media control (Linux), plus OS queries (volume, power, wallpaper, monitors, printers, browser history, installed apps…) behind one `@sys` / `@core` API — capability probing with semantic fallbacks, never silent.
 
-**📝 Declarative UI** — describe the interface as a tree and let the library drive it:
+**🎨 Lightweight self-drawing, one theme everywhere** — rendered by the library's own pure-MoonBit software rasterizer (optional Cairo backend) with no Skia-class engine; the `hello` minimal window ships as a **1.1 MB** release binary (measured on Linux). Widgets look the same on every platform; light/dark and the system accent colour are followed by default, and the theme is a plain value you can override.
+
+**📊 Charts & rich content** — charts (line / bar / pie / gauge / scatter plus radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst, map and more, with a cross-cutting interactive layer), a Markdown view and an embedded WebView share the same rasterizer and layout tree as regular widgets.
+
+**📝 Declarative UI & reactive state** — describe the interface as a tree and let the library drive it; keep state in `Store` / `Signal` (from `@core`) and bound spots refresh themselves when the data changes:
 
 ```moonbit
 fn main {
@@ -38,13 +42,11 @@ fn main {
 }
 ```
 
-**⚡ Reactive state** — keep state in `Store` / `Signal` (from `@core`); bound spots refresh themselves when the data changes.
+> `moon run examples/showcase` — the full demo board: component library + system probes + extended charts (15 pages).
 
-**🖥 Desktop-grade system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart, media keys, and OS queries (volume, power, browser history, installed apps…) sit behind one `@sys` API.
+## Ecosystem position
 
-**📊 Self-drawn charts & rich content** — charts (line / bar / pie / gauge / scatter plus radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst, map and more, with a cross-cutting interactive layer) and a Markdown view, drawn by the same rasterizer.
-
-> `moon run examples/showcase` — the full demo board: component library + system capabilities.
+GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github.com/wzzc-dev/MoUI) targets shared multi-platform logic (Skia / WebGPU rendering), and [Sun](https://github.com/wzzc-dev/sun) provides low-level 2D graphics and text rendering. native-gui shares no code with either and focuses on a third lane — **one-stop desktop apps**: deep OS integration plus ready-made desktop components (charts / Markdown / WebView).
 
 ## Packages
 
@@ -52,7 +54,7 @@ fn main {
 
 | Import in `moon.pkg` | Alias | Contents |
 |---|---|---|
-| `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, overlays, drag & drop, `Store` / `Signal` |
+| `NoahLiu/native-gui/core` | `@core` | App host, event loop, focus / keys / pointer, menus, notifications, tray, hotkey facade, overlays, drag & drop, `Store` / `Signal` |
 | `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: window mount, labels / buttons, forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
 | `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, attributed text and range attributes (Pango / DirectWrite) |
@@ -97,7 +99,7 @@ moon run examples/browser        # embedded WebView browser (demo menu + status 
 
 ## Platform support
 
-Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 backend not yet developed
+Ubuntu 24.04 (XFCE / GNOME / KDE) ✅ · Deepin 23 / 25 ✅ · Windows 10/11 ✅ · macOS 🚧 landing on the `mac` branch (Cocoa / CoreText / ImageIO / WKWebView; CI green, pending on-device verification)
 
 On Windows, exes are built as a GUI-subsystem binary — no console window on double-click.
 
@@ -117,7 +119,7 @@ On Windows, exes are built as a GUI-subsystem binary — no console window on do
 
 ## Contributing
 
-Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend is the largest open gap (not yet developed; it needs an Apple Silicon machine). A few basic requirements:
+Everyone is welcome: reporting platform-compatibility issues, adding widgets, improving docs — the macOS backend has landed on the `mac` branch, and its on-device verification & merge is the largest open item (it needs an Apple Silicon machine). A few basic requirements:
 
 - **Commit gate**: the MoonBit native toolchain, then `cd gui && moon check && moon test core ui render text theme icons sys input win dbus chart mdview web style` — zero errors, zero warnings
 - **Experience on record**: write field-tested pitfalls together with their fixes into [adaptation.md](docs/adaptation.md) — not only in commit messages
