@@ -6,6 +6,8 @@
 // 换曲走 holder clear_children + 重挂 audio；打开失败经 on_error 落
 // 错误横幅，解码引擎不在位时组件画说明板（探测 + 降级，不静默）。
 // 带视频轨的文件走 video，见同模块的 video 示例。
+// 歌词：按音频文件同名 .lrc 自动配对（示例侧读文本，组件不碰磁盘），
+// 当前行由组件舞台区画在底部，行数经 on_lyric 落状态行。
 
 ///|
 /// 音频扩展名（目录扫描与文件对话框过滤共用）。
@@ -106,6 +108,7 @@ fn main {
   let selected : @core.Store[String] = @core.Store::new("")
   let track_line : @core.Store[String] = @core.Store::new("（还没载入曲目）")
   let tick_line : @core.Store[String] = @core.Store::new("")
+  let lyric_line : @core.Store[String] = @core.Store::new("")
   let err_line : @core.Store[String] = @core.Store::new("")
   let list_holder : Ref[@core.Widget?] = Ref(None)
   let player_holder : Ref[@core.Widget?] = Ref(None)
@@ -130,6 +133,28 @@ fn main {
     }
     names
   }
+  /// 同名 .lrc 配对：把音频扩展名换成 .lrc，在就读文本传进组件
+  /// （外部文件的读取归调用方，组件不碰磁盘路径）。
+  fn sidecar_lyric(path : String) -> String {
+    let mut dot = -1
+    let mut slash = -1
+    for i = 0; i < path.length(); i = i + 1 {
+      if path[i] == '.' {
+        dot = i
+      } else if path[i] == '/' {
+        slash = i
+      }
+    }
+    let base = if dot > slash { path[0:dot].to_owned() } else { path }
+    let cand = base + ".lrc"
+    if !@sys.sys_path_exists(cand) {
+      return ""
+    }
+    match @sys.sys_read_text_file(cand) {
+      Some(t) => t
+      None => ""
+    }
+  }
   /// 把播放器挂进右侧区域（换载语义：清掉旧的再挂新的）。
   fn mount_player(path : String, display : String) -> Unit {
     err_line.set("")
@@ -139,6 +164,7 @@ fn main {
         h.clear_children()
         let node = @media.audio(
           path,
+          lyric=sidecar_lyric(path),
           width=560.0,
           height=220.0,
           auto_play=true,
@@ -149,6 +175,11 @@ fn main {
           },
           on_speed=fn(v : Double) -> Unit {
             tick_line.set("倍速 \{v.to_string()}x")
+          },
+          on_lyric=fn(n : Int) -> Unit {
+            lyric_line.set(
+              if n > 0 { "歌词 \{n} 行（同名 .lrc）" } else { "没配上同名 .lrc" },
+            )
           },
           on_error=fn(e : String) -> Unit { fail(e) },
           handle=fn(w) {
@@ -278,7 +309,7 @@ fn main {
         [
           @ui.text("音频播放", role=@ui.Section),
           @ui.text(
-            "gui-media audio（ffmpeg 解码 + 设备直出）：列表点选换曲，控制条自带播放/进度/音量/倍速与 ±5 秒跳转。",
+            "gui-media audio（ffmpeg 解码 + 设备直出）：列表点选换曲，控制条自带播放/进度/音量/倍速与 ±5 秒跳转，歌词按同名 .lrc 自动配对。",
             role=@ui.Secondary,
             max_width=860.0,
           ),
@@ -320,6 +351,7 @@ fn main {
                 [
                   @ui.bind_label(track_line, fn(s) { s }),
                   @ui.bind_label(tick_line, fn(s) { s }, font_size=12.0, color="text_secondary"),
+                  @ui.bind_label(lyric_line, fn(s) { s }, font_size=12.0, color="text_secondary"),
                   @core.bind_node(err_line.signal(), fn(e : String) -> @core.Node {
                     if e.length() == 0 {
                       @ui.view([])

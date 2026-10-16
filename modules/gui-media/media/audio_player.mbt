@@ -28,11 +28,13 @@ let ap_skip_step : Double = 5.0
 
 ///|
 /// 音频播放控件。`width`/`height` 是整块控件尺寸（默认只有一条控制条高）；
-/// 组件被外层撑高时，多出来的高度归上方舞台区（当前只在无输出设备时写字，
-/// 频谱动画也落在这块）。打不开时不抛异常——画说明板并把原因经 `on_error`
-/// 交出去（探测 + 降级不静默）。
+/// 组件被外层撑高时，多出来的高度归上方舞台区（歌词写在这块底部，无输出设备
+/// 的降级说明也写在这块，频谱动画落在这块）。`lyric` 传**已读好的 LRC 文本**
+/// （外部文件的读取归调用方，本组件不碰使用者的磁盘路径）。打不开时不抛异常
+/// ——画说明板并把原因经 `on_error` 交出去（探测 + 降级不静默）。
 pub fn audio(
   path : String,
+  lyric? : String = "",
   width? : Double = 560.0,
   height? : Double = 34.0,
   auto_play? : Bool = false,
@@ -45,6 +47,9 @@ pub fn audio(
   ) -> Unit { () },
   /// 倍速档位变化的观测口（控制条点倍速键时回调）。
   on_speed? : (Double) -> Unit = fn(_v : Double) -> Unit { () },
+  /// 歌词来源的观测口（行数），打开时回调一次：调用方要区分「没配上歌词」与
+  /// 「配上了但还没唱」，不必去猜引擎状态。
+  on_lyric? : (Int) -> Unit = fn(_n : Int) -> Unit { () },
   on_error? : (String) -> Unit = fn(_s : String) -> Unit { () },
   handle? : (@core.Widget) -> Unit = fn(_w : @core.Widget) -> Unit { () },
 ) -> @core.Node {
@@ -55,6 +60,8 @@ pub fn audio(
       return media_error_board("打不开音频：" + e, width, height, handle)
     }
   }
+  let lrc = lrc_parse(lyric)
+  on_lyric(lrc.cues.length())
   let dragging : Ref[Bool] = Ref(false)
   let drag_frac : Ref[Double] = Ref(0.0)
   let vol_drag : Ref[Bool] = Ref(false)
@@ -63,7 +70,7 @@ pub fn audio(
   if auto_play {
     engine.play()
   }
-  // 舞台区：撑高时占住多出来的高度，无输出设备的降级说明写在这里。
+  // 舞台区：撑高时占住多出来的高度，歌词写在底部，无输出设备的降级说明写在中间。
   let stage = @core.Widget::new()
   stage.node.set_flex_grow(1.0)
   stage.node.set_min_height(@yoga.fixed(0.0))
@@ -77,6 +84,18 @@ pub fn audio(
     }
     p.set_fill_color(@theme.theme_bg_panel())
     p.fill_rect(0.0, 0.0, r.w, r.h)
+    let line = lrc_at(lrc, engine.current())
+    if line.length() > 0 {
+      p.flush()
+      let _ = @text.draw_text_at(
+        p,
+        8.0,
+        r.h - 26.0,
+        line.replace(old="\n", new=" "),
+        15.0,
+        @theme.theme_text_primary(),
+      )
+    }
     if engine.is_muted() {
       p.flush()
       let _ = @text.draw_text_at(
