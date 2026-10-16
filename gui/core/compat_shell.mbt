@@ -98,3 +98,43 @@ pub fn notify_send(
 pub fn reveal_in_file_manager(path : String) -> Result[Unit, @sys.FileManagerError] {
   @shell.reveal_in_file_manager(path)
 }
+
+///|
+pub type Loop = @shell.Loop
+pub type Job = @shell.Job
+
+///|
+pub fn set_timer_hooks(
+  schedule : (Int, () -> Unit) -> Int,
+  cancel : (Int) -> Unit,
+) -> Unit {
+  @shell.set_timer_hooks(schedule, cancel)
+}
+
+///|
+pub fn set_timeout(ms : Int, f : () -> Unit) -> Int {
+  @shell.set_timeout(ms, f)
+}
+
+///|
+pub fn clear_timeout(id : Int) -> Unit {
+  @shell.clear_timeout(id)
+}
+
+///|
+pub fn now_ms() -> Int64 { @shell.now_ms() }
+
+///|
+pub fn sys_color_scheme() -> String {
+  @shell.sys_color_scheme()
+}
+
+///|
+pub fn sys_accent() -> String {
+  @shell.sys_accent()
+}
+
+///|
+pub fn local_ymd() -> (Int, Int, Int) {
+  @shell.local_ymd()
+}

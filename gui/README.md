@@ -54,7 +54,7 @@ Each showcase page is its own source file under `examples/showcase/pages/` — t
 | Import | Alias | Contents |
 |---|---|---|
 | `NoahLiu/native-gui/base` | `@base` | Platform-free primitives: `Store` / `Signal` / `ListStore`, focus stack, key codes, tick/prof |
-| `NoahLiu/native-gui/shell` | `@shell` | System-capability shell: menus, global hotkeys, tray, notifications, reveal |
+| `NoahLiu/native-gui/shell` | `@shell` | System-capability shell: menus, global hotkeys, tray, notifications, reveal, the loop scheduler and read-only platform probes |
 | `NoahLiu/native-gui/core` | `@core` | App host, event loop, pointer, overlays, drag & drop (`@base`/`@shell` names still forwarded during G9 Batch 2) |
 | `.../native-gui/ui` | `@ui` | Self-drawn widgets and the component library: forms, display, navigation, date, tables & virtual lists, entries, scroll, overlays, code view, declarative layer |
 | `.../native-gui/render` | `@render` | Rasterizer — a pure-MoonBit software raster (path / fill / blend / gradient) plus a Cairo backend; bitmaps, canvas, images, PNG |

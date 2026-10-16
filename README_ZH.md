@@ -55,7 +55,7 @@ MoonBit 生态的 GUI 能力各有分工：[MoUI](https://github.com/wzzc-dev/Mo
 | `moon.pkg` 中的 import | 别名 | 内容 |
 |---|---|---|
 | `NoahLiu/native-gui/base` | `@base` | 平台无关基元：`Store` / `Signal` / `ListStore` 响应式内核、焦点栈、键码常量、帧末合并与账本 |
-| `NoahLiu/native-gui/shell` | `@shell` | 系统能力壳层：菜单栏 / 右键菜单、全局热键门面、托盘、通知、外部打开 |
+| `NoahLiu/native-gui/shell` | `@shell` | 系统能力壳层：菜单栏 / 右键菜单、全局热键门面、托盘、通知、外部打开，加上事件循环调度器与只读平台探针 |
 | `NoahLiu/native-gui/core` | `@core` | 应用宿主、事件循环、指针、浮层、拖放（G9 Batch 2 迁移期 `@base`/`@shell` 名仍经 `@core` 转发可用） |
 | `.../native-gui/ui` | `@ui` | 自绘控件与组件库：窗口挂载、标签 / 按钮、表单、显示、导航、日期、表格与虚拟列表、输入框、滚动、浮层、代码视图、声明式层 |
 | `.../native-gui/render` | `@render` | 光栅器：纯 MoonBit 软件光栅 + Cairo 后端；位图、画布、图像、PNG |

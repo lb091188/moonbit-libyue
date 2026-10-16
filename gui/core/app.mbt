@@ -68,35 +68,6 @@ pub fn App::add_key_fallthrough(self : App, f : (KeyEvent) -> Bool) -> Unit {
 }
 
 ///|
-/// 单调时钟（毫秒）。声明式组件的双击判定等要它；无后端时返回 0。
-pub fn now_ms() -> Int64 { @win.now_ms() }
-
-///|
-/// 系统深浅偏好（"dark" / "light" / ""）与系统主色（"#rrggbb" / ""）：
-/// 窗口层只读探针的转发（与 `local_ymd` 同理，示例与集成层不必引用平台包）。
-pub fn sys_color_scheme() -> String {
-  @win.sys_color_scheme()
-}
-
-///|
-pub fn sys_accent() -> String {
-  @win.sys_accent()
-}
-
-///|
-/// 本地时区的今天 (年, 月, 日)。平台给不出时返回 (0, 0, 0)——组件层据此退回
-/// 自己的兜底值，本层不猜日期。
-pub fn local_ymd() -> (Int, Int, Int) {
-  let v = @win.local_date()
-  if v <= 0L {
-    (0, 0, 0)
-  } else {
-    let iv = v.to_int()
-    (iv / 10000, iv % 10000 / 100, iv % 100)
-  }
-}
-
-///|
 /// 装进程级挂钩（多窗形态只有一套）：重绘请求广播给所有在窗、浮层按当前窗取
 /// 宿主、延时定时器走共用的 `Loop`。每建一扇窗都装一遍，装的是同一组闭包，
 /// 重复安装没有副作用（无头测试自装的静态宿主会在下一扇窗建好时被接管）。

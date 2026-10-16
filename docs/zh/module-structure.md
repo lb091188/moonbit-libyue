@@ -173,6 +173,8 @@ moonbit-native-gui/                          # 根 workspace
 
 **迁移顺序**：每步独立可编译、可回滚。
 
+0b. **步骤 2·乙首批（2026-10-17 已交付）**：`loop.mbt` 与四个只读探针（now_ms/sys_color_scheme/sys_accent/local_ymd）进 shell；core 用 `pub type Loop = @shell.Loop` + 函数转调门面化，下游 `@core.set_timeout` 等零改动。**卡点定案**：`host.mbt` 不能整文件进 shell——它写 `a.dirty*`、走 `a.root.by_id`+`mark_widget_rect`，App 定义处 import shell 会成包环；余下的 2·乙必须先做 Session 手术（注册表存壳层记录、绘制广播经注入 sink 转投，先例 `set_repaint_hook`）。
+
 0a. **步骤 2·甲（2026-10-17 已交付）**：`gui/shell` 收 menu/hotkey/tray/notify/reveal 五族（与控件树零耦合，只吃 win/sys/dbus）+ 五条 wbtest；core 加 `compat_shell.mbt` 转发。实测两条修正：① **枚举变体转发不了**——别名不导出构造子，且 `Unsupported`/`Failed` 在 TrayError/HotkeyError 里重名无法各自转值，所以外部消费方（showcase 的 system/window 页、menu_probe、hotkey_probe）直接改 `@shell.MenuRole::Copy` 这类全限定写法，这也是终态写法；② **drag.mbt 不在本刀**——它的 `drag_window_root_of`/`set_drag_root` 吃 Widget，留 core 随 widget 刀定归属。`base` 刀同批交付。
 
 1. 建 `base/`（2026-10-17 已交付）：搬 `signal`/`store`/`effect`/`keys`/`focus`/`list_store`/`prof`/`tick` 八文件 + 对应 wbtest。`node` 不在本刀——它的 `mount : (Widget) -> Widget` 直接吃 widget 层类型，落位归步骤 3 的 `widget/`；`node_wbtest` 两条读 `Signal` 内部字段 `node.subs` 的断言改走公开 `sub_count()`（跨包私有字段不可见，顺带把测试拉回公开 API）。`prof_record` 从包私有提为公开——core 的帧账本调用点跨包了。
