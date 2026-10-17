@@ -56,7 +56,46 @@ pub fn Color::parse(hex : String) -> Color? {
 }
 
 ///|
-let color_black : Color = { r: 0, g: 0, b: 0, a: 255, }
+pub let color_black : Color = { r: 0, g: 0, b: 0, a: 255, }
 
 ///|
-let color_transparent : Color = { r: 0, g: 0, b: 0, a: 0, }
+pub let color_white : Color = { r: 255, g: 255, b: 255, a: 255, }
+
+///|
+pub let color_transparent : Color = { r: 0, g: 0, b: 0, a: 0, }
+
+///|
+/// 按 RGBA 分量（0–255）构造颜色。
+pub fn Color::rgba(r : Int, g : Int, b : Int, a : Int) -> Color {
+  { r, g, b, a, }
+}
+
+///|
+/// 按 RGB 构造不透明颜色。
+pub fn Color::rgb(r : Int, g : Int, b : Int) -> Color {
+  { r, g, b, a: 255, }
+}
+
+///|
+fn nibble_to_hex(n : Int) -> String {
+  let hex = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]
+  hex[n]
+}
+
+///|
+fn byte_to_hex2(v : Int) -> String {
+  let hi = (v / 16) % 16
+  let lo = v % 16
+  nibble_to_hex(hi) + nibble_to_hex(lo)
+}
+
+///|
+/// 输出 `#RRGGBB` 或 `#RRGGBBAA`（a==255 时省略 AA）。
+pub fn Color::to_hex(self : Color) -> String {
+  let s = "#" + byte_to_hex2(self.r) + byte_to_hex2(self.g) + byte_to_hex2(self.b)
+  if self.a != 255 {
+    s + byte_to_hex2(self.a)
+  } else {
+    s
+  }
+}
