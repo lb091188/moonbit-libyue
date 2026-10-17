@@ -6256,7 +6256,2812 @@ int wm_hotkey_poll(void) {
   return 0;
 }
 
-#elif !defined(__linux__)
+
+#elif defined(WM_STUB_MAC)
+
+// ---------------- macOS 后端（Cocoa，prebuild 带 -x objective-c 专编） ----------------
+//
+// 这一支是 Objective-C：本文件由 scripts/prebuild.py 的 Darwin 分支带
+// `-x objective-c -fobjc-arc -DWM_STUB_MAC` 编成 build/libyue_win_stub_mac.a，
+// 经 link_flags 传给 win/sys/web 三个包。moon 的 native-stub 在 macOS 上编本
+// 文件时不带这个宏、且落不进 `!defined(__linux__) && !defined(__APPLE__)`
+// 那条占位分支，于是编出空翻译单元——与 Linux 的 GTK 完全同一套路（防双定义）。
+//
+// 三条与 GTK/Win32 支不同的形态约束（都写进 docs/zh/adaptation.md）：
+// - **循环归 MoonBit**：不自带 `[NSApp run]`。等待用 `nextEventMatchingMask:
+//   untilDate:`（AppKit 自己的阻塞取事件），跑事件用 `sendEvent:` 派给
+//   NSView 子类；跨线程唤醒走 `postEvent:` 投一个 NSApplicationDefined 事件，
+//   取到它就只当「醒了」、不进队列。
+// - **坐标与尺度**：整栈物理像素口径，Cocoa 侧一律点（point）。点↔像素的
+//   比例取窗口所在屏的 backingScaleFactor，进出边界各换算一次。绘制区视图
+//   **不设 isFlipped**：非翻转视图里 `CGContextDrawImage` 的图像第一行正好
+//   落在矩形顶边（与本栈 Bitmap 同向），鼠标 y 用 `bounds.height - p.y` 换。
+// - **菜单/托盘/通知是 App 级**：NSMenu 挂 `[NSApp setMainMenu:]`（macOS 的
+//   菜单条属于应用不属于窗口），NSStatusItem 属于状态栏。
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#import <Cocoa/Cocoa.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <CoreText/CoreText.h>
+
+// 这两个 setter 在新 SDK（macOS 26 的构建机）上不再公开声明，clang 直接报
+// 「no visible @interface / no known instance method」，而旧 SDK 上它们是真实
+// 存在的。这里只给 NSObject 做 informal 声明让 selector 在编译期可见，调用点
+// 一律先 respondsToSelector: 再发：SDK 真没有这一口时退回默认行为，不硬写。
+@interface NSObject (WMAppKitOptionalSetters)
+- (void)setCanShowHiddenFiles:(BOOL)flag;
+- (void)setSendActionOn:(NSUInteger)mask;
+@end
+
+#define WM_MAX_WINDOWS 32
+#define WM_MAX_SURFACES 64
+#define WM_MAX_MENUS 128
+#define WM_MAX_ICONS 32
+#define WM_MAX_TRAYS 16
+#define WM_TRAY_EV_MAX 32
+#define WM_DLG_MAX 16
+#define WM_MENU_CMD_BASE 1000
+#define WM_MENU_CMD_MAX 2048
+
+// 唤醒事件的标记值（NSApplicationDefined 的 data1，别的来源给不到这个数）
+#define WM_WAKE_TOKEN 0x77416BUL
+
+typedef struct {
+  uint32_t keysym;
+  uint32_t code; // 0 键按下 1 键释放 2 按钮按下 3 按钮释放 4 指针移动 5 滚轮
+  int32_t x;
+  int32_t y;
+  int32_t dx;
+  int32_t dy;
+  uint32_t mods;
+} WmEv;
+
+@class WMState;
+@class WMView;
+
+// 绘制区视图：收键鼠、实现 NSTextInputClient（输入法通道）、贴像素。
+@interface WMView : NSView <NSTextInputClient> {
+@public
+  int vsid; // 槽号，一切状态经 wm_state(vsid) 取（不持对象指针，免得拆窗后悬垂）
+}
+- (void)setSlot:(int)sid;
+@end
+
+// 每窗状态：ARC 管理的对象，槽表 strong 引用；拆窗时置 nil 一起回收。
+@interface WMState : NSObject <NSWindowDelegate> {
+@public
+  int sid;
+  int need_draw;
+  int resized;
+  int closing;
+  int focus_lost;
+  int width;  // 物理像素
+  int height;
+  WmEv evs[64];
+  WmEv last;
+  int ev_head;
+  int ev_count;
+  char commit[256];
+  int commit_len;
+  char preedit[256];
+  int preedit_len;
+  int preedit_caret;
+  int preedit_active;
+  int im_cx; // 输入光标矩形（物理像素，wm_im_set_cursor 落点）
+  int im_cy;
+  int im_cw;
+  int im_ch;
+  int cursor_kind; // 0 默认 1 手 2 文本 3 横向 4 纵向
+  int min_w;
+  int min_h;
+  int drag_x;
+  int drag_y;
+  int drag_w;
+  int drag_h;
+  int borderless;
+  unsigned char *backing; // 本层拥有的帧缓冲（present 拷进来，drawRect 贴它）
+  int backing_w;
+  int backing_h;
+  size_t backing_cap;
+}
+@property(nonatomic, strong) NSWindow *win;
+@property(nonatomic, strong) WMView *view;
+- (void)pushEv:(const WmEv *)e;
+- (void)syncSize;
+@end
+
+static WMState *wm_windows[WM_MAX_WINDOWS];
+static NSView *wm_surf_views[WM_MAX_SURFACES];
+static int64_t wm_surf_win[WM_MAX_SURFACES];
+static int wm_surf_kind[WM_MAX_SURFACES];
+static int wm_surf_x[WM_MAX_SURFACES];
+static int wm_surf_y[WM_MAX_SURFACES];
+static int wm_surf_w[WM_MAX_SURFACES];
+static int wm_surf_h[WM_MAX_SURFACES];
+
+// ---- 小工具 ----
+
+void wm_pump(void); // wm_show 里要先跑一轮就绪事件，实现在下方
+
+static WMState *wm_state(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return nil;
+  }
+  WMState *s = wm_windows[(int)id];
+  return s.view != nil ? s : nil; // 槽已拆：与 GTK 的 area==NULL 同判据
+}
+
+static WMState *wm_state_alive(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return nil;
+  }
+  return wm_windows[(int)id];
+}
+
+static NSString *wm_str(const char *s) {
+  if (s == NULL) {
+    return nil;
+  }
+  return [[NSString alloc] initWithBytes:s
+                                  length:strlen(s)
+                                encoding:NSUTF8StringEncoding];
+}
+
+// UTF-8 字节 → moonbit 的 Bytes 对象（返回给 MoonBit 的文本都走这条）
+static void *wm_bytes(const char *s) {
+  size_t len = s != NULL ? strlen(s) : 0;
+  void *out = moonbit_make_bytes((int)len, 0);
+  if (len > 0 && out != NULL) {
+    memcpy(out, s, len);
+  }
+  return out;
+}
+
+static int wm_clamp_cap(char *out, int cap, const char *s) {
+  if (out == NULL || cap < 1) {
+    return 0;
+  }
+  size_t n = s != NULL ? strlen(s) : 0;
+  if (n >= (size_t)cap) {
+    n = (size_t)(cap - 1);
+  }
+  if (n > 0 && s != NULL) {
+    memcpy(out, s, n);
+  }
+  out[n] = '\0';
+  return (int)n;
+}
+
+// 窗口所在屏的点↔像素比例（无窗退回主屏）
+static CGFloat wm_scale_of(WMState *s) {
+  // win/view 是 ObjC 属性（ARC 管理的对象引用），只能用点取，不能 `->`——
+  // 桩里其余 C 字段是 @public 裸字段，两种取法在同一个函数里并存，容易看串
+  NSScreen *sc = (s != nil && s.win != nil) ? [s.win screen] : nil;
+  if (sc == nil) {
+    sc = [NSScreen mainScreen];
+  }
+  CGFloat f = sc != nil ? [sc backingScaleFactor] : 1.0;
+  return f > 0 ? f : 1.0;
+}
+
+// 主屏的 Cocoa frame（屏幕坐标换算的基准：Cocoa 是 y 向上、主屏原点在左下）
+static NSRect wm_primary_frame(void) {
+  NSArray<NSScreen *> *all = [NSScreen screens];
+  return all.count > 0 ? [[all firstObject] frame]
+                       : NSMakeRect(0, 0, 1920, 1080);
+}
+
+// 修饰位必须与 core/keys.mbt 的 MOD_* 一致（1 shift / 2 ctrl / 4 alt / 8 meta）。
+// mac 的主修饰是 Command，按 core/win/hotkey.mbt 的口径（is_mac 时 CmdOrCtrl → 8）
+// 映射到 META；Control 键本身给 CTRL，Option 给 ALT。
+static uint32_t wm_cocoa_mods(NSUInteger flags) {
+  uint32_t m = 0;
+  if ((flags & NSEventModifierFlagShift) != 0) {
+    m |= 1u;
+  }
+  if ((flags & NSEventModifierFlagControl) != 0) {
+    m |= 2u;
+  }
+  if ((flags & NSEventModifierFlagOption) != 0) {
+    m |= 4u;
+  }
+  if ((flags & NSEventModifierFlagCommand) != 0) {
+    m |= 8u;
+  }
+  return m;
+}
+
+// kVK_*（硬件键位）→ X11 keysym。表与 core/input_map.mbt 的 mac_vk_to_keysym
+// 同值同源（那份是纯函数、有回归钉住），字母/数字不在这里——它们由事件带的
+// Unicode 文本给（键盘布局归系统解析）。
+static uint32_t wm_mac_vk_keysym(uint16_t code) {
+  switch (code) {
+    case 36: return 65293u; // kVK_Return → XK_Return
+    case 48: return 65289u; // kVK_Tab
+    case 49: return 32u;    // kVK_Space
+    case 51: return 65288u; // kVK_Delete（退格）
+    case 53: return 65307u; // kVK_Escape
+    case 76: return 65421u; // KeypadEnter
+    case 65: return 65454u; // KeypadDecimal
+    case 67: return 65450u; // KeypadMultiply
+    case 69: return 65451u; // KeypadPlus
+    case 78: return 65453u; // KeypadMinus
+    case 75: return 65455u; // KeypadDivide
+    case 117: return 65535u; // ForwardDelete → XK_Delete
+    case 115: return 65360u; // Home
+    case 119: return 65367u; // End
+    case 116: return 65365u; // PageUp
+    case 121: return 65366u; // PageDown
+    case 123: return 65361u; // Left
+    case 124: return 65363u; // Right
+    case 125: return 65364u; // Down
+    case 126: return 65362u; // Up
+    case 122: return 65470u; // F1
+    case 120: return 65471u;
+    case 99: return 65472u;
+    case 118: return 65473u;
+    case 96: return 65474u;
+    case 97: return 65475u;
+    case 98: return 65476u;
+    case 100: return 65477u;
+    case 101: return 65478u;
+    case 109: return 65479u;
+    case 103: return 65480u;
+    case 111: return 65481u; // F12
+    default: return 0u;
+  }
+}
+
+// 事件 → keysym：特判表优先，其余取 charactersIgnoringModifiers 的码点
+// （X11 的 Latin-1 段 keysym == 码点，段外按 XK_UNICODE 的 0x01000000+cp）。
+static uint32_t wm_keysym_of(NSEvent *ev) {
+  uint32_t ks = wm_mac_vk_keysym([ev keyCode]);
+  if (ks != 0u) {
+    return ks;
+  }
+  NSString *chars = [ev charactersIgnoringModifiers];
+  if ([chars length] == 0u) {
+    return 0u;
+  }
+  unichar c = [chars characterAtIndex:0u];
+  if (c == 0x1B) {
+    return 65307u; // Escape 在 characters 里是控制字符，按 keysym 给
+  }
+  if (c < 32u) {
+    return 0u; // 其余控制字符：不是可打印键
+  }
+  if (c < 0x100u) {
+    return (uint32_t)c;
+  }
+  return 0x01000000u + (uint32_t)c;
+}
+
+// NSStatusItem / NSMenu / NSImage / 热键的表在下方各自段落里声明。
+
+@implementation WMState
+- (void)pushEv:(const WmEv *)e {
+  // 指针移动先合并（与 GTK/Win32 支同一条：位置是状态不是流水，只留最新一条）。
+  if (e->code == 4u && ev_count > 0) {
+    int prev = (ev_head + ev_count - 1) % 64;
+    if (evs[prev].code == 4u) {
+      evs[prev] = *e;
+      return;
+    }
+  }
+  if (ev_count >= 64) {
+    return; // 满了丢弃而不是覆盖：宁可丢一个事件,不能把 FIFO 打乱
+  }
+  int slot = (ev_head + ev_count) % 64;
+  evs[slot] = *e;
+  ev_count++;
+}
+
+// 尺寸同步：从 contentView 的边界点尺寸 × 所在屏缩放算出物理像素。
+// 全屏切换通知也走这里（那条同样带非空 note，但复用逻辑比 nil 参数干净）。
+- (void)syncSize {
+  if (self.view == nil) {
+    return;
+  }
+  CGFloat sc = wm_scale_of(self);
+  NSSize pts = [[self.view window] contentView].bounds.size;
+  self->width = (int)(pts.width * sc + 0.5);
+  self->height = (int)(pts.height * sc + 0.5);
+  self->resized = 1;
+  self->need_draw = 1;
+  [self.view updateTrackingAreas];
+}
+
+- (void)windowDidResize:(NSNotification *)note {
+  (void)note;
+  [self syncSize];
+}
+
+- (void)windowDidExitFullScreen:(NSNotification *)note {
+  (void)note;
+  [self syncSize];
+}
+
+- (BOOL)windowShouldClose:(NSWindow *)sender {
+  (void)sender;
+  self->closing = 1; // 不在这里销毁：拆对象由 MoonBit 侧看到事件 3 后调 wm_close
+  return NO;
+}
+
+- (void)dealloc {
+  if (self->backing != NULL) {
+    free(self->backing);
+    self->backing = NULL;
+    self->backing_cap = 0;
+  }
+}
+@end
+
+@implementation WMView
+
+- (instancetype)initWithFrame:(NSRect)frame {
+  self = [super initWithFrame:frame];
+  if (self != nil) {
+    vsid = 0;
+  }
+  return self;
+}
+
+- (void)setSlot:(int)sid {
+  vsid = sid;
+}
+
+- (BOOL)acceptsFirstResponder {
+  return YES;
+}
+
+// 不设 isFlipped：见文件头「坐标与尺度」。绘制与鼠标换算都按非翻转视图来。
+
+- (void)updateTrackingAreas {
+  [super updateTrackingAreas];
+  // 自绘 UI 要 hover，就得自己声明 tracking area（GTK 侧是 motion mask 申请）
+  for (NSTrackingArea *old in self.trackingAreas) {
+    [self removeTrackingArea:old];
+  }
+  NSTrackingArea *ta = [[NSTrackingArea alloc]
+      initWithRect:self.bounds
+           options:(NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited |
+                    NSTrackingActiveAlways | NSTrackingInVisibleRect)
+             owner:self
+           userInfo:nil];
+  [self addTrackingArea:ta];
+}
+
+- (void)resetCursorRects {
+  [super resetCursorRects];
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  NSCursor *cur = nil;
+  switch (s->cursor_kind) {
+    case 1: cur = [NSCursor pointingHandCursor]; break;
+    case 2: cur = [NSCursor IBeamCursor]; break;
+    case 3: cur = [NSCursor resizeLeftRightCursor]; break;
+    case 4: cur = [NSCursor resizeUpDownCursor]; break;
+    default: cur = [NSCursor arrowCursor]; break;
+  }
+  [self addCursorRect:self.bounds cursor:cur];
+}
+
+// 事件 → 队列。坐标：视图内点坐标（左下原点）→ 本栈的左上原点物理像素。
+- (void)pushPointer:(NSEvent *)ev code:(uint32_t)code button:(int32_t)button {
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  CGFloat sc = wm_scale_of(s);
+  NSPoint p = [self convertPoint:[ev locationInWindow] fromView:nil];
+  WmEv e;
+  memset(&e, 0, sizeof(e));
+  e.code = code;
+  e.x = (int32_t)(p.x * sc + 0.5);
+  e.y = (int32_t)((self.bounds.size.height - p.y) * sc + 0.5);
+  e.dx = button;
+  e.mods = wm_cocoa_mods([ev modifierFlags]);
+  [s pushEv:&e];
+}
+
+// 自绘标题栏的拖拽区：落在区内就交系统拖窗，并且**不入队**按下事件
+// （与 Win32 支的 WM_NCHITTEST → HTCAPTION 同语义：应用看不到这一击）。
+- (BOOL)tryDragRect:(NSEvent *)ev {
+  WMState *s = wm_state(vsid);
+  if (s == nil || s->drag_w <= 0 || s->drag_h <= 0) {
+    return NO;
+  }
+  CGFloat sc = wm_scale_of(s);
+  NSPoint p = [self convertPoint:[ev locationInWindow] fromView:nil];
+  int px = (int)(p.x * sc + 0.5);
+  int py = (int)((self.bounds.size.height - p.y) * sc + 0.5);
+  if (px < s->drag_x || py < s->drag_y || px >= s->drag_x + s->drag_w ||
+      py >= s->drag_y + s->drag_h) {
+    return NO;
+  }
+  [[self window] performWindowDragWithEvent:ev];
+  return YES;
+}
+
+- (void)mouseDown:(NSEvent *)ev {
+  if ([self tryDragRect:ev]) {
+    return;
+  }
+  [self pushPointer:ev code:2u button:1];
+}
+
+- (void)mouseUp:(NSEvent *)ev {
+  [self pushPointer:ev code:3u button:1];
+}
+
+- (void)rightMouseDown:(NSEvent *)ev {
+  [self pushPointer:ev code:2u button:3];
+}
+
+- (void)rightMouseUp:(NSEvent *)ev {
+  [self pushPointer:ev code:3u button:3];
+}
+
+- (void)otherMouseDown:(NSEvent *)ev {
+  // NSMouseEvent.buttonNumber：0 左 1 右 2 中 → 本栈按钮号 1/3/2
+  NSInteger n = [ev buttonNumber];
+  [self pushPointer:ev code:2u button:(n == 1 ? 3 : (n == 2 ? 2 : 1))];
+}
+
+- (void)otherMouseUp:(NSEvent *)ev {
+  NSInteger n = [ev buttonNumber];
+  [self pushPointer:ev code:3u button:(n == 1 ? 3 : (n == 2 ? 2 : 1))];
+}
+
+- (void)mouseMoved:(NSEvent *)ev {
+  [self pushPointer:ev code:4u button:0];
+}
+
+- (void)mouseDragged:(NSEvent *)ev {
+  [self pushPointer:ev code:4u button:0];
+}
+
+- (void)rightMouseDragged:(NSEvent *)ev {
+  [self pushPointer:ev code:4u button:0];
+}
+
+- (void)scrollWheel:(NSEvent *)ev {
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  CGFloat sc = wm_scale_of(s);
+  NSPoint p = [self convertPoint:[ev locationInWindow] fromView:nil];
+  WmEv e;
+  memset(&e, 0, sizeof(e));
+  e.code = 5u;
+  e.x = (int32_t)(p.x * sc + 0.5);
+  e.y = (int32_t)((self.bounds.size.height - p.y) * sc + 0.5);
+  // deltaY 单位是点、正数=向上滚；本栈给「每档 ±1」的方向（与 GTK 支同口径）
+  e.dy = [ev deltaY] > 0 ? 1 : ([ev deltaY] < 0 ? -1 : 0);
+  e.dx = [ev deltaX] > 0 ? -1 : ([ev deltaX] < 0 ? 1 : 0);
+  e.mods = wm_cocoa_mods([ev modifierFlags]);
+  [s pushEv:&e];
+}
+
+- (void)keyDown:(NSEvent *)ev {
+  NSTextInputContext *ic = [self inputContext];
+  if (ic != nil && [ic handleEvent:ev]) {
+    // 输入法吃掉了：不推按键，改由 insertText:/setMarkedText: 通道回报
+    WMState *s = wm_state(vsid);
+    if (s != nil) {
+      s->need_draw = 1;
+    }
+    [self setNeedsDisplay:YES];
+    return;
+  }
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  WmEv e;
+  memset(&e, 0, sizeof(e));
+  e.code = 0u;
+  e.keysym = wm_keysym_of(ev);
+  e.mods = wm_cocoa_mods([ev modifierFlags]);
+  [s pushEv:&e];
+}
+
+- (void)keyUp:(NSEvent *)ev {
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  WmEv e;
+  memset(&e, 0, sizeof(e));
+  e.code = 1u;
+  e.keysym = wm_keysym_of(ev);
+  e.mods = wm_cocoa_mods([ev modifierFlags]);
+  [s pushEv:&e];
+}
+
+- (void)flagsChanged:(NSEvent *)ev {
+  // 修饰键自身的按下/释放： keycode 查表给 keysym，让上层能识别「只按了 Cmd」
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  WmEv e;
+  memset(&e, 0, sizeof(e));
+  e.mods = wm_cocoa_mods([ev modifierFlags]);
+  uint32_t ks = 0u;
+  // 修饰键自身的按下/释放：kVK 值与 X11 keysym 都按 Events.h / Xutil 的表给。
+  // 按下还是释放看**这一个键自己的位**在不在 flags 里——不能拿合成后的 mods
+  // 判（按住 Cmd 再松开 Shift，mods 仍非零，按 mods 判会把释放报成按下）。
+  NSUInteger flags = [ev modifierFlags];
+  NSUInteger own = 0;
+  switch ([ev keyCode]) {
+    case 0x37: ks = 65515u; own = NSEventModifierFlagCommand; break; // Super_L
+    case 0x36: ks = 65516u; own = NSEventModifierFlagCommand; break; // Super_R
+    case 0x38: ks = 65505u; own = NSEventModifierFlagShift; break;   // Shift_L
+    case 0x3C: ks = 65506u; own = NSEventModifierFlagShift; break;   // Shift_R
+    case 0x3B: ks = 65507u; own = NSEventModifierFlagControl; break; // Control_L
+    case 0x3E: ks = 65508u; own = NSEventModifierFlagControl; break; // Control_R
+    case 0x3A: ks = 65406u; own = NSEventModifierFlagOption; break;  // Alt_L
+    case 0x3D: ks = 65407u; own = NSEventModifierFlagOption; break;  // Alt_R
+    default: break;
+  }
+  if (ks == 0u) {
+    return;
+  }
+  e.keysym = ks;
+  e.code = (flags & own) != 0 ? 0u : 1u; // 自己的位还亮着 = 按下，灭了 = 释放
+  [s pushEv:&e];
+}
+
+// ---- NSTextInputClient（输入法通道）----
+//
+// 本栈不持文档，所以「选区/已有文本」一类查询按空答复；实际要用的两件事
+// 都在这里落地：组合串（setMarkedText → preedit）与上屏文本
+// （insertText → commit），口径与 GTK 支一样是 UTF-8 字节 + 字节偏移光标。
+
+- (BOOL)hasMarkedText {
+  WMState *s = wm_state(vsid);
+  return s != nil && s->preedit_len > 0;
+}
+
+- (NSRange)markedRange {
+  WMState *s = wm_state(vsid);
+  if (s == nil || s->preedit_len == 0) {
+    return NSMakeRange(NSNotFound, 0);
+  }
+  return NSMakeRange(0, s->preedit_len);
+}
+
+- (NSRange)selectedRange {
+  return NSMakeRange(NSNotFound, 0);
+}
+
+- (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range
+                                                 actualRange:(NSRangePointer)actualRange {
+  (void)range;
+  (void)actualRange;
+  return nil; // 无文档可查：输入法的「取周围文本」按空处理
+}
+
+- (NSUInteger)characterIndexForPoint:(NSPoint)point {
+  (void)point;
+  return NSNotFound; // 无文档模型：给不到字符索引
+}
+
+// 候选窗落点：wm_im_set_cursor 给的像素矩形换算成屏幕坐标点
+- (NSRect)firstRectForCharacterRange:(NSRange)range
+                         actualRange:(NSRangePointer)actualRange {
+  (void)range;
+  (void)actualRange;
+  WMState *s = wm_state(vsid);
+  if (s == nil || self.window == nil) {
+    return NSZeroRect;
+  }
+  CGFloat sc = wm_scale_of(s);
+  NSRect r = [self convertRect:NSMakeRect(s->im_cx / sc,
+                                           self.bounds.size.height -
+                                               (s->im_cy + s->im_ch) / sc,
+                                           s->im_cw / sc, s->im_ch / sc)
+                        toView:nil];
+  return [[self window] convertRectToScreen:r];
+}
+
+- (void)insertText:(id)str replacementRange:(NSRange)replacementRange {
+  (void)replacementRange;
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  NSString *text = nil;
+  if ([str isKindOfClass:[NSAttributedString class]]) {
+    text = [(NSAttributedString *)str string];
+  } else if ([str isKindOfClass:[NSString class]]) {
+    text = (NSString *)str;
+  }
+  if (text == nil) {
+    return;
+  }
+  const char *utf8 = [text UTF8String];
+  int n = 0;
+  if (utf8 != NULL) {
+    while (utf8[n] != '\0' && n < 255) {
+      s->commit[n] = utf8[n];
+      n++;
+    }
+  }
+  s->commit[n] = '\0';
+  s->commit_len = n;
+  s->preedit_active = 0;
+  s->preedit_len = 0;
+  s->preedit[0] = '\0';
+  s->need_draw = 1;
+}
+
+- (void)doCommandBySelector:(SEL)selector {
+  (void)selector; // 组合中的回车/退格由输入法定，本层不额外投键（与 GTK 一致）
+}
+
+- (void)setMarkedText:(id)markedText
+                 selectedRange:(NSRange)selRange
+            replacementRange:(NSRange)replacementRange {
+  (void)replacementRange; // 本层没有选区可替换：组合串总是整体覆写 preedit
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  NSString *str = nil;
+  if ([markedText isKindOfClass:[NSAttributedString class]]) {
+    str = [(NSAttributedString *)markedText string];
+  } else if ([markedText isKindOfClass:[NSString class]]) {
+    str = (NSString *)markedText;
+  }
+  if (str == nil) {
+    s->preedit_len = 0;
+    s->preedit[0] = '\0';
+    s->preedit_active = 1;
+    s->need_draw = 1;
+    return;
+  }
+  const char *utf8 = [str UTF8String];
+  int n = 0;
+  if (utf8 != NULL) {
+    while (utf8[n] != '\0' && n < 255) {
+      s->preedit[n] = utf8[n];
+      n++;
+    }
+  }
+  s->preedit[n] = '\0';
+  s->preedit_len = n;
+  s->preedit_active = 1;
+  // selRange.location 是 UTF-16 单元位置，MoonBit 侧按 UTF-8 字节管光标，
+  // 这里换算成字节偏移（与 GTK 支的 caret 同口径）
+  NSUInteger cut = selRange.location;
+  if (cut > [str length]) {
+    cut = [str length];
+  }
+  if (cut > 0) {
+    NSString *head = [str substringToIndex:cut];
+    long bl = (long)[head lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    s->preedit_caret = bl > n ? n : (bl < 0 ? 0 : (int)bl);
+  } else {
+    s->preedit_caret = 0;
+  }
+  s->need_draw = 1;
+}
+
+- (void)unmarkText {
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  s->preedit_active = 0;
+  s->preedit_len = 0;
+  s->preedit[0] = '\0';
+  s->need_draw = 1;
+}
+
+- (NSArray *)validAttributesForMarkedText {
+  return @[];
+}
+
+- (BOOL)resignFirstResponder {
+  WMState *s = wm_state(vsid);
+  if (s != nil && [self.window isKeyWindow]) {
+    // 焦点还在本窗内转移（用户点了本窗的网页子件）→ 浮层「点外收起」
+    s->focus_lost = 1;
+  }
+  if (s != nil) {
+    s->preedit_active = 0;
+    s->preedit_len = 0;
+    s->preedit[0] = '\0';
+  }
+  return [super resignFirstResponder];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  (void)dirtyRect;
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return;
+  }
+  if (s->backing == NULL || s->backing_w < 1 || s->backing_h < 1) {
+    s->need_draw = 1; // 还没有帧可贴：请 MoonBit 画第一帧
+    return;
+  }
+  NSGraphicsContext *gc = [NSGraphicsContext currentContext];
+  CGContextRef ctx = [gc CGContext];
+  if (ctx == NULL) {
+    s->need_draw = 1;
+    return;
+  }
+  size_t len = (size_t)s->backing_w * (size_t)s->backing_h * 4u;
+  CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+  CGDataProviderRef dp = CGDataProviderCreateWithData(NULL, s->backing, len, NULL);
+  CGImageRef img = NULL;
+  if (dp != NULL) {
+    img = CGImageCreate(s->backing_w, s->backing_h, 8, 32,
+                        (size_t)s->backing_w * 4u, cs,
+                        (CGBitmapInfo)(kCGImageAlphaPremultipliedFirst |
+                                       kCGBitmapByteOrder32Little),
+                        dp, NULL, kCGInterpolationNone,
+                        kCGRenderingIntentDefault);
+  }
+  if (img != NULL) {
+    CGContextDrawImage(ctx, self.bounds, img);
+    CGImageRelease(img);
+  } else {
+    s->need_draw = 1;
+  }
+  if (dp != NULL) {
+    CGDataProviderRelease(dp);
+  }
+  if (cs != NULL) {
+    CGColorSpaceRelease(cs);
+  }
+}
+@end
+
+// 应用级委托：最后一扇窗关掉**不能**终结进程（循环归 MoonBit）。
+@interface WMAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation WMAppDelegate
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:
+    (NSApplication *)sender {
+  (void)sender;
+  return NO;
+}
+@end
+
+static WMAppDelegate *wm_app_delegate = nil;
+
+int wm_init(void) {
+  @autoreleasepool {
+    // 手工跑循环（不用 [NSApp run]），但必须先让 AppKit 建出共享应用对象，
+    // 之后所有事件与窗口都挂在这个单例上（NSApp 就是它的宏）
+    [NSApplication sharedApplication];
+    if (![NSThread isMainThread]) {
+      return 0; // AppKit 的类方法要从主线程调（MoonBit 宿主就在主线程，这条是护栏）
+    }
+    // 非 bundle 的裸二进制也要能被窗口服务接受：Regular 策略让本进程进
+    // Dock 与菜单栏（不设为 Regular，NSWindow 建得出来但不会显示）。
+    if ([NSApp activationPolicy] == NSApplicationActivationPolicyProhibited) {
+      [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    }
+    if (wm_app_delegate == nil) {
+      wm_app_delegate = [[WMAppDelegate alloc] init];
+      [NSApp setDelegate:wm_app_delegate];
+    }
+    [NSApp finishLaunching];
+    return 1;
+  }
+}
+
+int64_t wm_window_new(int width, int height, const char *title) {
+  @autoreleasepool {
+    int id = 0;
+    for (int i = 1; i < WM_MAX_WINDOWS; i++) {
+      if (wm_windows[i] == nil || wm_windows[i].view == nil) {
+        id = i;
+        break;
+      }
+    }
+    if (id == 0) {
+      return 0;
+    }
+    WMState *s = [[WMState alloc] init];
+    s->sid = id;
+    CGFloat sc = wm_scale_of(s); // 还没挂屏：退回主屏比例
+    double pw = (double)(width > 1 ? width : 1) / (double)sc;
+    double ph = (double)(height > 1 ? height : 1) / (double)sc;
+    s->width = width > 1 ? width : 1;
+    s->height = height > 1 ? height : 1;
+    NSWindowStyleMask mask =
+        NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+        NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+    NSWindow *win = [[NSWindow alloc]
+        initWithContentRect:NSMakeRect(0, 0, pw, ph)
+                  styleMask:mask
+                    backing:NSBackingStoreBuffered
+                      defer:NO];
+    if (win == nil) {
+      return 0;
+    }
+    [win setReleasedWhenClosed:NO];
+    [win setTitle:(wm_str(title) ?: @"MoonBit")];
+    WMView *view = [[WMView alloc]
+        initWithFrame:NSMakeRect(0, 0, pw, ph)];
+    [view setSlot:id];
+    [view setWantsLayer:NO]; // 走 CGContext 直贴（drawRect 里取当前上下文）
+    [win setContentView:view];
+    [win setDelegate:s];
+    [win setAcceptsMouseMovedEvents:YES];
+    [win makeFirstResponder:view];
+    s.win = win;
+    s.view = view;
+    wm_windows[id] = s;
+    return (int64_t)id;
+  }
+}
+
+void wm_show(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    [s.win makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    [s.view updateTrackingAreas];
+    [s.win invalidateCursorRectsForView:s.view];
+    s->need_draw = 1;
+    wm_pump(); // 把映射请求推出去，别让首帧等到下一次 wait
+  }
+}
+
+void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return;
+  }
+  if (out_w != NULL) {
+    *out_w = s->width;
+  }
+  if (out_h != NULL) {
+    *out_h = s->height;
+  }
+}
+
+// 形参不叫 id：ObjC 里 `id` 是类型名，占用它会让下面的对象转型读成变量。
+int wm_focus_owner(int64_t wid) {
+  @autoreleasepool {
+    WMState *s = wm_state(wid);
+    if (s == nil) {
+      return 0;
+    }
+    if ([NSApp keyWindow] != s.win) {
+      return 0; // 整窗失焦：上层不该清自绘控件的焦点
+    }
+    NSResponder *fr = [s.win firstResponder];
+    if (fr == nil || (NSObject *)fr == (NSObject *)s.win) {
+      return 0;
+    }
+    return (NSObject *)fr == (NSObject *)s.view ? 1 : 2;
+  }
+}
+
+// 消费式取事件：1 重绘 / 2 尺寸变化 / 3 请求关闭 / 4 有输入事件 / 5 失去焦点，
+// 0 没有。优先级与 GTK/Win32 支一致（输入事件最先）。
+int wm_event(int64_t id) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return 0;
+  }
+  if (s->ev_count > 0) {
+    return 4;
+  }
+  if (s->closing) {
+    s->closing = 0;
+    return 3;
+  }
+  if (s->resized) {
+    s->resized = 0;
+    return 2;
+  }
+  if (s->focus_lost) {
+    s->focus_lost = 0;
+    return 5;
+  }
+  if (s->need_draw) {
+    s->need_draw = 0;
+    return 1;
+  }
+  return 0;
+}
+
+int wm_take_event(int64_t id) {
+  WMState *s = wm_state(id);
+  if (s == nil || s->ev_count == 0) {
+    return -1;
+  }
+  s->last = s->evs[s->ev_head];
+  s->ev_head = (s->ev_head + 1) % 64;
+  s->ev_count--;
+  return (int)s->last.code;
+}
+
+int wm_pending_events(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->ev_count;
+}
+
+int32_t wm_ev_keysym(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : (int32_t)s->last.keysym;
+}
+int32_t wm_ev_mods(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : (int32_t)s->last.mods;
+}
+int32_t wm_ev_x(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->last.x;
+}
+int32_t wm_ev_y(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->last.y;
+}
+int32_t wm_ev_button(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->last.dx;
+}
+int32_t wm_ev_axis(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->last.dy;
+}
+
+static BOOL wm_is_wake(NSEvent *ev) {
+  return ev != nil && [ev type] == NSApplicationDefined &&
+         [ev data1] == (NSInteger)WM_WAKE_TOKEN;
+}
+
+// 跑掉已就绪的事件，不阻塞。
+void wm_pump(void) {
+  @autoreleasepool {
+    NSEvent *ev;
+    while ((ev = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                    untilDate:[NSDate distantPast]
+                                       inMode:NSDefaultRunLoopMode
+                                      dequeue:YES]) != nil) {
+      if (wm_is_wake(ev)) {
+        continue; // 唤醒位：不进派发
+      }
+      [NSApp sendEvent:ev];
+    }
+  }
+}
+
+// 等平台事件。timeout_ms < 0 = 无限等（只能靠事件或 wm_wakeup 回来）。
+// 这里用 AppKit 自己的阻塞取事件：它内部会跑主 run loop，跨线程
+// postEvent:（wm_wakeup）能让它立刻返回——这正是本栈需要的唤醒位。
+int wm_wait(int timeout_ms) {
+  @autoreleasepool {
+    NSDate *until = timeout_ms < 0
+                        ? [NSDate distantFuture]
+                        : [NSDate dateWithTimeIntervalSinceNow:
+                                                  (double)timeout_ms / 1000.0];
+    NSEvent *ev = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                     untilDate:until
+                                        inMode:NSDefaultRunLoopMode
+                                       dequeue:YES];
+    if (ev == nil) {
+      return 0;
+    }
+    if (!wm_is_wake(ev)) {
+      [NSApp sendEvent:ev];
+    }
+    wm_pump(); // 同批剩下的也一并派发
+    return 1;
+  }
+}
+
+void wm_wakeup(void) {
+  @autoreleasepool {
+    NSEvent *ev = [NSEvent otherEventWithType:NSApplicationDefined
+                                     location:NSZeroPoint
+                                modifierFlags:0
+                                    timestamp:0
+                                 windowNumber:0
+                                      context:nil
+                                      subtype:0
+                                        data1:(NSInteger)WM_WAKE_TOKEN
+                                        data2:0];
+    if (ev != nil) {
+      [NSApp postEvent:ev atStart:NO];
+    }
+  }
+}
+
+void wm_request_focus(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    [s.win makeKeyWindow];
+    [s.win makeFirstResponder:s.view];
+  }
+}
+
+// present：把帧拷进本层缓冲再请重画（真正的贴像素在下一次 drawRect:，
+// 那时窗口与数据都一定还活着——与 GTK 支同一条实测结论）。
+void wm_present(int64_t id, const unsigned char *rgba, int width, int height) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil || rgba == NULL || width < 1 || height < 1) {
+      return;
+    }
+    size_t need = (size_t)width * (size_t)height * (size_t)4;
+    if (s->backing_cap < need) {
+      unsigned char *nb = (unsigned char *)realloc(s->backing, need);
+      if (nb == NULL) {
+        return;
+      }
+      s->backing = nb;
+      s->backing_cap = need;
+    }
+    memcpy(s->backing, rgba, need);
+    s->backing_w = width;
+    s->backing_h = height;
+    [s.view setNeedsDisplay:YES];
+  }
+}
+
+void wm_close(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state_alive(id);
+    if (s == nil) {
+      return;
+    }
+    // 归属本窗的原生子件槽一起清（视图随窗口销毁）
+    for (int i = 1; i < WM_MAX_SURFACES; i++) {
+      if (wm_surf_views[i] != nil && wm_surf_win[i] == id) {
+        wm_surf_views[i] = nil;
+        wm_surf_win[i] = 0;
+        wm_surf_kind[i] = 0;
+        wm_surf_x[i] = wm_surf_y[i] = wm_surf_w[i] = wm_surf_h[i] = 0;
+      }
+    }
+    if (s.win != nil) {
+      [s.win setDelegate:nil];
+      [s.win close];
+    }
+    s.win = nil;
+    s.view = nil;
+    wm_windows[(int)id] = nil; // 置 nil：ARC 释放对象，dealloc 里还帧缓冲
+  }
+}
+
+// ---- IME（自绘内联档：MoonBit 拿 preedit 自画、拿 commit 进文本状态）----
+
+void wm_im_set_surrounding(int64_t id, const char *text, int caret) {
+  (void)text;
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return;
+  }
+  // 本层无文档模型，候选窗位置只靠 wm_im_set_cursor 的矩形；这里 caret
+  // 仅用于「输入法问周边文本」时的字节偏移提示，不落状态。
+  (void)caret;
+}
+
+void wm_im_set_cursor(int64_t id, int x, int y, int w, int h) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return;
+  }
+  s->im_cx = x;
+  s->im_cy = y;
+  s->im_cw = w;
+  s->im_ch = h;
+}
+
+void wm_im_reset(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    s->preedit_active = 0;
+    s->preedit_len = 0;
+    s->preedit[0] = '\0';
+    s->commit_len = 0;
+    [[s.view inputContext] invalidateCharacterCoordinates];
+  }
+}
+
+int wm_im_commit_len(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->commit_len;
+}
+
+int wm_im_commit_byte(int64_t id, int index) {
+  WMState *s = wm_state(id);
+  if (s == nil || index < 0 || index >= s->commit_len) {
+    return 0;
+  }
+  return (int)(unsigned char)s->commit[index];
+}
+
+void wm_im_commit_done(int64_t id) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return;
+  }
+  s->commit_len = 0;
+  s->commit[0] = '\0';
+}
+
+int wm_im_preedit_len(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->preedit_len;
+}
+
+int wm_im_preedit_byte(int64_t id, int index) {
+  WMState *s = wm_state(id);
+  if (s == nil || index < 0 || index >= s->preedit_len) {
+    return 0;
+  }
+  return (int)(unsigned char)s->preedit[index];
+}
+
+int wm_im_preedit_caret(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->preedit_caret;
+}
+
+int wm_im_preedit_active(int64_t id) {
+  WMState *s = wm_state(id);
+  return s == nil ? 0 : s->preedit_active;
+}
+
+// ---- 光标 ----
+
+void wm_set_cursor(int64_t id, int kind) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    if (s->cursor_kind == kind) {
+      return;
+    }
+    s->cursor_kind = kind;
+    [s.win invalidateCursorRectsForView:s.view];
+  }
+}
+
+// ---- 窗口属性 ----
+
+void wm_set_title(int64_t id, const char *title) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    [s.win setTitle:(wm_str(title) ?: @"")];
+  }
+}
+
+int wm_window_title(int64_t id, char *out, int cap) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return wm_clamp_cap(out, cap, "");
+    }
+    NSString *t = [s.win title];
+    return wm_clamp_cap(out, cap, t != nil ? [t UTF8String] : "");
+  }
+}
+
+void wm_set_min_size(int64_t id, int wmin, int hmin) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    CGFloat sc = wm_scale_of(s);
+    s->min_w = wmin;
+    s->min_h = hmin;
+    [s.win setContentMinSize:NSMakeSize(wmin > 0 ? wmin / sc : 0,
+                                        hmin > 0 ? hmin / sc : 0)];
+  }
+}
+
+void wm_get_min_size(int64_t id, int32_t *out_w, int32_t *out_h) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      if (out_w != NULL) {
+        *out_w = 0;
+      }
+      if (out_h != NULL) {
+        *out_h = 0;
+      }
+      return;
+    }
+    CGFloat sc = wm_scale_of(s);
+    NSSize m = [s.win contentMinSize];
+    if (out_w != NULL) {
+      *out_w = (int)(m.width * sc + 0.5);
+    }
+    if (out_h != NULL) {
+      *out_h = (int)(m.height * sc + 0.5);
+    }
+  }
+}
+
+void wm_set_drag_rect(int64_t id, int x, int y, int w, int h) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return;
+  }
+  s->drag_x = x;
+  s->drag_y = y;
+  s->drag_w = w;
+  s->drag_h = h;
+}
+
+void wm_get_drag_rect(int64_t id, int32_t *x, int32_t *y, int32_t *w,
+                      int32_t *h) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    if (x != NULL) { *x = 0; }
+    if (y != NULL) { *y = 0; }
+    if (w != NULL) { *w = 0; }
+    if (h != NULL) { *h = 0; }
+    return;
+  }
+  if (x != NULL) { *x = s->drag_x; }
+  if (y != NULL) { *y = s->drag_y; }
+  if (w != NULL) { *w = s->drag_w; }
+  if (h != NULL) { *h = s->drag_h; }
+}
+
+void wm_set_borderless(int64_t id, int on) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil || s->borderless == (on ? 1 : 0)) {
+      return;
+    }
+    s->borderless = on ? 1 : 0;
+    NSWindowStyleMask mask = on
+        ? NSWindowStyleMaskBorderless
+        : (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+           NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable);
+    [s.win setStyleMask:mask];
+    [s.win setMovableByWindowBackground:!on];
+    s->resized = 1;
+    s->need_draw = 1;
+  }
+}
+
+int wm_is_borderless(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return 0;
+    }
+    return ([s.win styleMask] & NSWindowStyleMaskBorderless) != 0 ? 1 : 0;
+  }
+}
+
+void wm_window_set_size(int64_t id, int w, int h) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    CGFloat sc = wm_scale_of(s);
+    int ww = w > 1 ? w : 1;
+    int hh = h > 1 ? h : 1;
+    [s.win setContentSize:NSMakeSize(ww / sc, hh / sc)];
+    s->width = ww;
+    s->height = hh;
+    s->resized = 1;
+    s->need_draw = 1;
+  }
+}
+
+// 内容区左上角在屏幕上的原点（物理像素，y 从主屏顶向下）——弹层按
+// 「owner 原点 + 控件窗口内矩形」摆位，两侧口径必须一致。
+void wm_window_origin(int64_t id, int32_t *out_x, int32_t *out_y) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil || s.view == nil) {
+      return;
+    }
+    CGFloat sc = wm_scale_of(s);
+    NSRect content =
+        [s.win convertRectToScreen:[s.view convertRect:s.view.bounds toView:nil]];
+    NSRect pf = wm_primary_frame();
+    if (out_x != NULL) {
+      *out_x = (int)(content.origin.x * sc + 0.5);
+    }
+    if (out_y != NULL) {
+      *out_y = (int)(((pf.origin.y + pf.size.height) - NSMaxY(content)) * sc +
+                     0.5);
+    }
+  }
+}
+
+void wm_window_move(int64_t id, int x, int y) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil || s.view == nil) {
+      return;
+    }
+    CGFloat sc = wm_scale_of(s);
+    NSRect content = [s.win convertRectToScreen:
+                      [s.view convertRect:s.view.bounds toView:nil]];
+    NSRect pf = wm_primary_frame();
+    CGFloat cur_top = (pf.origin.y + pf.size.height) - NSMaxY(content);
+    CGFloat dx = (CGFloat)x / sc - content.origin.x;
+    CGFloat dy = (CGFloat)y / sc - cur_top; // 向下为正
+    NSRect fr = [s.win frame];
+    [s.win setFrameTopLeftPoint:NSMakePoint(fr.origin.x + dx,
+                                            NSMaxY(fr) - dy)];
+    s->resized = 1;
+    s->need_draw = 1;
+  }
+}
+
+void wm_window_set_fullscreen(int64_t id, int on) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    BOOL is_fs = ([s.win styleMask] & NSWindowStyleMaskFullScreen) != 0;
+    if (on && !is_fs) {
+      [s.win toggleFullScreen:nil];
+    } else if (!on && is_fs) {
+      [s.win toggleFullScreen:nil];
+    }
+  }
+}
+
+// 浮层窗：无边框 + 不抢主窗焦点 + 挂在 owner 之上随其移动。
+void wm_window_set_popup(int64_t id, int64_t owner_id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    [s.win setStyleMask:NSWindowStyleMaskBorderless];
+    [s.win setLevel:NSFloatingWindowLevel];
+    [s.win setHasShadow:NO];
+    [s.win setHidesOnDeactivate:NO];
+    s->borderless = 1;
+    WMState *owner = wm_state_alive(owner_id);
+    if (owner != nil && owner.win != nil && owner != s) {
+      [owner.win addChildWindow:s.win ordered:NSWindowAbove];
+    }
+  }
+}
+
+// ---- 原生子件通道（方案 §4.7）----
+
+int64_t wm_surface_new(int64_t window_id, int kind, int x, int y, int w,
+                       int h) {
+  @autoreleasepool {
+    WMState *win = wm_state(window_id);
+    if (win == nil) {
+      return 0;
+    }
+    int sid = 0;
+    for (int i = 1; i < WM_MAX_SURFACES; i++) {
+      if (wm_surf_views[i] == nil) {
+        sid = i;
+        break;
+      }
+    }
+    if (sid == 0) {
+      return 0;
+    }
+    CGFloat sc = wm_scale_of(win);
+    NSRect parent = win.view.bounds;
+    double pw = (w > 1 ? w : 1) / sc;
+    double ph = (h > 1 ? h : 1) / sc;
+    // 内容坐标（左上原点、物理像素）→ 视图 frame（左下原点、点）
+    NSView *v = [[NSView alloc] initWithFrame:NSMakeRect(
+                    x / sc, parent.size.height - (y / sc) - ph, pw, ph)];
+    [v setWantsLayer:YES];
+    [win.view addSubview:v];
+    wm_surf_views[sid] = v;
+    wm_surf_win[sid] = window_id;
+    wm_surf_kind[sid] = kind;
+    wm_surf_x[sid] = x;
+    wm_surf_y[sid] = y;
+    wm_surf_w[sid] = w;
+    wm_surf_h[sid] = h;
+    return (int64_t)sid;
+  }
+}
+
+void wm_surface_set_rect(int64_t surface_id, int x, int y, int w, int h) {
+  @autoreleasepool {
+    if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+      return;
+    }
+    NSView *v = wm_surf_views[(int)surface_id];
+    if (v == nil) {
+      return;
+    }
+    if (wm_surf_x[(int)surface_id] == x && wm_surf_y[(int)surface_id] == y &&
+        wm_surf_w[(int)surface_id] == w && wm_surf_h[(int)surface_id] == h) {
+      return; // 每帧都同步，位置没动就不重排
+    }
+    WMState *win = wm_state(wm_surf_win[(int)surface_id]);
+    if (win == nil) {
+      return;
+    }
+    CGFloat sc = wm_scale_of(win);
+    NSRect parent = win.view.bounds;
+    double pw = (w > 1 ? w : 1) / sc;
+    double ph = (h > 1 ? h : 1) / sc;
+    wm_surf_x[(int)surface_id] = x;
+    wm_surf_y[(int)surface_id] = y;
+    wm_surf_w[(int)surface_id] = w;
+    wm_surf_h[(int)surface_id] = h;
+    [v setFrame:NSMakeRect(x / sc, parent.size.height - (y / sc) - ph, pw, ph)];
+  }
+}
+
+void wm_surface_close(int64_t surface_id) {
+  @autoreleasepool {
+    if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+      return;
+    }
+    NSView *v = wm_surf_views[(int)surface_id];
+    if (v != nil) {
+      [v removeFromSuperview];
+    }
+    wm_surf_views[(int)surface_id] = nil;
+    wm_surf_win[(int)surface_id] = 0;
+    wm_surf_kind[(int)surface_id] = 0;
+    wm_surf_x[(int)surface_id] = wm_surf_y[(int)surface_id] =
+        wm_surf_w[(int)surface_id] = wm_surf_h[(int)surface_id] = 0;
+  }
+}
+
+// 给能力层的桩用（WebKit 支把 WKWebView 加进这个视图）
+void *wm_surface_container(int64_t surface_id) {
+  if (surface_id <= 0 || surface_id >= WM_MAX_SURFACES) {
+    return NULL;
+  }
+  return (__bridge void *)wm_surf_views[(int)surface_id];
+}
+
+int wm_window_surface_count(int64_t id) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_SURFACES; i++) {
+    if (wm_surf_views[i] != nil && wm_surf_win[i] == id) {
+      n++;
+    }
+  }
+  return n;
+}
+
+// ---- 时间 ----
+
+int64_t wm_now_ms(void) {
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+    return 0;
+  }
+  return (int64_t)ts.tv_sec * 1000 + (int64_t)(ts.tv_nsec / 1000000);
+}
+
+int64_t wm_local_date(void) {
+  time_t now = time(NULL);
+  struct tm tm_local;
+  if (localtime_r(&now, &tm_local) == NULL) {
+    return 0;
+  }
+  return (int64_t)(tm_local.tm_year + 1900) * 10000 +
+         (int64_t)(tm_local.tm_mon + 1) * 100 + (int64_t)tm_local.tm_mday;
+}
+
+// ---- 系统外观（深浅与主色）----
+
+int wm_sys_color_scheme(char *out, int cap) {
+  @autoreleasepool {
+    if (out == NULL || cap < 1) {
+      return 0;
+    }
+    out[0] = '\0';
+    NSAppearance *ap = [NSApp effectiveAppearance];
+    if (ap == nil) {
+      return 0;
+    }
+    BOOL dark = NO;
+    if (@available(macOS 10.14, *)) {
+      dark = [ap bestMatchFromAppearancesWithNames:
+                     @[ NSAppearanceNameDarkAqua,
+                        NSAppearanceNameAqua ]] == NSAppearanceNameDarkAqua;
+    }
+    return wm_clamp_cap(out, cap, dark ? "dark" : "light");
+  }
+}
+
+int wm_sys_accent(char *out, int cap) {
+  @autoreleasepool {
+    if (out == NULL || cap < 8) {
+      return wm_clamp_cap(out, cap, "");
+    }
+    NSColor *c = nil;
+    if (@available(macOS 10.14, *)) {
+      c = [NSColor controlAccentColor];
+    }
+    if (c == nil) {
+      c = [NSColor selectedContentBackgroundColor];
+    }
+    if (c == nil) {
+      return wm_clamp_cap(out, cap, "");
+    }
+    NSColor *rgb = [c colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
+    if (rgb == nil) {
+      return wm_clamp_cap(out, cap, "");
+    }
+    int r = (int)([rgb redComponent] * 255.0 + 0.5);
+    int g = (int)([rgb greenComponent] * 255.0 + 0.5);
+    int b = (int)([rgb blueComponent] * 255.0 + 0.5);
+    char buf[8];
+    snprintf(buf, sizeof(buf), "#%02x%02x%02x", r, g, b);
+    return wm_clamp_cap(out, cap, buf);
+  }
+}
+
+// ---- 剪贴板（sys/clipboard.mbt 的 mac 分支走 pbpaste/pbcopy 命令线；
+// 这三条符号是 sys 链接 win 归档时必须存在的，这里给 NSPasteboard 真实现）----
+
+int wm_clipboard_available(void) {
+  @autoreleasepool {
+    return [NSPasteboard generalPasteboard] != nil ? 1 : 0;
+  }
+}
+
+void *wm_clipboard_get_text(int32_t *ok) {
+  @autoreleasepool {
+    if (ok != NULL) {
+      *ok = 0;
+    }
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    if (pb == nil) {
+      return wm_bytes(NULL);
+    }
+    NSString *t = [pb stringForType:NSPasteboardTypeString];
+    if (t == nil) {
+      return wm_bytes(NULL);
+    }
+    if (ok != NULL) {
+      *ok = 1;
+    }
+    return wm_bytes([t UTF8String]);
+  }
+}
+
+int wm_clipboard_set_text(const char *text) {
+  @autoreleasepool {
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    if (pb == nil || text == NULL) {
+      return 0;
+    }
+    NSString *t = wm_str(text);
+    if (t == nil) {
+      return 0;
+    }
+    [pb clearContents];
+    return [pb setString:t forType:NSPasteboardTypeString] ? 1 : 0;
+  }
+}
+
+// ---- 文件对话框（NSOpenPanel / NSSavePanel）----
+
+static NSSavePanel *wm_dialogs[WM_DLG_MAX];
+static int wm_dlg_accepted[WM_DLG_MAX];
+static int wm_dlg_is_open[WM_DLG_MAX];
+
+static int64_t wm_dlg_put(NSSavePanel *panel, int is_open) {
+  for (int i = 0; i < WM_DLG_MAX; i++) {
+    if (wm_dialogs[i] == nil) {
+      wm_dialogs[i] = panel;
+      wm_dlg_accepted[i] = 0;
+      wm_dlg_is_open[i] = is_open;
+      return (int64_t)(i + 1);
+    }
+  }
+  return 0;
+}
+
+static NSSavePanel *wm_dlg_of(int64_t id) {
+  if (id <= 0 || id > WM_DLG_MAX) {
+    return nil;
+  }
+  return wm_dialogs[(int)id - 1];
+}
+
+static void wm_dlg_free(int64_t id) {
+  if (id <= 0 || id > WM_DLG_MAX) {
+    return;
+  }
+  wm_dlg_accepted[(int)id - 1] = 0;
+  wm_dlg_is_open[(int)id - 1] = 0;
+  wm_dialogs[(int)id - 1] = nil;
+}
+
+static int64_t wm_file_dialog_new(int save) {
+  @autoreleasepool {
+    if (![NSThread isMainThread]) {
+      return 0; // AppKit 面板必须在主线程建
+    }
+    if (save) {
+      return wm_dlg_put([NSSavePanel savePanel], 0);
+    }
+    return wm_dlg_put([NSOpenPanel openPanel], 1);
+  }
+}
+
+int64_t wm_file_open_dialog_new(void) { return wm_file_dialog_new(0); }
+int64_t wm_file_save_dialog_new(void) { return wm_file_dialog_new(1); }
+
+// 选项位：1 选文件夹、2 多选、4 显示隐藏文件。
+void wm_file_dialog_set_options(int64_t id, int32_t options) {
+  @autoreleasepool {
+    NSSavePanel *p = wm_dlg_of(id);
+    if (p == nil) {
+      return;
+    }
+    // 三个开关都只在「打开面板」上声明（NSSavePanel 天生单选、也没有
+    // canShowHiddenFiles）：多选/选文件夹/显示隐藏对保存面板无意义，
+    // 于是保存对话框只吃 FILE_OPTION_SHOW_HIDDEN 之外的语义（按 API 事实给）
+    if (wm_dlg_is_open[(int)id - 1]) {
+      NSOpenPanel *op = (NSOpenPanel *)p;
+      [op setAllowsMultipleSelection:(options & 2) != 0];
+      [op setCanChooseFiles:(options & 1) == 0];
+      [op setTreatsFilePackagesAsDirectories:YES];
+      // canShowHiddenFiles 在 macOS 26 的 SDK 上不再随 NSOpenPanel 公开声明
+      // （clang 报 no visible @interface），故按运行时能力设：上面的 informal
+      // 声明只让 selector 可见，SDK 里没有这一口就跳过（隐藏文件开关失灵,
+      // 其余选项不受影响）。
+      if ([op respondsToSelector:@selector(setCanShowHiddenFiles:)]) {
+        [op setCanShowHiddenFiles:(options & 4) != 0];
+      }
+    }
+  }
+}
+
+// filters 打包："描述:扩展1,扩展2|描述2:扩展3"（'*' 匹配全部）
+void wm_file_dialog_set_filters(int64_t id, const char *filters) {
+  @autoreleasepool {
+    NSSavePanel *p = wm_dlg_of(id);
+    if (p == nil || filters == NULL) {
+      return;
+    }
+    NSMutableArray<NSString *> *types = [NSMutableArray array];
+    BOOL all = NO;
+    const char *pos = filters;
+    while (*pos != '\0') {
+      const char *bar = strchr(pos, '|');
+      size_t glen = bar != NULL ? (size_t)(bar - pos) : strlen(pos);
+      char group[256];
+      if (glen >= sizeof(group)) {
+        glen = sizeof(group) - 1;
+      }
+      memcpy(group, pos, glen);
+      group[glen] = '\0';
+      const char *colon = strchr(group, ':');
+      if (colon != NULL) {
+        const char *ep = colon + 1;
+        while (*ep != '\0') {
+          const char *comma = strchr(ep, ',');
+          size_t el = comma != NULL ? (size_t)(comma - ep) : strlen(ep);
+          char pat[64];
+          if (el >= sizeof(pat)) {
+            el = sizeof(pat) - 1;
+          }
+          memcpy(pat, ep, el);
+          pat[el] = '\0';
+          if (strcmp(pat, "*") == 0) {
+            all = YES;
+          } else if ([types count] < 64) {
+            NSString *ext = wm_str(pat);
+            if (ext != nil) {
+              [types addObject:ext];
+            }
+          }
+          ep = comma != NULL ? comma + 1 : ep + el;
+        }
+      }
+      pos = bar != NULL ? bar + 1 : pos + glen;
+    }
+    if (all || [types count] == 0) {
+      [p setAllowedFileTypes:nil];
+    } else {
+      [p setAllowedFileTypes:types];
+    }
+  }
+}
+
+// folder 可以是 file:// URI 或本地路径（与 GTK 支同口径）。
+void wm_file_dialog_set_folder(int64_t id, const char *folder) {
+  @autoreleasepool {
+    NSSavePanel *p = wm_dlg_of(id);
+    if (p == nil || folder == NULL) {
+      return;
+    }
+    const char *path = folder;
+    if (strncmp(path, "file://", 7) == 0) {
+      path += 7;
+    }
+    NSString *s = wm_str(path);
+    if (s != nil) {
+      [p setDirectoryURL:[NSURL fileURLWithPath:s]];
+    }
+  }
+}
+
+void wm_file_dialog_set_filename(int64_t id, const char *filename) {
+  @autoreleasepool {
+    NSSavePanel *p = wm_dlg_of(id);
+    if (p == nil || filename == NULL) {
+      return;
+    }
+    NSString *s = wm_str(filename);
+    if (s != nil) {
+      [p setNameFieldStringValue:s];
+    }
+  }
+}
+
+// 模态运行。parent 是 win 的窗口 id——macOS 的应用级模态面板不挂父窗
+// （挂窗要走异步 beginSheet，与本栈「一次调用拿到结果」的契约不合），
+// 这里按应用级模态跑，parent 只用于把那一侧的窗先带到前台。
+int32_t wm_file_dialog_run_for_window(int64_t id, int64_t parent_id) {
+  @autoreleasepool {
+    NSSavePanel *p = wm_dlg_of(id);
+    if (p == nil) {
+      return 0;
+    }
+    WMState *par = wm_state_alive(parent_id);
+    if (par != nil && par.win != nil) {
+      [NSApp activateIgnoringOtherApps:YES];
+      [par.win makeKeyWindow];
+    }
+    NSInteger r = [p runModal];
+    if ((int64_t)(id - 1) >= 0 && id <= WM_DLG_MAX) {
+      wm_dlg_accepted[(int)id - 1] = (r == NSModalResponseOK) ? 1 : 0;
+    }
+    return r == NSModalResponseOK ? 1 : 0;
+  }
+}
+
+// 选中路径（file:// 已剥；未确认/无结果给空串；多选取首个，与 GTK 支同口径）
+void *wm_file_dialog_get_result(int64_t id) {
+  @autoreleasepool {
+    NSSavePanel *p = wm_dlg_of(id);
+    if (p == nil || id < 1 || id > WM_DLG_MAX || !wm_dlg_accepted[(int)id - 1]) {
+      return wm_bytes(NULL);
+    }
+    // URLs 只在 NSOpenPanel 上声明（多选），保存面板退回单值 URL
+    NSURL *url = nil;
+    if (wm_dlg_is_open[(int)id - 1]) {
+      url = [[(NSOpenPanel *)p URLs] firstObject];
+    }
+    if (url == nil) {
+      url = [p URL];
+    }
+    if (url == nil) {
+      return wm_bytes(NULL);
+    }
+    return wm_bytes([[url path] UTF8String]);
+  }
+}
+
+void wm_file_dialog_destroy(int64_t id) { wm_dlg_free(id); }
+
+// ---- 全局快捷键（Carbon RegisterEventHotKey）----------------------------
+//
+// macOS 没有 Win32 的 RegisterHotKey：全局热键的现役公开入口仍是 Carbon 那三个
+// 函数（libyue/Chromium 同一条路），事件经 Carbon 事件管理器进 Cocoa 的 run
+// loop，所以照旧走「注册 + 泵里抽」，不蹦床回 MoonBit。
+//
+// 一条必须写出来的平台差异：Carbon 热键认的是 **kVK_*（硬件键位）**，US 布局下
+// 与字母/数字一一对应，非 US 布局（Dvorak、法语等）同一物理键的字符不同——这是
+// Carbon 自身的语义，不做布局层换算。表外的 vk 返回 0（注册失败），由门面降级。
+#import <Carbon/Carbon.h>
+
+#define WM_HOTKEY_MAX 32
+
+typedef struct {
+  EventHotKeyRef ref;
+  int used;
+  int id;
+} WmHotkey;
+
+static WmHotkey wm_hotkeys[WM_HOTKEY_MAX];
+static int wm_hotkey_fired[WM_HOTKEY_MAX];
+static int wm_hotkey_fired_head = 0;
+static int wm_hotkey_fired_count = 0;
+static EventHandlerRef wm_hotkey_handler = NULL;
+
+// Win32 vk → kVK_*（`Events.h` 的硬件键位值，ANSI 名按 US 布局标注）。
+// 未知给 -1（0 是 kVK_ANSI_A，不能当「没查到」用）。
+static int wm_vk_to_mac_keycode(int vk) {
+  switch (vk) {
+    // 字母（kVK 的编号顺序是物理键位顺序，不是字母表顺序）
+    case 0x41: return 0x00;  // A
+    case 0x42: return 0x0B;  // B
+    case 0x43: return 0x08;  // C
+    case 0x44: return 0x02;  // D
+    case 0x45: return 0x0E;  // E
+    case 0x46: return 0x03;  // F
+    case 0x47: return 0x05;  // G
+    case 0x48: return 0x04;  // H
+    case 0x49: return 0x22;  // I
+    case 0x4A: return 0x26;  // J
+    case 0x4B: return 0x28;  // K
+    case 0x4C: return 0x25;  // L
+    case 0x4D: return 0x2E;  // M
+    case 0x4E: return 0x2D;  // N
+    case 0x4F: return 0x1F;  // O
+    case 0x50: return 0x23;  // P
+    case 0x51: return 0x0C;  // Q
+    case 0x52: return 0x0F;  // R
+    case 0x53: return 0x01;  // S
+    case 0x54: return 0x11;  // T
+    case 0x55: return 0x20;  // U
+    case 0x56: return 0x09;  // V
+    case 0x57: return 0x0D;  // W
+    case 0x58: return 0x07;  // X
+    case 0x59: return 0x10;  // Y
+    case 0x5A: return 0x06;  // Z
+    // 数字
+    case 0x30: return 0x1D; // 0
+    case 0x31: return 0x12; // 1
+    case 0x32: return 0x13;
+    case 0x33: return 0x14;
+    case 0x34: return 0x15;
+    case 0x35: return 0x17;
+    case 0x36: return 0x16;
+    case 0x37: return 0x1A;
+    case 0x38: return 0x1C;
+    case 0x39: return 0x19;
+    // 编辑与导航
+    case 0x08: return 0x33; // Backspace（kVK_Delete）
+    case 0x09: return 0x30; // Tab
+    case 0x0D: return 0x24; // Return
+    case 0x1B: return 0x35; // Escape
+    case 0x20: return 0x31; // Space
+    case 0x21: return 0x74; // PageUp
+    case 0x22: return 0x79; // PageDown
+    case 0x23: return 0x77; // End
+    case 0x24: return 0x73; // Home
+    case 0x25: return 0x7B; // Left
+    case 0x26: return 0x7E; // Up
+    case 0x27: return 0x7C; // Right
+    case 0x28: return 0x7D; // Down
+    case 0x2E: return 0x75; // Delete（前向删除）
+    // 功能键
+    case 0x70: return 0x7A; // F1
+    case 0x71: return 0x78;
+    case 0x72: return 0x63;
+    case 0x73: return 0x76;
+    case 0x74: return 0x60;
+    case 0x75: return 0x61;
+    case 0x76: return 0x62;
+    case 0x77: return 0x64;
+    case 0x78: return 0x65;
+    case 0x79: return 0x6D;
+    case 0x7A: return 0x67;
+    case 0x7B: return 0x6F; // F12
+    // US 布局标点（OEM 键）
+    case 0xBC: return 0x2B; // ,
+    case 0xBE: return 0x2F; // .
+    case 0xBF: return 0x2C; // /
+    case 0xBA: return 0x29; // ;
+    case 0xDE: return 0x27; // '
+    case 0xDB: return 0x21; // [
+    case 0xDD: return 0x1E; // ]
+    case 0xDC: return 0x2A; // \
+    case 0xBD: return 0x1B; // -
+    case 0xBB: return 0x18; // =
+    case 0xC0: return 0x32; // `
+    default: return -1;
+  }
+}
+
+static void wm_hotkey_push(int id);
+static OSStatus wm_hotkey_dispatch(EventHandlerCallRef next_handler,
+                                   EventRef event, void *user_data);
+
+static int wm_hotkey_ensure(void) {
+  if (wm_hotkey_handler != NULL) {
+    return 1;
+  }
+  EventTypeSpec spec;
+  spec.eventClass = kEventClassKeyboard;
+  spec.eventKind = kEventHotKeyPressed;
+  OSStatus st = InstallApplicationEventHandler(
+      NewEventHandlerUPP(wm_hotkey_dispatch), 1, &spec, NULL,
+      &wm_hotkey_handler);
+  return st == noErr ? 1 : 0;
+}
+
+static OSStatus wm_hotkey_dispatch(EventHandlerCallRef next_handler,
+                                   EventRef event, void *user_data) {
+  (void)next_handler;
+  (void)user_data;
+  EventHotKeyID hkid;
+  OSStatus st = GetEventParameter(event, kEventParamDirectObject,
+                                  typeEventHotKeyID, NULL, sizeof(hkid), NULL,
+                                  &hkid);
+  if (st == noErr) {
+    wm_hotkey_push((int)hkid.id);
+  }
+  return noErr;
+}
+
+static void wm_hotkey_push(int id) {
+  if (wm_hotkey_fired_count >= WM_HOTKEY_MAX) {
+    return;
+  }
+  wm_hotkey_fired[(wm_hotkey_fired_head + wm_hotkey_fired_count) %
+                  WM_HOTKEY_MAX] = id;
+  wm_hotkey_fired_count++;
+}
+
+int wm_hotkey_register(int mods, int vk) {
+  if (!wm_hotkey_ensure()) {
+    return 0;
+  }
+  int code = wm_vk_to_mac_keycode(vk);
+  if (code < 0) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_HOTKEY_MAX; i++) {
+    if (!wm_hotkeys[i].used) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  // 修饰位：1 shift / 2 ctrl / 4 alt / 8 meta（mac 的 meta 就是 Command）
+  UInt32 cm = 0;
+  if (mods & 1) {
+    cm |= shiftKey;
+  }
+  if (mods & 2) {
+    cm |= controlKey;
+  }
+  if (mods & 4) {
+    cm |= optionKey;
+  }
+  if (mods & 8) {
+    cm |= cmdKey;
+  }
+  EventHotKeyID hkid;
+  hkid.signature = FOUR_CHAR_CODE('mbtg');
+  hkid.id = (UInt32)slot;
+  EventHotKeyRef ref = NULL;
+  OSStatus st = RegisterEventHotKey((UInt32)code, cm, hkid,
+                                    GetApplicationEventTarget(), 0, &ref);
+  if (st != noErr || ref == NULL) {
+    return 0;
+  }
+  wm_hotkeys[slot].ref = ref;
+  wm_hotkeys[slot].used = 1;
+  wm_hotkeys[slot].id = slot;
+  return slot;
+}
+
+void wm_hotkey_unregister(int hk_id) {
+  if (hk_id <= 0 || hk_id >= WM_HOTKEY_MAX || !wm_hotkeys[hk_id].used) {
+    return;
+  }
+  if (wm_hotkeys[hk_id].ref != NULL) {
+    UnregisterEventHotKey(wm_hotkeys[hk_id].ref);
+  }
+  wm_hotkeys[hk_id].ref = NULL;
+  wm_hotkeys[hk_id].used = 0;
+  wm_hotkeys[hk_id].id = 0;
+}
+
+int wm_hotkey_poll(void) {
+  if (wm_hotkey_fired_count <= 0) {
+    return 0;
+  }
+  int id = wm_hotkey_fired[wm_hotkey_fired_head];
+  wm_hotkey_fired_head = (wm_hotkey_fired_head + 1) % WM_HOTKEY_MAX;
+  wm_hotkey_fired_count--;
+  return id;
+}
+
+// ---- 图标表（NSImage）----------------------------------------------------
+
+static NSImage *wm_icons[WM_MAX_ICONS];
+
+static void wm_free_buf(void *info, const void *data, size_t size) {
+  (void)info;
+  (void)size;
+  free((void *)data);
+}
+
+static int wm_icon_put(NSImage *img) {
+  if (img == nil) {
+    return 0;
+  }
+  for (int i = 1; i < WM_MAX_ICONS; i++) {
+    if (wm_icons[i] == nil) {
+      wm_icons[i] = img;
+      return i;
+    }
+  }
+  return 0;
+}
+
+static NSImage *wm_icon_of(int slot) {
+  if (slot <= 0 || slot >= WM_MAX_ICONS) {
+    return nil;
+  }
+  return wm_icons[slot];
+}
+
+// BGRA 预乘像素（本栈 Bitmap 口径）→ NSImage：与 Win32 支的
+// CreateIconIndirect 同一份像素，逐字节直拷。
+int wm_icon_from_bgra(const unsigned char *px, int w, int h) {
+  @autoreleasepool {
+    if (px == NULL || w < 1 || h < 1) {
+      return 0;
+    }
+    size_t len = (size_t)w * (size_t)h * 4u;
+    void *copy = malloc(len);
+    if (copy == NULL) {
+      return 0;
+    }
+    memcpy(copy, px, len);
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGDataProviderRef dp = CGDataProviderCreateWithData(NULL, copy, len, wm_free_buf);
+    if (dp == NULL) {
+      free(copy);
+      if (cs != NULL) {
+        CGColorSpaceRelease(cs);
+      }
+      return 0;
+    }
+    CGImageRef img = CGImageCreate(
+        w, h, 8, 32, (size_t)w * 4u, cs,
+        (CGBitmapInfo)(kCGImageAlphaPremultipliedFirst |
+                       kCGBitmapByteOrder32Little),
+        dp, NULL, kCGInterpolationNone, kCGRenderingIntentDefault);
+    NSImage *out = nil;
+    if (img != NULL) {
+      out = [[NSImage alloc] initWithCGImage:img size:NSMakeSize(w, h)];
+      CGImageRelease(img);
+    }
+    CGDataProviderRelease(dp); // 触发 wm_free_buf，copy 在这里归还
+    if (cs != NULL) {
+      CGColorSpaceRelease(cs);
+    }
+    return wm_icon_put(out);
+  }
+}
+
+int wm_icon_from_png(const unsigned char *data, int len) {
+  @autoreleasepool {
+    if (data == NULL || len < 1) {
+      return 0;
+    }
+    NSData *d = [NSData dataWithBytes:(const void *)data length:(size_t)len];
+    if (d == nil) {
+      return 0;
+    }
+    return wm_icon_put([[NSImage alloc] initWithData:d]);
+  }
+}
+
+int wm_icon_load_file(const char *path, int size) {
+  @autoreleasepool {
+    NSString *p = wm_str(path);
+    if (p == nil) {
+      return 0;
+    }
+    NSImage *img = [[NSImage alloc] initWithContentsOfFile:p];
+    if (img == nil) {
+      return 0;
+    }
+    if (size > 0) {
+      [img setSize:NSMakeSize(size, size)];
+    }
+    return wm_icon_put(img);
+  }
+}
+
+void wm_icon_free(int slot) {
+  if (slot > 0 && slot < WM_MAX_ICONS) {
+    wm_icons[slot] = nil;
+  }
+}
+
+int wm_icon_alive(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_ICONS; i++) {
+    if (wm_icons[i] != nil) {
+      n++;
+    }
+  }
+  return n;
+}
+
+void *wm_icon_handle(int slot) {
+  return (__bridge void *)wm_icon_of(slot);
+}
+
+// which：0 大图标 / 1 小图标 / 2 两者。macOS 只有应用图标一档（Dock 与
+// 窗口代理图标同源），三档都落到 applicationIconImage。
+void wm_set_icon(int64_t wid, int icon_slot, int which) {
+  @autoreleasepool {
+    (void)wid;
+    (void)which;
+    NSImage *img = wm_icon_of(icon_slot);
+    if (img == nil) {
+      return;
+    }
+    [NSApp setApplicationIconImage:img];
+  }
+}
+
+// ---- 原生菜单（NSMenu）---------------------------------------------------
+//
+// macOS 的菜单条属于 App 不属于窗口：wm_menu_apply 落到 setMainMenu:，多窗
+// 共用一份（后挂的赢）。命令一律回本层队列由 MoonBit 按 native_id 派发，
+// 不用原生 role——这样三平台的菜单行为是同一条链（与 Win32 支同口径）。
+
+static NSMenu *wm_menus[WM_MAX_MENUS];
+static int wm_menu_cmd_next = WM_MENU_CMD_BASE;
+static int wm_menu_fired[64];
+static int wm_menu_fired_head = 0;
+static int wm_menu_fired_count = 0;
+
+static void wm_menu_push(int cmd);
+
+@interface WMMenuTarget : NSObject
+- (void)wmMenuItemFired:(NSMenuItem *)sender;
+@end
+
+static WMMenuTarget *wm_menu_target = nil;
+
+@implementation WMMenuTarget
+- (void)wmMenuItemFired:(NSMenuItem *)sender {
+  // NSMenuItem 没有 tag：命令 id 放 representedObject
+  id obj = [sender representedObject];
+  if ([obj isKindOfClass:[NSNumber class]]) {
+    int cmd = (int)[(NSNumber *)obj integerValue];
+    if (cmd >= WM_MENU_CMD_BASE && cmd < WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+      wm_menu_push(cmd);
+    }
+  }
+}
+@end
+
+static void wm_menu_push(int cmd) {
+  if (wm_menu_fired_count >= 64) {
+    return;
+  }
+  wm_menu_fired[(wm_menu_fired_head + wm_menu_fired_count) % 64] = cmd;
+  wm_menu_fired_count++;
+}
+
+static int wm_menu_slot_put(NSMenu *m) {
+  if (m == nil) {
+    return 0;
+  }
+  for (int i = 1; i < WM_MAX_MENUS; i++) {
+    if (wm_menus[i] == nil) {
+      wm_menus[i] = m;
+      return i;
+    }
+  }
+  return 0;
+}
+
+// 加速键串（"CmdOrCtrl+Shift+Z" 那套语法）→ keyEquivalent + 修饰位。
+// 功能键（F1..F12）在本栈的菜单里不给原生快捷键：AppKit 的 function-key
+// 快捷键要配额外的 keyEquivalentModifierMask 语义，跨布局不可靠，交给
+// MoonBit 侧的按键派发。
+static void wm_apply_accel(NSMenuItem *item, const char *acc) {
+  if (item == nil || acc == NULL || acc[0] == '\0') {
+    return;
+  }
+  NSString *s = wm_str(acc);
+  if (s == nil) {
+    return;
+  }
+  NSUInteger mask = 0;
+  unichar key = 0;
+  for (NSString *part in [s componentsSeparatedByString:@"+"]) {
+    NSString *t = [part stringByTrimmingCharactersInSet:
+                      [NSCharacterSet whitespaceCharacterSet]];
+    NSString *low = [t lowercaseString];
+    if ([low isEqualToString:@"ctrl"] || [low isEqualToString:@"control"]) {
+      mask |= NSEventModifierFlagControl;
+    } else if ([low isEqualToString:@"shift"]) {
+      mask |= NSEventModifierFlagShift;
+    } else if ([low isEqualToString:@"alt"] || [low isEqualToString:@"option"] ||
+               [low isEqualToString:@"opt"]) {
+      mask |= NSEventModifierFlagOption;
+    } else if ([low isEqualToString:@"cmd"] || [low isEqualToString:@"command"] ||
+               [low isEqualToString:@"super"] || [low isEqualToString:@"win"] ||
+               [low isEqualToString:@"meta"] ||
+               [low isEqualToString:@"cmdorctrl"] ||
+               [low isEqualToString:@"cmdorctl"] ||
+               [low isEqualToString:@"commandorcontrol"]) {
+      // mac 的主修饰是 Command（core/win/hotkey.mbt 的 is_mac 口径）
+      mask |= NSEventModifierFlagCommand;
+    } else if ([t length] == 1u) {
+      key = [t characterAtIndex:0u];
+    }
+  }
+  if (key == 0u) {
+    return;
+  }
+  NSString *ks = [[NSString stringWithFormat:@"%C", key] lowercaseString];
+  [item setKeyEquivalent:ks];
+  [item setKeyEquivalentModifierMask:mask];
+}
+
+int wm_menu_bar_new(void) {
+  @autoreleasepool {
+    if (wm_menu_target == nil) {
+      wm_menu_target = [[WMMenuTarget alloc] init];
+    }
+    return wm_menu_slot_put([[NSMenu alloc] initWithTitle:@""]);
+  }
+}
+
+int wm_menu_popup_new(void) {
+  @autoreleasepool {
+    if (wm_menu_target == nil) {
+      wm_menu_target = [[WMMenuTarget alloc] init];
+    }
+    return wm_menu_slot_put([[NSMenu alloc] initWithTitle:@""]);
+  }
+}
+
+int wm_menu_new_sub(int parent, const char *title) {
+  @autoreleasepool {
+    if (parent <= 0 || parent >= WM_MAX_MENUS || wm_menus[parent] == nil) {
+      return 0;
+    }
+    NSString *t = wm_str(title) ?: @"";
+    NSMenu *sub = [[NSMenu alloc] initWithTitle:t];
+    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:t
+                                                 action:nil
+                                          keyEquivalent:@""];
+    [item setSubmenu:sub];
+    [wm_menus[parent] addItem:item];
+    return wm_menu_slot_put(sub);
+  }
+}
+
+// kind：0 command / 1 check / 2 radio / 3 separator。role 在 mac 侧不映射成
+// 原生动作（见本节头），只由 MoonBit 的默认标签/加速键表达。
+int wm_menu_add_item(int parent, const char *label, int kind, int role,
+                     const char *acc, int checked) {
+  @autoreleasepool {
+    (void)role;
+    if (parent <= 0 || parent >= WM_MAX_MENUS || wm_menus[parent] == nil) {
+      return 0;
+    }
+    if (kind == 3) {
+      [wm_menus[parent] addItem:[NSMenuItem separatorItem]];
+      return 0;
+    }
+    int cmd = wm_menu_cmd_next;
+    NSString *t = wm_str(label) ?: @"";
+    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:t
+                                                 action:@selector(wmMenuItemFired:)
+                                          keyEquivalent:@""];
+    [item setTarget:wm_menu_target];
+    [item setRepresentedObject:@(cmd)];
+    if (kind == 1 || kind == 2) {
+      [item setState:checked ? NSControlStateValueOn : NSControlStateValueOff];
+    }
+    [item setEnabled:YES];
+    wm_apply_accel(item, acc);
+    if ([[wm_menus[parent] itemArray] count] >= 4096) {
+      return 0; // 与 Win32 支同一条「挂载失败不吃 id」的口径
+    }
+    [wm_menus[parent] addItem:item];
+    wm_menu_cmd_next = cmd + 1;
+    if (wm_menu_cmd_next >= WM_MENU_CMD_BASE + WM_MENU_CMD_MAX) {
+      wm_menu_cmd_next = WM_MENU_CMD_BASE;
+    }
+    return cmd;
+  }
+}
+
+void wm_menu_apply(int64_t wid, int bar) {
+  @autoreleasepool {
+    (void)wid; // 菜单属于 App：窗口 id 在此不参与
+    NSMenu *m = (bar > 0 && bar < WM_MAX_MENUS) ? wm_menus[bar] : nil;
+    [NSApp setMainMenu:m];
+  }
+}
+
+int wm_menu_poll(void) {
+  if (wm_menu_fired_count <= 0) {
+    return 0;
+  }
+  int cmd = wm_menu_fired[wm_menu_fired_head];
+  wm_menu_fired_head = (wm_menu_fired_head + 1) % 64;
+  wm_menu_fired_count--;
+  return cmd;
+}
+
+// ---- 托盘（NSStatusItem）-------------------------------------------------
+//
+// Windows 的托盘是「隐藏消息窗 + Shell_NotifyIcon」，macOS 是状态栏项：
+// 点击经 NSStatusBarButton 的 action 进本层队列（0 左 / 1 右），右键菜单不在
+// 按钮上常驻——`wm_tray_set_menu` 只登记句柄，弹出由宿主调 `wm_tray_popup`
+// （与 Win32 支同一条派发链，选中项照样进菜单队列）。
+
+static NSStatusItem *wm_tray_items[WM_MAX_TRAYS];
+static NSMenu *wm_tray_menus[WM_MAX_TRAYS];
+static int wm_tray_kind[WM_MAX_TRAYS];
+static char wm_tray_tips[WM_MAX_TRAYS][128];
+static int wm_tray_events[WM_TRAY_EV_MAX];
+static int wm_tray_ev_head = 0;
+static int wm_tray_ev_count = 0;
+
+@interface WMTrayTarget : NSObject
+- (void)wmTrayClicked:(NSView *)sender;
+@end
+
+static WMTrayTarget *wm_tray_target = nil;
+
+static void wm_tray_push(int slot, int kind) {
+  if (wm_tray_ev_count >= WM_TRAY_EV_MAX) {
+    wm_tray_ev_head = (wm_tray_ev_head + 1) % WM_TRAY_EV_MAX;
+    wm_tray_ev_count--;
+  }
+  wm_tray_events[(wm_tray_ev_head + wm_tray_ev_count) % WM_TRAY_EV_MAX] =
+      slot * 4 + kind;
+  wm_tray_ev_count++;
+}
+
+@implementation WMTrayTarget
+- (void)wmTrayClicked:(NSView *)sender {
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_tray_items[i] != nil && [wm_tray_items[i] button] == sender) {
+      if (wm_tray_kind[i] != 0) {
+        return; // 通知槽不收点击（与 Win32 支同语义）
+      }
+      NSEvent *ev = [NSApp currentEvent];
+      int kind = ([ev type] == NSEventTypeRightMouseUp ||
+                  [ev type] == NSEventTypeRightMouseDown)
+                     ? 1
+                     : 0;
+      wm_tray_push(i, kind);
+      return;
+    }
+  }
+}
+@end
+
+int wm_tray_supported(void) {
+  @autoreleasepool {
+    if ([NSStatusBar systemStatusBar] == nil) {
+      return 0;
+    }
+    if (wm_tray_target == nil) {
+      wm_tray_target = [[WMTrayTarget alloc] init];
+    }
+    return wm_tray_target != nil ? 1 : 0;
+  }
+}
+
+// 内部：分配槽并落到状态栏。kind 0 托盘图标 / 1 通知槽（mac 的通知另走
+// NSUserNotification，本函数只服务 kind 0）。
+static int wm_tray_alloc(int kind, int icon_slot, const char *tip) {
+  if (!wm_tray_supported()) {
+    return 0;
+  }
+  if (kind != 0) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_tray_items[i] == nil) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  NSStatusItem *item = [[NSStatusBar systemStatusBar]
+      statusItemWithLength:NSVariableStatusItemLength];
+  if (item == nil) {
+    return 0;
+  }
+  [item setHighlightMode:YES];
+  NSStatusBarButton *btn = [item button];
+  if (btn == nil) {
+    [[NSStatusBar systemStatusBar] removeStatusItem:item];
+    return 0;
+  }
+  [btn setImage:wm_icon_of(icon_slot)];
+  [btn setImagePosition:NSImageOnly];
+  [btn setTitle:@""];
+  NSString *tipstr = wm_str(tip);
+  if (tipstr != nil) {
+    [btn setToolTip:tipstr];
+  }
+  [btn setTarget:wm_tray_target];
+  [btn setAction:@selector(wmTrayClicked:)];
+  // 触发掩码：不给就只在左键抬起时发动作，右键那条永远收不到。
+  // sendActionOn 在 macOS 26 的 SDK 上无公开声明（见文件头 informal 声明），
+  // 故按运行时能力设——设不上的话托盘只有左键可用。
+  id cell = [btn cell];
+  if ([cell respondsToSelector:@selector(setSendActionOn:)]) {
+    [cell setSendActionOn:(NSUInteger)(NSEventMaskLeftMouseUp |
+                                       NSEventMaskRightMouseUp)];
+  }
+  wm_clamp_cap(wm_tray_tips[slot], 128, tip != NULL ? tip : "");
+  wm_tray_items[slot] = item;
+  wm_tray_menus[slot] = nil;
+  wm_tray_kind[slot] = kind;
+  return slot;
+}
+
+int wm_tray_new(int icon_slot, const char *tip) {
+  @autoreleasepool {
+    return wm_tray_alloc(0, icon_slot, tip);
+  }
+}
+
+void wm_tray_set_tooltip(int slot, const char *tip) {
+  @autoreleasepool {
+    if (slot <= 0 || slot >= WM_MAX_TRAYS || wm_tray_items[slot] == nil) {
+      return;
+    }
+    NSString *s = wm_str(tip);
+    if (s == nil) {
+      return;
+    }
+    [[wm_tray_items[slot] button] setToolTip:s];
+    wm_clamp_cap(wm_tray_tips[slot], 128, tip);
+  }
+}
+
+void wm_tray_set_icon(int slot, int icon_slot) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || wm_tray_items[slot] == nil) {
+    return;
+  }
+  [[wm_tray_items[slot] button] setImage:wm_icon_of(icon_slot)];
+}
+
+void wm_tray_set_menu(int slot, int menu_handle) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || wm_tray_items[slot] == nil) {
+    return;
+  }
+  wm_tray_menus[slot] =
+      (menu_handle > 0 && menu_handle < WM_MAX_MENUS) ? wm_menus[menu_handle]
+                                                      : nil;
+}
+
+// 在状态栏项处弹出登记的菜单。AppKit 的菜单在自己的事件循环里跑完，
+// 选中项的 action 已经把命令压进菜单队列，这里只报「弹没弹起来」。
+int wm_tray_popup(int slot) {
+  @autoreleasepool {
+    if (slot <= 0 || slot >= WM_MAX_TRAYS || wm_tray_items[slot] == nil) {
+      return 0;
+    }
+    NSMenu *m = wm_tray_menus[slot];
+    if (m == nil) {
+      return 0;
+    }
+    NSStatusBarButton *btn = [wm_tray_items[slot] button];
+    if (btn == nil) {
+      return 0;
+    }
+    BOOL ok = [m popUpMenuPositioningItem:nil
+                               atLocation:NSMakePoint(0, btn.bounds.size.height)
+                                   inView:btn];
+    return ok ? 1 : 0;
+  }
+}
+
+void wm_tray_remove(int slot) {
+  @autoreleasepool {
+    if (slot <= 0 || slot >= WM_MAX_TRAYS || wm_tray_items[slot] == nil) {
+      return;
+    }
+    NSStatusItem *item = wm_tray_items[slot];
+    [[item button] setTarget:nil];
+    [[item button] setAction:nil];
+    [[NSStatusBar systemStatusBar] removeStatusItem:item];
+    wm_tray_items[slot] = nil;
+    wm_tray_menus[slot] = nil;
+    wm_tray_kind[slot] = 0;
+    wm_tray_tips[slot][0] = '\0';
+  }
+}
+
+int wm_tray_poll(int32_t *out_slot, int32_t *out_kind) {
+  if (wm_tray_ev_count <= 0) {
+    return 0;
+  }
+  int ev = wm_tray_events[wm_tray_ev_head];
+  wm_tray_ev_head = (wm_tray_ev_head + 1) % WM_TRAY_EV_MAX;
+  wm_tray_ev_count--;
+  if (out_slot != NULL) {
+    *out_slot = ev / 4;
+  }
+  if (out_kind != NULL) {
+    *out_kind = ev % 4;
+  }
+  return 1;
+}
+
+int wm_tray_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_tray_items[i] != nil && wm_tray_kind[i] == 0) {
+      n++;
+    }
+  }
+  return n;
+}
+
+int wm_tray_tooltip(int slot, char *out, int cap) {
+  if (slot <= 0 || slot >= WM_MAX_TRAYS || wm_tray_items[slot] == nil) {
+    return wm_clamp_cap(out, cap, "");
+  }
+  return wm_clamp_cap(out, cap, wm_tray_tips[slot]);
+}
+
+// ---- 桌面通知（NSUserNotification）--------------------------------------
+//
+// 与 Win32 支的托盘气泡不同，macOS 有系统级通知中心；UNUserNotificationCenter
+// 要求调用者是**已签名的 bundle**（裸二进制拿不到授权），所以这里用仍在
+// SDK 里的 NSUserNotification 一档（deprecated 但可用），`kind` 只映射到
+// 提示音：>=2 响一声，其余静默（mac 没有「进度/严重程度」的原生对位）。
+//
+// 一条待真机确认的口径：非 bundle 进程投递的通知可能被系统丢弃。这里
+// 如实返回槽号（表示「已交给系统」），是否弹出由 `docs/zh/adaptation.md`
+// 的 macOS 复验清单目视定。
+
+static NSUserNotification *wm_notifs[WM_MAX_TRAYS];
+
+int wm_notify_supported(void) {
+  @autoreleasepool {
+    return [NSUserNotificationCenter defaultUserNotificationCenter] != nil ? 1
+                                                                           : 0;
+  }
+}
+
+static int wm_notify_slot_of(int slot) {
+  return slot > 0 && slot < WM_MAX_TRAYS ? slot : 0;
+}
+
+static int wm_notify_alloc(const char *title, const char *text, int kind) {
+  NSUserNotificationCenter *nc = [NSUserNotificationCenter defaultUserNotificationCenter];
+  if (nc == nil) {
+    return 0;
+  }
+  int slot = -1;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_notifs[i] == nil) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    return 0;
+  }
+  NSUserNotification *n = [[NSUserNotification alloc] init];
+  NSString *t = wm_str(title);
+  NSString *b = wm_str(text);
+  if (t != nil) {
+    [n setTitle:t];
+  }
+  if (b != nil) {
+    [n setInformativeText:b];
+  }
+  [n setIdentifier:[NSString stringWithFormat:@"native-gui-%d", slot]];
+  [n setSoundName:kind >= 2 ? NSUserNotificationDefaultSoundName : nil];
+  [n setDeliveryDate:[NSDate distantFuture]]; // 停在通知中心直到本层收起
+  [nc deliverNotification:n];
+  wm_notifs[slot] = n;
+  return slot;
+}
+
+int wm_notify_send(int icon_slot, const char *title, const char *text,
+                   int kind) {
+  @autoreleasepool {
+    (void)icon_slot; // mac 的通知不带自定义图标（NSUserNotification 无此入口）
+    return wm_notify_alloc(title, text, kind);
+  }
+}
+
+int wm_notify_update(int slot, const char *title, const char *text, int kind) {
+  @autoreleasepool {
+    slot = wm_notify_slot_of(slot);
+    if (slot == 0) {
+      return wm_notify_alloc(title, text, kind);
+    }
+    NSUserNotification *n = wm_notifs[slot];
+    if (n == nil) {
+      return 0;
+    }
+    NSString *t = wm_str(title);
+    NSString *b = wm_str(text);
+    if (t != nil) {
+      [n setTitle:t];
+    }
+    if (b != nil) {
+      [n setInformativeText:b];
+    }
+    [n setSoundName:kind >= 2 ? NSUserNotificationDefaultSoundName : nil];
+    [[NSUserNotificationCenter defaultUserNotificationCenter]
+        deliverNotification:n]; // 同 identifier 即替换
+    return 1;
+  }
+}
+
+void wm_notify_close(int slot) {
+  @autoreleasepool {
+    slot = wm_notify_slot_of(slot);
+    if (slot == 0) {
+      return;
+    }
+    NSUserNotification *n = wm_notifs[slot];
+    if (n != nil) {
+      NSUserNotificationCenter *nc =
+          [NSUserNotificationCenter defaultUserNotificationCenter];
+      [nc removeDeliveredNotification:n];
+      [nc removeScheduledNotification:n];
+    }
+    wm_notifs[slot] = nil;
+  }
+}
+
+int wm_notify_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_TRAYS; i++) {
+    if (wm_notifs[i] != nil) {
+      n++;
+    }
+  }
+  return n;
+}
+
+int wm_notify_title(int slot, char *out, int cap) {
+  @autoreleasepool {
+    slot = wm_notify_slot_of(slot);
+    NSUserNotification *n = slot == 0 ? nil : wm_notifs[slot];
+    if (n == nil) {
+      return wm_clamp_cap(out, cap, "");
+    }
+    return wm_clamp_cap(out, cap, [[n title] UTF8String]);
+  }
+}
+
+// ---- 任务栏进度 -----------------------------------------------------------
+//
+// macOS 没有任务栏按钮：dock 徽标只有一枚文本角标，画不出「进度条 + 状态色」
+// 那一档语义。按跨平台门面口径给 supported = 0，让门面走 unsupported 降级，
+// 不拿角标冒充进度。
+int wm_taskbar_supported(void) { return 0; }
+int wm_taskbar_set_progress(int64_t wid, int64_t value, int64_t total) {
+  (void)wid;
+  (void)value;
+  (void)total;
+  return 0;
+}
+int wm_taskbar_set_state(int64_t wid, int state) {
+  (void)wid;
+  (void)state;
+  return 0;
+}
+
+// ---- 原生消息框（NSAlert）------------------------------------------------
+//
+// MoonBit 侧把「图标段 ∪ 按钮段 ∪ 默认钮段」按 Win32 的 uType 口径算好传过来
+// （core 的门面跨平台同签名），这里按段还原成 NSAlert 的按钮与图标样式，
+// 返回值给回 Win32 的 ID* 编号（1 OK / 2 Cancel / 3 Abort / 4 Retry /
+// 5 Ignore / 6 Yes / 7 No），门面按同一张表解释。
+int wm_message_box(const char *title, const char *text, int utype) {
+  @autoreleasepool {
+    NSAlert *alert = [[NSAlert alloc] init];
+    NSString *t = wm_str(title);
+    NSString *x = wm_str(text);
+    [alert setMessageText:(t != nil ? t : @"")];
+    [alert setInformativeText:(x != nil ? x : @"")];
+    // 按钮段 → 按 Win32 的按钮顺序建（NSAlert 的第 N 个钮对应第 N 个返回档）
+    int btns = utype & 0xf;
+    switch (btns) {
+      case 1: // MB_OKCANCEL
+        [alert addButtonWithTitle:@"OK"];
+        [alert addButtonWithTitle:@"Cancel"];
+        break;
+      case 2: // MB_ABORTRETRYIGNORE
+        [alert addButtonWithTitle:@"Abort"];
+        [alert addButtonWithTitle:@"Retry"];
+        [alert addButtonWithTitle:@"Ignore"];
+        break;
+      case 3: // MB_YESNOCANCEL
+        [alert addButtonWithTitle:@"Yes"];
+        [alert addButtonWithTitle:@"No"];
+        [alert addButtonWithTitle:@"Cancel"];
+        break;
+      case 4: // MB_YESNO
+        [alert addButtonWithTitle:@"Yes"];
+        [alert addButtonWithTitle:@"No"];
+        break;
+      case 5: // MB_RETRYCANCEL
+        [alert addButtonWithTitle:@"Retry"];
+        [alert addButtonWithTitle:@"Cancel"];
+        break;
+      default: // MB_OK
+        [alert addButtonWithTitle:@"OK"];
+        break;
+    }
+    switch ((utype >> 4) & 0xf) {
+      case 1: [alert setAlertStyle:NSAlertStyleCritical]; break; // MB_ICONHAND
+      case 2: [alert setAlertStyle:NSAlertStyleInformational]; break; // QUESTION
+      case 3: [alert setAlertStyle:NSAlertStyleWarning]; break;  // WARNING
+      case 4: [alert setAlertStyle:NSAlertStyleInformational]; break; // ASTERISK
+      default: break;
+    }
+    NSInteger r = [alert runModal];
+    int index = 0; // 0 第一钮 / 1 第二钮 / 2 第三钮
+    if (r == NSAlertSecondButtonReturn) {
+      index = 1;
+    } else if (r == NSAlertThirdButtonReturn) {
+      index = 2;
+    }
+    // 位置 → Win32 返回值编号（IDOK 1 / IDCANCEL 2 / IDABORT 3 / IDRETRY 4 /
+    // IDIGNORE 5 / IDYES 6 / IDNO 7）。默认钮位（MB_DEFBUTTON2/3/4）不映射：
+    // NSAlert 的首钮就是默认钮，改顺序会破坏「返回值按段序解释」这条口径，
+    // 记档在 docs/zh/adaptation.md 的 macOS 差异里。
+    static const int id_map[6][3] = {
+        {1, 1, 1}, // OK
+        {1, 2, 2}, // OKCancel
+        {3, 4, 5}, // AbortRetryIgnore
+        {6, 7, 2}, // YesNoCancel
+        {6, 7, 7}, // YesNo
+        {4, 2, 2}, // RetryCancel
+    };
+    return id_map[btns > 5 ? 0 : btns][index];
+  }
+}
+
+#elif !defined(__linux__) && !defined(__APPLE__)
 
 /* 剪贴板三符号（占位）：macOS 走 sys 自己的 pbpaste/pbcopy 命令线。 */
 int wm_clipboard_available(void) { return 0; }

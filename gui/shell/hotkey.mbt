@@ -8,9 +8,10 @@
 // 后端现状：**Windows 真实现**（`RegisterHotKey` + 线程队列，W20b 已交付并验证，
 // 纯函数与探针见 `win/hotkey.mbt` / `experiment/…`）；**Linux X11 真实现**
 // （`XGrabKey`，W22，GTK 桩的 wm_hotkey_* 三件套；Wayland 会话恒 Unsupported——
-// XWayland 的抓键拿不到真全局性）；macOS 的 Carbon/AppKit 热键**未接**，一律
-// `Err(Unsupported)`——这是「没做」而不是「失败」，与 tray 的 SNI 探测不到、
-// notify 的 watcher 不在线同口径。
+// XWayland 的抓键拿不到真全局性）；**macOS 真实现**（Carbon
+// `RegisterEventHotKey`：键码走 `kVK_*` 硬件键位表，修饰位
+// cmdKey/optionKey/shiftKey/controlKey）。三平台后端都收在 win 包的桩里，
+// 本文件只做「跨平台同构的面」。
 //
 // 与 win 包的分工：解析（加速串 → mods/vk）与注册/轮询都在 win 包（那里有
 // 平台纯函数与桩），本文件只做「跨平台同构的面」：字符串进出、错误统一、
@@ -19,7 +20,7 @@
 ///|
 /// 门面错误（与 `TrayError` / `NotifyError` 同构：不支持与失败分两档）。
 pub(all) enum HotkeyError {
-  /// 本平台没有后端（Linux Wayland 会话 / macOS 当前落点）
+  /// 本平台没有后端（Linux Wayland 会话）
   Unsupported
   /// 有后端但这次没成（加速串解析不了 / 组合被占用 / 表满）
   Failed(String)
@@ -66,9 +67,9 @@ fn hotkey_find(id : Int) -> Hotkey? {
 }
 
 ///|
-/// 后端可用性：Windows 恒真；Linux 仅 X11 会话（探测交给 win 桩）；其余
-/// 平台 false。注意与「这次注册成败」是两档——不支持时 `hotkey_register`
-/// 给 `Err(Unsupported)`，支持但组合被占用给 `Err(Failed)`。
+/// 后端可用性：Windows 恒真；Linux 仅 X11 会话（探测交给 win 桩）；macOS 看
+/// Carbon 注册器起不起得来。注意与「这次注册成败」是两档——不支持时
+/// `hotkey_register` 给 `Err(Unsupported)`，支持但组合被占用给 `Err(Failed)`。
 pub fn hotkey_supported() -> Bool {
   @win.hotkey_supported()
 }

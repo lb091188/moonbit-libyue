@@ -4,7 +4,7 @@
 
 > **On origins**: this library began as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. Neither is a runtime dependency now — both stay as references for behavior and sources of material. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A cross-platform desktop GUI framework for [MoonBit](https://github.com/moonbitlang) — one MoonBit codebase produces native windows on Windows ✅ / Linux ✅, with tray, notifications, global shortcuts, file dialogs and more ready to use. Zero config after `moon add`. The macOS backend is landing on the `mac` branch.
+A cross-platform desktop GUI framework for [MoonBit](https://github.com/moonbitlang) — one MoonBit codebase produces native windows on Windows ✅ / Linux ✅, with tray, notifications, global shortcuts, file dialogs and more ready to use. Zero config after `moon add`. The macOS backend has been merged into master.
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
@@ -104,7 +104,7 @@ moon run examples/browser        # embedded WebView browser
 | Ubuntu 24.04 (XFCE / GNOME / KDE) | ✅ | X11 is the primary path |
 | Deepin 23 / 25 | ✅ | |
 | Windows 10 / 11 | ✅ | Built as a GUI-subsystem exe — double-clicking opens no console |
-| macOS | 🚧 | Landing on the `mac` branch: Cocoa / CoreText / ImageIO / WKWebView; CI green, on-device re-verification pending |
+| macOS | 🚧 | Backend merged into master (Cocoa / CoreText / ImageIO / WKWebView); CI green, on-device re-verification pending |
 
 ## Documentation
 

@@ -127,11 +127,18 @@ pub fn gif(
         @base.sub_bag_register(fn() { a.close() })
       }
       None => {
+        // 解不出动图的平台（macOS 首批口径：动图族探测即不可用）手里仍有
+        // 首帧静图：尺寸跟着那张图走，否则占位是 0x0，画得出也摆不下。
+        let base = keep.val
         if width > 0.0 {
           w.node.set_width(@yoga.fixed(width))
+        } else if !base.is_empty() {
+          w.node.set_width(@yoga.fixed(base.get_width()))
         }
         if height > 0.0 {
           w.node.set_height(@yoga.fixed(height))
+        } else if !base.is_empty() {
+          w.node.set_height(@yoga.fixed(base.get_height()))
         }
       }
     }

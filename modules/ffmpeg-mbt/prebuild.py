@@ -11,8 +11,12 @@
   输出 `vars.FFMPEG_INC`（供 moon.pkg 的 stub-cc-flags 引用 `-I${build.FFMPEG_INC}`）
   和 link_flags（导入库绝对路径）。运行期 dll 不进仓库：本地把
   avcodec-63.dll 等与 exe 同目录或放 PATH（口径见 README）。
-- macOS：ffmpeg 后端随 macOS 线落地时再接，优雅降级为空 link_configs
-  保可构建（vars 仍给占位值，避免 moon.pkg 的 ${build.FFMPEG_INC} 落空）。
+- macOS：与 Linux 同一路——pkg-config 探测系统 ffmpeg（`brew install ffmpeg`），
+  头与链接参数随构建注入；探不到给出行级 brew 提示并以非零退出（与 Linux 缺
+  dev 包同口径：媒体线要求系统给得出 ffmpeg，不静默造一份假可用）。区别只在
+  brew 的 `.pc` 与头不在默认搜索路径上（Apple Silicon 是 /opt/homebrew，Intel
+  是 /usr/local），所以要显式拼 PKG_CONFIG_PATH，并把 includedir 喂给
+  `vars.FFMPEG_INC`（桩里的 `#include <libavformat/avformat.h>` 靠它）。
 
 约束：stdout 只能是 JSON；进度信息走 stderr。
 """
@@ -35,6 +39,43 @@ WIN_LIBS = ["avformat.lib", "avcodec.lib", "swscale.lib", "swresample.lib", "avu
 
 def win_vendor_dir() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
+
+
+# brew 的两个前缀（Apple Silicon / Intel）。GUI 环境里 PKG_CONFIG_PATH 与
+# /usr/local、/opt/homebrew 都不在默认搜索路径上，探测前显式拼进去。
+BREW_PREFIXES = ["/opt/homebrew", "/usr/local"]
+
+
+def mac_env() -> dict:
+    parts = [os.path.join(p, "lib", "pkgconfig") for p in BREW_PREFIXES]
+    cur = os.environ.get("PKG_CONFIG_PATH", "")
+    if cur:
+        parts.insert(0, cur)
+    return dict(os.environ, PKG_CONFIG_PATH=":".join(parts))
+
+
+def pkg_config(args: list[str], env: dict | None = None) -> str:
+    """跑一次 pkg-config，成功给 stdout（按空白切分），失败给空串。"""
+    run = subprocess.run(
+        ["pkg-config", *args], capture_output=True, text=True, env=env
+    )
+    return " ".join(run.stdout.split()) if run.returncode == 0 else ""
+
+
+def mac_includedir(fallback: str) -> str:
+    """ffmpeg 头所在目录：先问 pkg-config 的 includedir，问不到就扫 brew 前缀
+    （存在 libavformat/avformat.h 的那一个），再不行给占位值让后面报同一个错。"""
+    got = pkg_config(["--cflags-only-I", "libavformat"])
+    for tok in got.split():
+        if tok.startswith("-I"):
+            cand = tok[2:]
+            if os.path.isfile(os.path.join(cand, "libavformat", "avformat.h")):
+                return cand
+    for p in BREW_PREFIXES:
+        cand = os.path.join(p, "include")
+        if os.path.isfile(os.path.join(cand, "libavformat", "avformat.h")):
+            return cand
+    return fallback
 
 
 def emit(payload: dict) -> None:
@@ -82,9 +123,59 @@ def main() -> int:
         )
         return 0
 
+    if system == "Darwin":
+        # 与 Linux 同一路：探测系统 ffmpeg（brew 的 lgpl-shared 构建给得出 .pc）。
+        # 探不到就非零退出并给 brew 提示——媒体线要求系统给得出 ffmpeg，
+        # 静默编一支「看着能链、跑起来没解码器」的桩更坏。
+        env = mac_env()
+        if shutil.which("pkg-config") is None:
+            print(
+                "ffmpeg(prebuild): macOS 需要 pkg-config 定位 ffmpeg"
+                "（brew install pkg-config ffmpeg）",
+                file=sys.stderr,
+            )
+            return 1
+        flags: list[str] = []
+        for lib in LIBS:
+            out = pkg_config(["--libs", lib], env)
+            if not out:
+                print(
+                    f"ffmpeg(prebuild): 缺少 {lib}（macOS: brew install ffmpeg），"
+                    "ffmpeg 后端不可用",
+                    file=sys.stderr,
+                )
+                return 1
+            flags.extend(out.split())
+        inc = mac_includedir(BREW_PREFIXES[0] + "/include")
+        # brew 的 .pc 一般已在 Libs 里展开过 -L，这里再问一次 libdir 兜底
+        # （Apple Silicon 是 /opt/homebrew/lib、Intel 是 /usr/local/lib，写死任
+        # 一个都会在另一类机器上链不到）。
+        libdir = pkg_config(["--variable=libdir", "libavformat"], env) or os.path.join(
+            os.path.dirname(inc), "lib"
+        )
+        print(
+            f"ffmpeg(prebuild): macOS 走 brew 的 ffmpeg（include={inc} lib={libdir}）",
+            file=sys.stderr,
+        )
+        emit(
+            {
+                "vars": {
+                    "FFMPEG_INC": inc,
+                    "FFMPEG_STUB_CC": "-finput-charset=UTF-8",
+                },
+                "link_configs": [
+                    {
+                        "package": PKG,
+                        "link_flags": f"-L{libdir} " + " ".join(flags),
+                    }
+                ],
+            }
+        )
+        return 0
+
     if system != "Linux":
         print(
-            "ffmpeg(prebuild): 非 Linux/Windows 平台降级为空 link_configs（媒体线随平台落地再接）",
+            "ffmpeg(prebuild): 其余平台降级为空 link_configs（Linux/Windows/macOS 之外的目标）",
             file=sys.stderr,
         )
         emit({"vars": {"FFMPEG_INC": ".", "FFMPEG_STUB_CC": "-finput-charset=UTF-8"}, "link_configs": []})

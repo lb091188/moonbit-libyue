@@ -102,9 +102,94 @@ def compile_stub(
     return lib.as_posix()
 
 
+# ---------------------------------------------------------------------------
+# macOS（Darwin）。Cocoa/CoreText/ImageIO/WebKit 那几族 API 是 Objective-C，
+# 桩文件本身仍是 .c（与 libyue 的 .mm 同语言的子集，靠 clang 的 -x objective-c
+# 按 ObjC 编），但 moon 的 native-stub 只会按 C 编一遍、且不带平台宏——于是与
+# Linux 的 GTK 同一套路：本脚本带 -DWM_STUB_MAC 专编成静态库经 link_flags 传入，
+# native-stub 那趟编译落不进任何分支、编出空翻译单元（防双定义）。
+#
+# ARC（-fobjc-arc）开着的理由：这一层的对象生命周期跟着 NSWindow/NSView 走，
+# 手写 retain/release 在这种「C 侧持有一堆 ObjC 对象」的形态里几乎必错。
+# ---------------------------------------------------------------------------
+MAC_OBJC_CFLAGS = ["-x", "objective-c", "-fobjc-arc"]
+
+
+def compile_mac_stub(src: Path, lib_name: str, extra_cflags: list[str]) -> str:
+    """把 macOS 的 Objective-C 桩编成静态库，返回库路径；源文件缺失或编译失败
+    返回空串（该包的链接条目随之不下发，错误在 stderr 出声）。
+
+    目标文件名带包名：win/render/text 三个包各有一份同名 stub.c，撞在同一个 .o
+    上会互相覆盖（ar 归档里就只剩最后编的那份）。"""
+    if not src.exists():
+        print(f"stub: 源文件不存在，跳过该库：{src}", file=sys.stderr)
+        return ""
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    lib = BUILD_DIR / lib_name
+    if lib.exists() and lib.stat().st_mtime >= src.stat().st_mtime:
+        return lib.as_posix()
+    cc = shutil.which("cc") or shutil.which("clang") or "cc"
+    obj = BUILD_DIR / f"{src.parent.name}_{src.stem}_mac.o"
+    cmd = [
+        cc,
+        "-c",
+        "-O2",
+        *MAC_OBJC_CFLAGS,
+        *extra_cflags,
+        "-o",
+        obj.as_posix(),
+        src.as_posix(),
+    ]
+    run = subprocess.run(cmd, capture_output=True, text=True)
+    if run.returncode != 0:
+        print(f"stub: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
+        return ""
+    lib.unlink(missing_ok=True)
+    run = subprocess.run(
+        ["ar", "rcs", lib.as_posix(), obj.as_posix()], capture_output=True, text=True
+    )
+    if run.returncode != 0:
+        print(f"stub: ar 打包 {lib_name} 失败\n{run.stderr}", file=sys.stderr)
+        return ""
+    return lib.as_posix()
+
+
+# macOS 各包要的框架清单（Xcode Command Line Tools 自带，无需安装任何东西）。
+# 逐条按「哪一个能力要它」写清楚，加框架前先想这条是否真的需要——链进来的
+# 每个框架都会出现在最终用户的 dyld 依赖表里。
+MAC_WIN_FRAMEWORKS = [
+    "-framework", "Cocoa",           # NSApplication/NSWindow/NSMenu/NSAlert/NSPasteboard
+    "-framework", "CoreGraphics",    # CGContext 贴像素、CGImage 造图标
+    "-framework", "Carbon",          # RegisterEventHotKey 一族（全局快捷键）
+    "-framework", "IOKit",           # 电源/显示器相关的读数
+]
+MAC_SYS_FRAMEWORKS = [
+    "-framework", "Cocoa",           # NSWorkspace（打开/揭示、壁纸）、NSFileManager
+    "-framework", "CoreGraphics",    # CGEventSourceSecondsSinceLastEventType（空闲读数）
+    "-framework", "CoreServices",    # LSSharedFileList（自启动）、UTType
+    "-framework", "IOKit",           # IOHIDSystem 空闲时间
+    "-framework", "ApplicationServices",  # 打印机（CorePrint）
+    "-framework", "CoreAudio",       # 音量（AudioObject*）
+]
+MAC_RENDER_FRAMEWORKS = [
+    "-framework", "ImageIO",         # CGImageSource：PNG/JPEG/GIF 解码
+    "-framework", "CoreGraphics",
+    "-framework", "CoreFoundation",
+]
+MAC_TEXT_FRAMEWORKS = [
+    "-framework", "CoreText",        # CTLine/CTFont：测量与绘制
+    "-framework", "CoreGraphics",
+    "-framework", "CoreFoundation",
+    "-framework", "AppKit",          # NSFontManager 字体族枚举
+]
+
+
 def link_configs() -> dict:
     entries: list[dict] = []
     system = platform.system()
+    if system == "Windows":
+        # WebView2 的头与静态 Loader 只有 Windows 分支用得到，别的环境不必下载
+        ensure_release_files()
     if system == "Linux":
         libs = []
         for name in LINUX_PKG_CONFIG_LIBS:
@@ -213,6 +298,54 @@ def link_configs() -> dict:
             "package": TEXT_PACKAGE,
             "link_flags": "dwrite.lib d2d1.lib windowscodecs.lib ole32.lib uuid.lib gdi32.lib",
         })
+    elif system == "Darwin":
+        # 窗口后端：win/stub.c 的 WM_STUB_MAC 分支（Objective-C/Cocoa）。同一份归档
+        # 还要给两个包——sys 的文件对话框 extern 直链 win 桩的 wm_file_*（MoonBit 层
+        # 不引 win，parent 是纯句柄 id）：与 Linux 分支完全同一口径。（webview 已出
+        # 独立模块 NoahLiu/gui-webview，其 mac 链接参数由该模块自己的 prebuild 下发。）
+        win_lib = compile_mac_stub(
+            MODULE_ROOT / "win" / "stub.c",
+            "libyue_win_stub_mac.a",
+            ["-DWM_STUB_MAC"],
+        )
+        if win_lib:
+            win_flags = (
+                f"-L{BUILD_DIR.as_posix()} -lyue_win_stub_mac "
+                + " ".join(MAC_WIN_FRAMEWORKS)
+            )
+            entries.append({"package": WIN_PACKAGE, "link_flags": win_flags})
+            entries.append({
+                "package": SYS_PACKAGE,
+                "link_flags": win_flags + " " + " ".join(MAC_SYS_FRAMEWORKS),
+            })
+        # render：图片解码走 ImageIO（CGImageSource）+ 落盘。光栅部分仍是纯
+        # MoonBit 光栅器，cr_* 一族在 mac 分支是「探测即不可用」的桩，与 Windows
+        # 同口径。
+        render_lib = compile_mac_stub(
+            MODULE_ROOT / "render" / "stub.c",
+            "librender_mac_stub.a",
+            ["-DWM_STUB_MAC"],
+        )
+        if render_lib:
+            entries.append({
+                "package": RENDER_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lrender_mac_stub "
+                + " ".join(MAC_RENDER_FRAMEWORKS),
+            })
+        # text：CoreText。与 Linux 不同，这里不必再链 render 的归档——
+        # pt_draw_box_cr / rt_draw_cr 只在 Cairo 会话存在时才会被调用，macOS 走
+        # 纯光栅路径（cr_begin 探针返回 0），两支都是空桩返 0。
+        text_lib = compile_mac_stub(
+            MODULE_ROOT / "text" / "stub.c",
+            "libyue_text_mac.a",
+            ["-DWM_STUB_MAC"],
+        )
+        if text_lib:
+            entries.append({
+                "package": TEXT_PACKAGE,
+                "link_flags": f"-L{BUILD_DIR.as_posix()} -lyue_text_mac "
+                + " ".join(MAC_TEXT_FRAMEWORKS),
+            })
     return {"link_configs": entries}
 
 

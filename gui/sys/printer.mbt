@@ -5,7 +5,9 @@
 // 环境由 procrun 固定 C locale，lpstat 输出语言恒定可解析。lpstat 缺失
 // （系统未装 CUPS，shell 以退出码 127 呈现）→ PrtUnsupported，属合法
 // 降级；lp 有副作用（真实提交打印任务），仅实现不执行，wbtest 只断言其
-// 参数表。lpstat 输出解析与 lp 参数构造为纯函数（prt_ 前缀）。
+// 参数表。**macOS 明写走同一条 CUPS 线**：系统自带 `/usr/bin/lpstat` 与
+// `/usr/bin/lp`（macOS 的打印栈就是 CUPS），语义与 Linux 侧同源，所以这不是
+// 「意外跑到 Linux 分支」，是本平台的后端选择（真机复验清单里有一条对账）。lpstat 输出解析与 lp 参数构造为纯函数（prt_ 前缀）。
 //
 // 典型用法：
 //   match prt_default() {

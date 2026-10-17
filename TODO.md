@@ -111,7 +111,7 @@
 
 - **M1** 新栈跑通一个完整 `showcase`（组件 + 图表 + 系统集成页），与旧链路逐页视觉对照 → 同时恢复全仓门禁
 - **M2** Windows 地基与输入通道（W1–W16 已落）＋ Win 基础能力（W20 批，§6）
-- **M3** macOS 地基（取得设备后）
+- **M3** macOS 地基：mac 平台批①-⑤ 已落（窗口/渲染/文本/webview/sys 各族），进度与缺口见 §7；真机目视复验待做
 - **M4** 发布新版本并冻结旧 `shim + libyue` 链路
 
 ## 6. 跨平台能力面（Win 基础能力 + MBT 通用能力）
@@ -181,3 +181,24 @@
 - **跨平台能力批次表（Win 基础能力 + MBT 通用门面）：本文件 §6**（2026-10-12 定；只跟踪跨平台能力，Linux-only 细节不再入表）
 - 旧栈 API 参照面（可平移资产）：`experiment/async_coexist/lab/.mooncakes/NoahLiu/native-gui/yue/`（`tray.mbt`/`menu.mbt`/`misc.mbt`/`widgets.mbt`，本机离线可用）
 - 人工复验清单：`_人工测试清单.md`（跑 `moon run examples/native-app`）
+
+## 7. mac 平台批（macOS 后端落地进度）
+
+> 口径同 §6：**门面定形态 + 各平台后端**。形态与坑记在 [docs/zh/adaptation.md](docs/zh/adaptation.md) 的「macOS 后端首批」节；真机复验清单在 `_人工测试清单.md` 的 T 节；编译/链接门禁是 `ci.yml` 的 macOS job（push 到 `mac` 分支即跑）。
+
+- [x] **批① 窗口后端**（`gui/win/stub.c` 的 `WM_STUB_MAC`，Cocoa）——NSApplication 自建循环（pump/wait/wakeup + `postEvent:` 唤醒位）、CGContext 贴像素、`NSTextInputClient` 输入法通道、原生子件与弹层、NSOpenPanel/NSSavePanel 文件对话框、NSPasteboard、NSMenu/NSStatusItem/NSUserNotification/NSAlert/Carbon 热键/NSImage 图标各自成段；占位分支加 `__APPLE__` 闸防双定义；prebuild 加 Darwin 分支（`-x objective-c -fobjc-arc` 专编归档 + 按包下发 `-framework`）
+- [x] **批② render**（ImageIO 静态图解码，PNG/JPEG/GIF 首帧）+ CI：macOS job 起手补 `moon update`/依赖清单迁移（工具链 2026-10-12 起只认 `moon.mod`/`moon.pkg`，注册表已发布包还带旧清单，三平台 CI 因此从那天起就红——迁移只动 `.mooncakes/` 缓存）
+- [x] **批③ text**（CoreText，纯 C）——自带段落排版器（UTF-8 解码 → 样式段 → 按词/CJK 按字/超长按字符断行 → 每行 CTLine），`pt_measure*`/`pt_font_line_height` 给行盒累加含 leading + 首行基线，`pt_draw*`/`rt_*` 按 `wrapped_axis` 同式对齐、区间色/区间字体「后设覆盖先设」按 UTF-8 字节下标落码点，字族表按字节序升序去重 `\n` 连接；`*_cr` 与批三件按 Windows 档做空桩；顺带把 `pt_render_stats` 纠正成 `.mbt` 声明的四出参形态
+- [x] **批④ web**（WKWebView）——导航/标题/地址经 delegate + KVO 进 per-view 队列、`evaluateJavaScript` 按序号回 kind=7、`WKScriptMessageHandler` + 同形 shim 做页面→原生、公开 `WKURLSchemeHandler` 做自定义协议、`WKHTTPCookieStore` 回 kind=13；三条差异如实出声（不发 kind=9/10、运行期整串 UA 不接私有口、kind=4 由 decidePolicy 给）
+- [x] **批⑤ sys 与 core 分派**——揭示/系统信息/音量/壁纸/自启动走公开 CLI，空闲/内存/开机走桩的 `__APPLE__` 分支，打印族声明为「与 Linux 同走 CUPS」，windowctl/nightlight/powerprofile/media 加 mac 平台门（不再白发进程）；`core/hotkey.mbt` 开 mac 档（Carbon 已落）
+- [x] **批⑮-⑯ CI 三平台全绿（run 38616056855）**——macOS job 十一步全过：五支桩编译门禁、`moon check` 零警告、12 包 `moon test`（含只在真实 macOS 上才跑的读数环：`appfind` 扫 `/Applications`、`appfind_executable("sh")`、`sys` 的 `host_statistics64`/`kern.boottime`/空闲、`render` 的 ImageIO 解码、`text` 的 CoreText 测量）、逐包点名的库构建 + `examples/hello` 链接、`moon run examples/hello` 在 runner 的登录会话里建窗并转循环活到 20 秒超时。构建步改为按 13 个库包点名（裸 `moon build` 在 workspace 下等于构建整个 workspace，会连带编 `modules/ffmpeg-mbt` 的 native-stub，而 mac runner 没有 libavformat 头——媒体线的 mac 落地另批做，届时候与链接参数由该模块自己的 prebuild 探测）
+- [x] **批⑰ 媒体线的 macOS 落地**（`modules/ffmpeg-mbt/prebuild.py` + `modules/gui-media/prebuild.py`）——两支桩都不用改（`ffmpeg_stub.c` 素来无平台分支，`audio_stub.c` 内嵌的 miniaudio 自己按 `__APPLE__` 选 CoreAudio），只补两处 prebuild 的 Darwin 分支：ffmpeg 走 pkg-config 探测（探不到非零退出并给 `brew install ffmpeg` 提示，与 Linux 缺 dev 包同口径——不静默造「看着能链、跑起来没解码器」的桩），差别只在 brew 的 `.pc`/头不在默认路径，要显式拼 `PKG_CONFIG_PATH`，includedir 与 libdir 都按 pkg-config 问出来（不写死 `/opt/homebrew`，Intel 一台也通）；miniaudio 下发 CoreAudio/AudioToolbox/Foundation 三框架，且 **不能照抄 Linux 的库串**（mac 的 dlopen 在 libSystem 里、没有 libatomic 这个库，照抄直接 library not found）。CI 的 macOS job 自此 `brew install ffmpeg` 并把依赖媒体两包的 main 示例（systemprobe / native-web）加回构建点名。**待真机**：音频是否真出声、设备插拔后的降级行为（见清单 T8）
+- [ ] **macOS GIF 动图分帧合成**：要逐帧读「帧矩形 + disposal」，disposal 不在 Apple 的 GIF 公开属性清单里——先真机用 experiment 探针把可得性回证，再补（当前 `img_anim_decode_file` 给 0，组件退回首帧静图，尺寸已按首帧给对）
+- [x] **macOS 多显示器枚举**（批⑧，`sys/monitor.mbt` + `sys_stub.c` 的 `__APPLE__` 分支）——CoreGraphics 一家打齐：`CGGetOnlineDisplayList`（只列在线屏，mac 侧不产 `connected=false`）、`CGDisplayBounds` + 「当前模式像素宽÷逻辑宽」导出倍率换物理像素、`CGDisplayCopyAllDisplayModes` 给模式表（按像素尺寸×刷新率去重，表给不出退当前档一条）、`CGDisplayScreenSize` 给毫米；名字与内建面板刷新率是公开 CG 口给不到的，按 `Built-in`/`Display-<id>` 与 0=未知如实给；`MonitorInfo` 不加缩放比字段（清单里已是物理像素）。解析纯函数 + 样例断言在 `monitor_wbtest.mbt`，真机读数待 T 节复验
+- [ ] **macOS 显示器「首选档」标记**：`CGDisplayModeIsPreferred` 在当前 SDK 已不声明（同族的 `CGDisplayCopyAllDisplayModes`/`GetPixelWidth`/`GetRefreshRate` 都还在），`preferred` 一律给 false。要做要先找到公开信号（ScreenCaptureKit 那侧的模式清单能否对上 `CGDirectDisplayID`），不拿私有形态或「当前档」冒充
+- [x] **批⑬ appfind 的 macOS 臂**（`sys/appfind.mbt`）——`.app` 包扫 `/System/Applications`、`/Applications`（各带 `Utilities` 一层）与 `~/Applications`，读 `Contents/Info.plist` 的公开键（DisplayName→Name→包名、Identifier、`Contents/MacOS/<CFBundleExecutable>`、`Contents/Resources/<CFBundleIconFile>` 无扩展名补 `.icns`），二进制 plist / 读不到按包名回退、应用不从清单消失；两格如实给空：`categories`（没有 desktop Categories 的对等物）、本地化名（在 `.lproj`，公开键给不到，`locale_name=name`）；`appfind_executable` 先走 PATH 各段再补固定清单（含 `/opt/homebrew/{bin,sbin}`——从 Dock/Finder 起来的进程没有 shell 的 PATH）；plist 键抽取 + 实体回解 + 包名推导 + 目录拼装都是纯函数，由 `appfind_wbtest` 钉住，真机读数在 macos-only 那条环里
+- [x] **批⑨-⑫ CI 可绿化**——桩编译门禁抓到 `CGDisplayModeIsCurrentMode`/`IsPreferred` 不再声明、`httpCookieStore` 的真名、`setSendActionOn:` 等三个「新 SDK 不再公开声明」的 setter；Windows 的清单迁移循环用错 PowerShell 参数名（`-QuietPattern` 不存在）；`/tmp` 在 Windows 不是可写目录；五条按本机字体度量写死的判据改成与字体无关；动图族在 mac 退回首帧静图时组件没给尺寸（0×0）。过程与判据逐条写进 `docs/zh/adaptation.md` 的「CI runner 环境与开发机的差别」与「macOS 后端首批」两节
+- [ ] **macOS 通知的后端名仍叫 WinBalloon**：mac 的通知实现在 win 桩的 `wm_notify_*`（NSUserNotification），而 `core/notify.mbt` 的 `NotifyBackend` 只有 `Dbus`/`WinBalloon` 两档，于是 mac 上 `notify_backend_name()` 报 "win-balloon"。能力本身（标题+正文，无动作/持久化）与气泡同档，先不改门面；真机确认通知能用后再决定是否加第三档 `Cocoa`
+- [ ] **macOS 已明确不做的四族**：窗口管理（Accessibility 授权门槛）、夜间模式（CoreBrightness 私有）、电源方案（`pmset` 语义对不上三值方案）、媒体播放器枚举（无 MPRIS 对等物）——若将来要做，得先解决「授权弹窗由谁负责」的产品问题
+- [ ] **macOS 安装自启动的生效回证**：plist 写落点已通（纯函数有测试钉住），`launchctl load` 在新写入文件上的实际生效待真机确认（不通就换 `bootstrap gui/<uid>`，那要先给 sys 补一个取 uid 的口子）
+- [ ] **真机复验 T1-T6 全部目视项**（`_人工测试清单.md`）：CI 只证明「编得过、链得上」；Retina 观感、输入法内联、拖窗期间的循环、通知在非 bundle 进程下是否弹出，都要人看

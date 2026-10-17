@@ -140,6 +140,14 @@ pub extend MonitorError with Show::{to_string, output}
 // ---------------------------------------------------------------------------
 
 ///|
+/// macOS 直调：CoreGraphics 的显示器清单（行式文本，'\n' 分行、'\t' 分列，
+/// 格式见 gui/sys/sys_stub.c 的 monitor 段）。非 macOS 平台这个符号恒给
+/// ok=0（桩体在那边是哑的），于是 mon_list 退 Unsupported——运行时探测，
+/// 不用编译指令，与另两平台同口径。
+#borrow(ok)
+extern "c" fn ffi_mon_mac(ok : Ref[Int]) -> Bytes = "yue_sys_mon_mac"
+
+///|
 /// 字符是否空白（空格 / 制表）。
 fn mon_is_ws(ch : Char) -> Bool {
   ch == ' ' || ch == '\t'
@@ -617,7 +625,85 @@ fn mon_is_indented(line : String) -> Bool {
 }
 
 ///|
-/// 从完整快照中提取当前输出（已连接且有当前模式者），保持 xrandr 顺序。
+/// 按制表符切分一行（保留空字段：记录里的空字段是「没有这个读数」，不能像
+/// mon_split_ws 那样把连续分隔符并成一个）。
+fn mon_split_tab(s : String) -> Array[String] {
+  let out : Array[String] = []
+  let mut cur = StringBuilder()
+  for ch in s {
+    if ch == '\t' {
+      out.push(cur.to_string())
+      cur = StringBuilder()
+    } else {
+      cur.write_char(ch)
+    }
+  }
+  out.push(cur.to_string())
+  out
+}
+
+///|
+/// 取记录字段的整数（非法或越界按 0）。
+fn mon_tab_int(toks : Array[String], i : Int) -> Int {
+  if i < 0 || i >= toks.length() {
+    return 0
+  }
+  match win_parse_int(toks[i]) {
+    Some(v) => v
+    None => 0
+  }
+}
+
+///|
+/// 取记录字段的 0/1 标志（1 为真，其余为假）。
+fn mon_tab_flag(toks : Array[String], i : Int) -> Bool {
+  mon_tab_int(toks, i) == 1
+}
+
+///|
+/// 解析 yue_sys_mon_mac 的行式清单：`MON` 行开一个显示器，随后的 `MODE` 行
+/// 归它。字段数不合的记录整条跳过（上层按「少一台/少一档」降级，不整体失败）。
+/// connected 恒真：CG 的在线清单里没有「接了但关掉」那一档。
+fn mon_parse_mac(text : String) -> Array[MonitorInfo] {
+  let drafts : Array[MonDraft] = []
+  let mut idx = -1 // 当前草稿下标，-1 = 未开始
+  for line in mon_split_lines(text) {
+    if line == "" {
+      continue
+    }
+    let toks = mon_split_tab(line)
+    if toks[0] == "MON" && toks.length() == 7 {
+      drafts.push({
+        name: toks[1],
+        connected: true,
+        primary: mon_tab_flag(toks, 2),
+        pos_x: mon_tab_int(toks, 3),
+        pos_y: mon_tab_int(toks, 4),
+        mm_width: mon_tab_int(toks, 5),
+        mm_height: mon_tab_int(toks, 6),
+        modes: [],
+      })
+      idx = drafts.length() - 1
+    } else if toks[0] == "MODE" && toks.length() == 6 && idx >= 0 {
+      // 模式行必须在某个 MON 之后；孤儿行丢弃
+      drafts[idx].modes.push({
+        width: mon_tab_int(toks, 1),
+        height: mon_tab_int(toks, 2),
+        refresh_centi: mon_tab_int(toks, 3),
+        current: mon_tab_flag(toks, 4),
+        preferred: mon_tab_flag(toks, 5),
+      })
+    }
+  }
+  let out : Array[MonitorInfo] = []
+  for d in drafts {
+    out.push(mon_finish(d))
+  }
+  out
+}
+
+///|
+/// 从完整快照中提取当前输出（已连接且有当前模式者），保持清单顺序。
 fn mon_current_from(infos : Array[MonitorInfo]) -> Array[CurrentOutput] {
   let out : Array[CurrentOutput] = []
   for info in infos {
@@ -640,11 +726,12 @@ fn mon_current_from(infos : Array[MonitorInfo]) -> Array[CurrentOutput] {
 // ---------------------------------------------------------------------------
 
 ///|
-/// 枚举全部输出（含未连接）：名称 / 连接状态 / 当前分辨率×刷新率 /
-/// 位置 / 物理尺寸 / 支持的模式列表。
+/// 枚举显示器：Linux 走 xrandr（含未连接的输出），macOS 走 CoreGraphics
+/// （只列在线的输出，名字是 Built-in / Display-<id>）。Windows 未接 →
+/// Unsupported。
 pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
   if sys_platform() != "linux" {
-    return Err(Unsupported)
+    return mon_list_mac()
   }
   match pr_run("xrandr", ["--query"], timeout_ms=5000) {
     Err(Timeout(m)) => Err(CommandFailed(m))
@@ -665,8 +752,25 @@ pub fn mon_list() -> Result[Array[MonitorInfo], MonitorError] {
 }
 
 ///|
-/// 当前输出简化快照（已连接且有当前模式的输出；不含模式列表），保持
-/// xrandr 顺序。
+/// macOS 臂：探测不到（非 mac 平台，或取不到在线显示器）退 Unsupported，
+/// 取到清单却解析不出条目按 ParseFailed 给原文首行。
+fn mon_list_mac() -> Result[Array[MonitorInfo], MonitorError] {
+  let ok = Ref(0)
+  let blob = ffi_mon_mac(ok)
+  if ok.val != 1 {
+    return Err(Unsupported)
+  }
+  let text = @utf8.decode_lossy(blob)
+  let infos = mon_parse_mac(text)
+  if infos.length() == 0 {
+    Err(ParseFailed(mon_first_line(text)))
+  } else {
+    Ok(infos)
+  }
+}
+
+///|
+/// 当前输出简化快照（已连接且有当前模式的输出；不含模式列表），保持清单顺序。
 pub fn mon_current() -> Result[Array[CurrentOutput], MonitorError] {
   match mon_list() {
     Err(e) => Err(e)

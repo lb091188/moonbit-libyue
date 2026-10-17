@@ -66,6 +66,11 @@ jobs:
           iwr https://cli.moonbitlang.com/install/powershell.ps1 -useb | iex
           echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
 
+      # 新装 runner 的注册表索引里没有 prowk/moonsqlitefile 与 mizchi/markdown
+      # (报错 module was not found in the registry),解析依赖图前先刷索引。
+      - name: 刷新注册表索引
+        run: moon update
+
       # gui/scripts/prebuild.py 由 gui/moon.mod 的 prebuild 钩子执行,命令名是
       # python3;Windows runner 只有 python.exe——复制一份改名放进已入 PATH 的
       # ~/.moon/bin 即可解析。

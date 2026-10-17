@@ -43,13 +43,20 @@
 #else
 #include <dirent.h>
 #include <dlfcn.h> // 空闲查询的 X11/XSS 运行期取符号（W21e）
+#include <signal.h> // kill(2)：子进程超时强杀（Linux 上由 signal.h 顺带声明到，
+                    // macOS 不给隐式声明的机会——ISO C99 起隐式函数声明是错误）
 #include <errno.h> // 逐级建目录判 EEXIST（mkdir -p 语义）
 #include <fcntl.h>
+#include <stdarg.h> // 显示器清单逐行拼装的变参（sys_mon_line）
 #include <sys/stat.h> // mkdir(2)
 #include <sys/wait.h>
 #include <unistd.h>
 #if defined(__APPLE__)
 #include <mach-o/dyld.h> // _NSGetExecutablePath（可执行文件路径，W21d）
+#include <mach/mach.h> // host_statistics64 / host_page_size（物理内存快照）
+#include <sys/sysctl.h> // hw.memsize、kern.boottime
+#include <sys/time.h> // gettimeofday（开机秒数的「现在」端）
+#include <CoreGraphics/CoreGraphics.h> // 空闲读数（HID 事件源的「距上次输入秒数」）
 #endif
 #endif
 
@@ -1877,6 +1884,10 @@ int32_t yue_sys_idle_supported(void) {
   }
   sys_idle_x11_init();
   return g_idle_x11.ok ? 1 : 0;
+#elif defined(__APPLE__)
+  // CGEventSource 的 HID 系统态读数在 mac 上恒可用（不需要辅助功能权限——
+  // 它只回「距上次输入多少秒」，不读事件内容）
+  return 1;
 #else
   return 0;
 #endif
@@ -1918,6 +1929,16 @@ int64_t yue_sys_idle_seconds_ms(int32_t *ok) {
   }
   *ok = 1;
   return ms;
+#elif defined(__APPLE__)
+  // 「距任意一次输入事件多少秒」×1000。事件掩码取 kCGAnyInputEventType，
+  // 覆盖键鼠；触控板的滚动也算 HID 事件，故与另两平台的「有输入就归零」同观。
+  double secs = CGEventSourceSecondsSinceLastEventType(
+      kCGEventSourceStateHIDSystemState, kCGAnyInputEventType);
+  if (!(secs >= 0.0)) { // NaN/负值都按查不到处理（引擎在无会话时给的就是这个）
+    return 0;
+  }
+  *ok = 1;
+  return (int64_t)(secs * 1000.0);
 #else
   return 0;
 #endif
@@ -2237,6 +2258,32 @@ int32_t yue_sys_memory_kb(int64_t *total_kb, int64_t *avail_kb, int32_t *ok) {
   *avail_kb = (int64_t)(m.ullAvailPhys / 1024);
   *ok = 1;
   return 0;
+#elif defined(__APPLE__)
+  uint64_t bytes = 0;
+  size_t len = sizeof(bytes);
+  int mib[2] = { CTL_HW, HW_MEMSIZE };
+  if (sysctl(mib, 2, &bytes, &len, NULL, 0) != 0 || bytes == 0) {
+    return 0;
+  }
+  vm_size_t page = 0;
+  if (host_page_size(mach_host_self(), &page) != KERN_SUCCESS || page == 0) {
+    return 0;
+  }
+  vm_statistics64_data_t vm;
+  mach_msg_type_number_t cnt = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(mach_host_self(), HOST_VM_INFO64, (host_info_t)&vm,
+                        &cnt) != KERN_SUCCESS) {
+    return 0;
+  }
+  // 「还能拿来用」按 free + inactive + speculative 三档页算（macOS 的活动页
+  // 里有一部分是可压缩的，那部分不由我们判断——与 Linux 的 MemAvailable 只是
+  // 同档语义，不是同一算法，口径差写进 docs/zh/adaptation.md）
+  uint64_t usable = (uint64_t)vm.free_count + (uint64_t)vm.inactive_count +
+                    (uint64_t)vm.speculative_count;
+  *total_kb = (int64_t)(bytes / 1024ULL);
+  *avail_kb = (int64_t)(usable * (uint64_t)page / 1024ULL);
+  *ok = 1;
+  return 0;
 #else
   return 0;
 #endif
@@ -2246,6 +2293,23 @@ int32_t yue_sys_memory_kb(int64_t *total_kb, int64_t *avail_kb, int32_t *ok) {
 double yue_sys_uptime_seconds(void) {
 #if defined(_WIN32)
   return (double)(GetTickCount64() / 1000ULL);
+#elif defined(__APPLE__)
+  // 挂钟差：kern.boottime 是「启动那一刻的墙钟」，与 gettimeofday 相减得开机秒。
+  // 睡眠不计（mac 睡眠期间墙钟继续走，故这个数比 Linux 的 /proc/uptime——
+  // 也不计睡眠——同档；真正的差是夏令时/对时跳变会带来秒级抖动，读数用途可接受）
+  struct timeval boot;
+  size_t len = sizeof(boot);
+  int mib[2] = { CTL_KERN, KERN_BOOTTIME };
+  if (sysctl(mib, 2, &boot, &len, NULL, 0) != 0) {
+    return 0.0;
+  }
+  struct timeval now;
+  if (gettimeofday(&now, NULL) != 0) {
+    return 0.0;
+  }
+  double d = (double)(now.tv_sec - boot.tv_sec) +
+             (double)(now.tv_usec - boot.tv_usec) / 1000000.0;
+  return d > 0.0 ? d : 0.0;
 #else
   return 0.0;
 #endif
@@ -2768,5 +2832,211 @@ void *yue_sys_clipboard_gtk_get_text(int32_t *ok) {
 }
 int yue_sys_clipboard_gtk_set_text(const char *text) {
   return wm_clipboard_set_text(text);
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// monitor（macOS）：显示器枚举。CoreGraphics 的公开显示口一家打齐——
+// CGGetOnlineDisplayList 列「在线」显示器（已接且通电；macOS 没有「接了但
+// 关掉」的公开清单，所以这里不产 disconnected 那种条目）、CGDisplayBounds 给
+// 逻辑点原点、CGDisplayCopyDisplayMode/CGDisplayCopyAllDisplayModes 给当前档
+// 与模式表、CGDisplayModeGetPixelWidth/Height 给像素尺寸（缩放模式只有在像素
+// 空间里才可比，故一律取像素），倍率由「当前模式像素宽 ÷ 逻辑宽」导出。
+//
+// 名字给不了：本桩是纯 C，NSScreen 的 localizedName 够不着，而 CG 侧没有公开
+// 的显示器名。于是按可辨识度给——内建屏叫 "Built-in"，其余叫
+// "Display-<CGDirectDisplayID>"（与另两平台的输出名同为「本机特定」串）。
+//
+// 输出行式清单（'\n' 分行、'\t' 分列），MoonBit 侧 mon_parse_mac 解析：
+//   MON\t<name>\t<primary>\t<x>\t<y>\t<mm_w>\t<mm_h>
+//   MODE\t<w>\t<h>\t<centi>\t<current>\t<preferred>
+// MODE 行紧跟所属 MON 行。坐标与分辨率都是**物理像素**（本栈口径）；mm 是
+// CGDisplayScreenSize 的物理毫米，引擎不给时 0；刷新率厘赫兹，
+// CGDisplayModeGetRefreshRate 给 0 时（内建面板常见）如实给 0=未知。
+// 「当前档」由与 CGDisplayCopyDisplayMode 的同尺寸同刷新率比对得出，
+// 「首选档」恒 0——那两个 Is* 谓词在当前 SDK 上已不声明（见循环内注释）。
+// ---------------------------------------------------------------------------
+#if defined(__APPLE__)
+#define SYS_MON_MAX 32
+#define SYS_MON_DEDUPE 256
+
+typedef struct {
+  char *buf;
+  size_t len;
+  size_t cap;
+} sys_mon_blob_t;
+
+// 追加一行（vsnprintf 两遍：先量长度再写）。放不下就整行丢弃——清单宁缺
+// 毋滥，切一半的行会让上层解析错位。
+static void sys_mon_line(sys_mon_blob_t *b, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int need = vsnprintf(NULL, 0, fmt, ap);
+  va_end(ap);
+  if (need <= 0) {
+    return;
+  }
+  if (b->len + (size_t)need + 1 > b->cap) {
+    size_t nc = b->cap == 0 ? 4096 : b->cap;
+    while (nc < b->len + (size_t)need + 1) {
+      nc *= 2;
+    }
+    char *nb = (char *)realloc(b->buf, nc);
+    if (nb == NULL) {
+      return;
+    }
+    b->buf = nb;
+    b->cap = nc;
+  }
+  va_start(ap, fmt);
+  vsnprintf(b->buf + b->len, b->cap - b->len, fmt, ap);
+  va_end(ap);
+  b->len += (size_t)need;
+}
+
+static int sys_mon_round(double v) { return (int)(v < 0 ? v - 0.5 : v + 0.5); }
+
+void *yue_sys_mon_mac(int32_t *ok) {
+  *ok = 0;
+  CGDirectDisplayID ids[SYS_MON_MAX];
+  uint32_t n = 0;
+  if (CGGetOnlineDisplayList(SYS_MON_MAX, ids, &n) != kCGErrorSuccess ||
+      n == 0) {
+    return moonbit_make_bytes(0, 0);
+  }
+  sys_mon_blob_t blob;
+  blob.buf = NULL;
+  blob.len = 0;
+  blob.cap = 0;
+  for (uint32_t i = 0; i < n; i++) {
+    CGDirectDisplayID d = ids[i];
+    CGRect bounds = CGDisplayBounds(d);
+    CGSize mm = CGDisplayScreenSize(d);
+    CGDisplayModeRef cur = CGDisplayCopyDisplayMode(d);
+    double sc = 1.0;
+    if (cur != NULL) {
+      size_t pw = CGDisplayModeGetPixelWidth(cur);
+      size_t lw = CGDisplayModeGetWidth(cur);
+      if (pw > 0 && lw > 0) {
+        sc = (double)pw / (double)lw;
+      }
+    }
+    char name[40];
+    if (CGDisplayIsBuiltin(d) != 0) {
+      snprintf(name, sizeof(name), "Built-in");
+    } else {
+      snprintf(name, sizeof(name), "Display-%u", (unsigned)d);
+    }
+    sys_mon_line(&blob, "MON\t%s\t%d\t%d\t%d\t%d\t%d\n", name,
+                 CGDisplayIsMain(d) != 0 ? 1 : 0,
+                 sys_mon_round(bounds.origin.x * sc),
+                 sys_mon_round(bounds.origin.y * sc),
+                 sys_mon_round(mm.width), sys_mon_round(mm.height));
+    // 模式表：引擎给不出（受保护内容、或该屏由系统托管）时，至少把当前这一档
+    // 如实列出来，上层不至于拿到空表。同 (像素宽,像素高,刷新率) 只留一条——
+    // CG 的清单里同一像素尺寸可以有多份时序配置，重复项对布局没有意义。
+    struct {
+      size_t w;
+      size_t h;
+      int centi;
+    } seen[SYS_MON_DEDUPE];
+    int seen_n = 0;
+    int cur_emitted = 0;
+    // 当前档的身份三元组（像素宽、像素高、厘赫兹），供下面的 is_cur 比对
+    size_t cw = 0;
+    size_t ch = 0;
+    int ccenti = -1;
+    if (cur != NULL) {
+      cw = CGDisplayModeGetPixelWidth(cur);
+      ch = CGDisplayModeGetPixelHeight(cur);
+      if (cw == 0) {
+        cw = CGDisplayModeGetWidth(cur);
+      }
+      if (ch == 0) {
+        ch = CGDisplayModeGetHeight(cur);
+      }
+      ccenti = (int)(CGDisplayModeGetRefreshRate(cur) * 100.0 + 0.5);
+    }
+    CFArrayRef modes = CGDisplayCopyAllDisplayModes(d, NULL);
+    int modes_n = modes == NULL ? 0 : (int)CFArrayGetCount(modes);
+    for (int k = 0; k < modes_n; k++) {
+      CGDisplayModeRef m =
+          (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, (CFIndex)k);
+      if (m == NULL) {
+        continue;
+      }
+      size_t mw = CGDisplayModeGetPixelWidth(m);
+      size_t mh = CGDisplayModeGetPixelHeight(m);
+      if (mw == 0) {
+        mw = CGDisplayModeGetWidth(m);
+      }
+      if (mh == 0) {
+        mh = CGDisplayModeGetHeight(m);
+      }
+      double hz = CGDisplayModeGetRefreshRate(m);
+      int centi = (int)(hz * 100.0 + 0.5);
+      int dup = 0;
+      for (int s = 0; s < seen_n; s++) {
+        if (seen[s].w == mw && seen[s].h == mh && seen[s].centi == centi) {
+          dup = 1;
+          break;
+        }
+      }
+      if (dup) {
+        continue;
+      }
+      if (seen_n < SYS_MON_DEDUPE) {
+        seen[seen_n].w = mw;
+        seen[seen_n].h = mh;
+        seen[seen_n].centi = centi;
+        seen_n++;
+      }
+      // 当前档：`CGDisplayModeIsCurrentMode` 在当前 SDK 已不声明，改用
+      // 「与 CGDisplayCopyDisplayMode 同像素尺寸同刷新率」判——去重后的清单里
+      // 这一档只会出现一次，判据与那个谓词等价到读数层面。
+      int is_cur = (cur != NULL && mw == cw && mh == ch && centi == ccenti) ? 1
+                                                                           : 0;
+      if (is_cur) {
+        cur_emitted = 1;
+      }
+      // preferred 恒 0：`CGDisplayModeIsPreferred` 同样不再声明，当前 SDK 没有
+      // 公开的「首选/原生模式」信号，不给它编一个假值（缺口记 adaptation.md）。
+      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t%d\t0\n", mw, mh, centi, is_cur);
+    }
+    if (modes != NULL) {
+      CFRelease(modes);
+    }
+    if (!cur_emitted && cur != NULL) {
+      size_t mw = CGDisplayModeGetPixelWidth(cur);
+      size_t mh = CGDisplayModeGetPixelHeight(cur);
+      if (mw == 0) {
+        mw = CGDisplayModeGetWidth(cur);
+      }
+      if (mh == 0) {
+        mh = CGDisplayModeGetHeight(cur);
+      }
+      double hz = CGDisplayModeGetRefreshRate(cur);
+      sys_mon_line(&blob, "MODE\t%zu\t%zu\t%d\t1\t0\n", mw, mh,
+                   (int)(hz * 100.0 + 0.5));
+    }
+    if (cur != NULL) {
+      CGDisplayModeRelease(cur);
+    }
+  }
+  if (blob.buf == NULL) {
+    return moonbit_make_bytes(0, 0);
+  }
+  void *out = moonbit_make_bytes((int)blob.len, 0);
+  memcpy(out, blob.buf, blob.len);
+  free(blob.buf);
+  *ok = 1;
+  return out;
+}
+#else
+// 非 macOS：符号要在（MoonBit 侧的 extern 是无条件的，三平台同一套链接），
+// 探测一律给「不可用」，mon_list 随之退 Unsupported。
+void *yue_sys_mon_mac(int32_t *ok) {
+  *ok = 0;
+  return moonbit_make_bytes(0, 0);
 }
 #endif

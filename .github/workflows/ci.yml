@@ -1,4 +1,4 @@
-# CI 流水线:Linux(完整门禁) + Windows(编译/链接门禁)
+# CI 流水线:Linux(完整门禁) + Windows(编译/链接门禁) + macOS(编译/链接门禁)
 #
 # 仓库结构(2026-10-12 目录定案,详见 AGENTS.md):
 #   gui/        库模块 `NoahLiu/native-gui`(14 个包)——moon.work 成员,也是发布单元
@@ -9,9 +9,10 @@
 # 门禁口径(AGENTS.md 规则 6):库门禁一律在 `gui/` 下按包路径限定。裸 `moon test`
 # 在 workspace 里会连带示例/探针/媒体模块(其中含既有的平台适配缺口),不作库门禁。
 #
-# 平台:Windows ✅ / Linux ✅(X11 + GTK3,当前主链路) / macOS 🚧 后端暂未开发
-#   (gui/win/stub.c 的 macOS 分支是占位空实现,建不出窗口,故不设 macOS job;
-#   口径与 README 平台表、docs/zh/adaptation.md 一致,不做无依据的承诺)。
+# 平台:Windows ✅ / Linux ✅(X11 + GTK3,当前主链路) / macOS 🚧 后端落地中
+#   (gui/win/stub.c 的 WM_STUB_MAC 分支是 Cocoa 真实现,由 mac 平台批逐族补齐;
+#   macOS job 只验「编得过、链得上」——runner 无窗口服务会话,视觉与交互验证
+#   按 AGENTS 规则 6 由使用者在真机做,批次口径见 TODO.md 的「mac 平台批」一节)。
 #
 # 链接参数由 `gui/scripts/prebuild.py`(`gui/moon.mod` 的 prebuild 钩子)按当前
 # 系统生成并传播;prebuild 只能给自己模块内的包下发配置(moon 拒绝外部包名),
@@ -22,7 +23,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, mac]
   pull_request:
 
 jobs:
@@ -283,3 +284,165 @@ jobs:
           && moon test
           && cd ..\..
           && moon build examples/hello --target native
+
+  macos:
+    name: macOS(静态检查 + 测试 + 链接)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装 moon 工具链
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # 媒体线（gui-media 的 miniaudio 设备 + ffmpeg-mbt 的解码）在 macOS 走系统
+      # ffmpeg：与 Linux 的 apt 装 -dev 包同一路（prebuild 用 pkg-config 探测，
+      # 探不到就非零退出并给 brew 提示，不静默造一份「看着能链、跑起来没解码器」的桩）。
+      # brew 的 bottle 在这个 runner 上是分钟级——它换来的是「媒体两包真编得过、
+      # 真链得上」，比把构建步绕开它们更值。
+      - name: 安装 ffmpeg 与 pkg-config（媒体线要）
+        run: |
+          brew install ffmpeg pkg-config
+          pkg-config --modversion libavformat
+
+      # macOS 的原生层是 Objective-C(stub.c 的 WM_STUB_MAC 分支由 prebuild 带
+      # -x objective-c 专编成静态库),链接器与 SDK 头由 runner 自带的 Xcode
+      # Command Line Tools 提供,无需额外安装——这也是本 job 唯一的编译期依赖。
+      # 起手把依赖的框架列出来:缺哪个就在日志里直说,不用等编译报错再猜。
+      - name: 核对 SDK 框架齐备
+        run: |
+          xcrun --show-sdk-path
+          sdk="$(xcrun --show-sdk-path)/System/Library/Frameworks"
+          for f in Cocoa CoreGraphics CoreText ImageIO WebKit Carbon IOKit; do
+            if [ ! -d "$sdk/$f.framework" ]; then
+              echo "::error title=缺框架::$sdk/$f.framework 不存在"
+              exit 1
+            fi
+          done
+          echo "框架齐备: Cocoa/CoreGraphics/CoreText/ImageIO/WebKit/Carbon/IOKit"
+
+      # macOS 原生桩的编译门禁:与 prebuild 完全同一串 clang 旗标(去掉 -c/-o,
+      # 改 -fsyntax-only),四个桩逐个过。放在最前面是因为 moon check 不编这些
+      # 桩——Objective-C 的形态错(selector 不存在之类)只有真编一遍才暴露,
+      # 让它在三十秒里直说,不用等 moon test 链接期炸一堆 undefined symbols。
+      - name: macOS 原生桩编译门禁(clang 逐桩语法检查)
+        working-directory: gui
+        run: |
+          gate() {
+            src="$1"
+            define="$2"
+            lang="${3:-objective-c}"
+            args=()
+            if [ -n "$define" ]; then args+=("-D$define"); fi
+            if [ "$lang" = "objective-c" ]; then args+=("-fobjc-arc"); fi
+            printf '\033[36m==> %s (%s%s)\033[0m\n' "$src" "$lang" \
+              "${define:+, $define}"
+            if ! xcrun clang -fsyntax-only -O2 -x "$lang" "${args[@]}" "$src";
+            then
+              echo "::error title=mac 桩编译失败::$src 的 ${define:-默认} 分支编不过(见上方 clang 诊断)"
+              exit 1
+            fi
+          }
+          gate win/stub.c WM_STUB_MAC
+          gate render/stub.c WM_STUB_MAC
+          gate text/stub.c WM_STUB_MAC
+          gate web/webkit_stub.c WB_HAVE_WKWEBVIEW
+          # sys 桩是纯 C(moon native-stub 自编),但 __APPLE__ 分支里那些
+          # CoreGraphics 口同样在新 SDK 上被动过,一并做语法检查。
+          gate sys/sys_stub.c "" c
+          echo "五个 macOS 桩全部编译通过"
+
+      # 新装 runner 的注册表索引里查不到 prowk/moonsqlitefile 与 mizchi/markdown
+      # (三平台同一个报错: module was not found in the registry),先刷索引。
+      - name: 刷新注册表索引
+        run: moon update
+
+      # 同 Linux job:迁移依赖缓存里的旧式清单(工具链 2026-10-12 起只认 moon.mod/moon.pkg)。
+      # macOS job 的价值全在这里之后——它才会真的走到 native-stub 与 prebuild 编 ObjC 那两步。
+      - name: 迁移依赖缓存里的旧式清单
+        run: |
+          for i in $(seq 1 40); do
+            if (cd gui && moon check >/tmp/resolve.log 2>&1); then
+              echo "依赖图解析通过（第 $i 轮）"
+              exit 0
+            fi
+            if ! grep -aq "no longer supported" /tmp/resolve.log; then
+              tail -30 /tmp/resolve.log
+              exit 1
+            fi
+            find .mooncakes \( -name moon.mod.json -o -name moon.pkg.json \) \
+              | while read -r f; do
+                  (cd "$(dirname "$f")" && moon fmt >/dev/null 2>&1) || true
+                done
+          done
+          echo "::error title=依赖清单迁移没收敛::40 轮后仍报 no longer supported"
+          tail -30 /tmp/resolve.log
+          exit 1
+
+      - name: 静态检查(库模块)
+        working-directory: gui
+        run: moon check
+
+      # 与 Windows job 同口径的平台排除:dbus 是 Linux 桌面基建,macOS 无会话总线。
+      # 失败时把关键行塞进 error 注解(匿名 API 可读),并回显输出尾部。
+      - name: 单元测试(库模块,12 包)
+        working-directory: gui
+        run: |
+          set +e
+          moon test \
+            core ui render text theme icons sys input win chart mdview web \
+            >/tmp/mt.out 2>&1
+          code=$?
+          set -e
+          if [ $code -ne 0 ]; then
+            # 不塞进注解:macOS 的 BSD sed 不认 GNU 的 `:a;N;$!ba` 多行写法,
+            # 关键行直接打在日志里。
+            echo "::error title=moon test 失败(退出码 $code)::关键行见日志"
+            grep -aiE 'failed|FAILED|error|panicked|expect' /tmp/mt.out | tail -40
+            tail -c 4000 /tmp/mt.out
+            exit 1
+          fi
+          grep -aE "Total tests" /tmp/mt.out | tail -1
+
+      # 库模块全量构建 + hello 示例的 native 链接:后者顺带验证 prebuild 的
+      # Darwin 分支下发的 framework 链接参数能传播到独立模块(示例模块不配 prebuild)。
+      # 逐包点名而不裸 `moon build`:裸构建在 workspace 下等于构建整个 workspace,
+      # 会牵连与本 job 无关的模块(experiment/其它示例),失败时看不出是哪里坏了。
+      # 媒体线自「mac 平台批⑰」起接回:上一轮因 runner 没有 ffmpeg 头而绕开,
+      # 现在装了 brew 的 ffmpeg,所以额外构建依赖媒体两包(systemprobe / native-web)
+      # 的 main 包——这等于在真实 macOS 上编一遍 ffmpeg 桩与 miniaudio 桩、
+      # 并把 CoreAudio/AudioToolbox 那组 framework 真链一次。
+      - name: 构建(库模块 + hello 示例 + 媒体线)
+        run: |
+          set +e
+          (cd gui && moon build core ui render text theme icons sys input win dbus chart mdview web \
+            --target native) >/tmp/mb.out 2>&1; c1=$?
+          moon build examples/hello --target native >>/tmp/mb.out 2>&1; c2=$?
+          moon build modules/gui-examples/systemprobe modules/gui-examples/native-web \
+            --target native >>/tmp/mb.out 2>&1; c3=$?
+          set -e
+          if [ $c1 -ne 0 ] || [ $c2 -ne 0 ] || [ $c3 -ne 0 ]; then
+            echo "::error title=moon build 失败(退出码 $c1/$c2/$c3)::关键行见日志"
+            grep -aiE 'error|undefined|failed|Undefined symbol|ld: ' /tmp/mb.out | tail -40
+            tail -c 6000 /tmp/mb.out
+            exit 1
+          fi
+          echo "库 13 包 + examples/hello + 媒体两包(systemprobe/native-web)全部构建链接通过"
+
+      # 尽力冒烟：macOS runner 有登录会话与窗口服务，`hello` 这类常驻事件循环的
+      # 进程活着到超时就说明「窗口建出来了、循环转起来了」；退出码 124 = 存活。
+      # 标 continue-on-error：这一条不是门禁（真机目视仍按 AGENTS 规则 6 由使用者
+      # 做，见 `_人工测试清单.md` 的 T 节），但红/绿本身就是有用的证据。
+      - name: GUI 冒烟(hello 存活 20 秒即算通过,不卡门禁)
+        continue-on-error: true
+        run: |
+          set +e
+          timeout 20s moon run examples/hello 2>/tmp/smoke.err
+          code=$?
+          set -e
+          echo "hello 退出码 $code（124 = 存活到超时）"
+          tail -c 2000 /tmp/smoke.err || true
+          if [ "$code" != "124" ] && [ "$code" != "143" ]; then
+            echo "::warning title=macOS 冒烟未通过::退出码 $code，需真机复验 T1 节"
+          fi

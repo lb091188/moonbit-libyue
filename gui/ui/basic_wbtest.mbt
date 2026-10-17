@@ -441,6 +441,24 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
   p_seen.end()
   // 尺寸取自动图本身（未显式给宽高的分支）
   assert_eq((w.rect.w, w.rect.h), (120.0, 120.0))
+  if @render.Animation::new_from_file(gif_asset()) is None {
+    // 动图族「探测即不可用」的平台（macOS 首批口径）：组件退回首帧静图——
+    // 尺寸仍是首帧的 120×120、画得出墨，而且**不排自转**（没有下一帧可换）。
+    // 下面那些换帧节奏的断言只属于有动图后端的路径。
+    assert_eq(delays.val.length(), 0)
+    assert_eq(h.frame_count(), 0)
+    let (bm_d, _, _) = shot(w)
+    let mut ink_d = 0
+    for y = 0; y < 120; y = y + 1 {
+      for x = 0; x < 120; x = x + 1 {
+        if color_of(bm_d, x, y) != (0, 0, 0, 0) {
+          ink_d = ink_d + 1
+        }
+      }
+    }
+    assert_true(ink_d > 100)
+    return
+  }
   assert_eq(delays.val.length(), 1)
   assert_true(delays.val[0] > 0)
   // 队空时是空操作（暂停断链之后就是空的，再 fire 不该崩）

@@ -401,9 +401,16 @@ fn win_win_parse_list(blob : String) -> Array[WindowInfo] {
   out
 }
 ///|
+// macOS 本族保持 Unsupported：mac 的窗口枚举/激活/关闭只有 Accessibility
+// 一条路（`AXUIElement` 或 osascript 问 System Events），两者都要求用户先授予
+// 「辅助功能」权限，未授权时直接报错——不是我们能替用户点的弹窗，故按「没做」
+// 出声而不是跑一次注定失败的命令。Linux 侧若不装 wmctrl/xdotool 也是同样口径。
 pub fn win_supported() -> Bool {
   if sys_platform() == "windows" {
     return true
+  }
+  if sys_platform() == "macos" {
+    return false
   }
   if !pr_available() {
     return false
@@ -416,6 +423,9 @@ pub fn win_supported() -> Bool {
 /// 需要 X 会话；无会话时 wmctrl 以非零退出呈现，返回
 /// Err([WinError.CommandFailed])。
 pub fn win_list() -> Result[Array[WindowInfo], WinError] {
+  if sys_platform() == "macos" {
+    return Err(Unsupported)
+  }
   if sys_platform() == "windows" {
     let ok = Ref(0)
     let b = ffi_win_list(ok)
@@ -438,6 +448,9 @@ pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
   if id_or_title == "" {
     return Err(InvalidParam("窗口 id 或标题为空"))
   }
+  if sys_platform() == "macos" {
+    return Err(Unsupported)
+  }
   if sys_platform() == "windows" {
     let ok = Ref(0)
     let _ = ffi_win_activate(@utf8.encode(id_or_title), ok)
@@ -455,6 +468,9 @@ pub fn win_activate(id_or_title : String) -> Result[Unit, WinError] {
 pub fn win_close(title : String) -> Result[Unit, WinError] {
   if title == "" {
     return Err(InvalidParam("窗口标题为空"))
+  }
+  if sys_platform() == "macos" {
+    return Err(Unsupported)
   }
   if sys_platform() == "windows" {
     let ok = Ref(0)

@@ -433,6 +433,64 @@ fn wp_apply(
 // ---------------------------------------------------------------------------
 
 ///|
+// ---- macOS 后端：osascript 问 System Events 的桌面图片 ----
+//
+// System Events 的 AppleScript 字典里 `desktop N` 的 `picture` 是公开属性，
+// 读写各一条脚本。**两点与 Linux/Windows 不同**（记进 adaptation）：
+//   ① 只动 `desktop 1`（主屏）——Linux 侧按已连接输出逐个写，mac 的多屏要
+//      遍历 `every desktop`，本批不做；
+//   ② 首次调用可能被系统的「自动化」授权拦下（脚本控制别的进程），真机复验
+//      清单里有一条专测它；拿不到就走 CommandFailed，不假装成功。
+
+fn wp_mac_quote(path : String) -> String {
+  // 路径要拼进 AppleScript 的字符串字面量：反斜杠与引号都得转义，
+  // 不转义等于把路径当脚本片段执行（注入面）
+  let buf = StringBuilder()
+  for ch in path {
+    match ch {
+      '\\' => buf.write_string("\\\\")
+      '"' => buf.write_string("\\\"")
+      _ => buf.write_char(ch)
+    }
+  }
+  buf.to_string()
+}
+
+fn wp_mac_run(script : String) -> Result[(Int, String), WallpaperError] {
+  wp_run_capture("osascript", ["-e", script], timeout_ms=8000)
+}
+
+fn wp_get_mac() -> Result[String, WallpaperError] {
+  let script =
+    "tell application \"System Events\" to get POSIX path of (get picture of desktop 1)"
+  match wp_mac_run(script) {
+    Err(e) => Err(e)
+    Ok((code, out)) => {
+      if code != 0 {
+        return Err(CommandFailed("osascript 读壁纸: 退出码 \{code}"))
+      }
+      let p = wp_trim(out)
+      if p == "" {
+        Err(ParseFailed("osascript 读壁纸: 空串"))
+      } else {
+        Ok(p)
+      }
+    }
+  }
+}
+
+fn wp_set_mac(path : String) -> Result[Unit, WallpaperError] {
+  let head =
+    "tell application \"System Events\" to set desktop picture to POSIX file \""
+  let script = head + wp_mac_quote(path) + "\""
+  match wp_mac_run(script) {
+    Err(e) => Err(e)
+    Ok((0, _)) => Ok(())
+    Ok((code, _)) => Err(CommandFailed("osascript 写壁纸: 退出码 \{code}"))
+  }
+}
+
+///|
 /// 读当前壁纸路径（按桌面环境分派）。XFCE 取 workspace0 的 last-image 属性
 /// （存在多个显示器时优先已连接输出）；GNOME 取 picture-uri，未设置时
 /// 回退 picture-uri-dark；KDE 走 plasmashell evaluateScript。不认识的
@@ -440,6 +498,7 @@ fn wp_apply(
 pub fn wp_get() -> Result[String, WallpaperError] {
   match sys_platform() {
     "linux" => wp_get_linux()
+    "macos" => wp_get_mac()
     "windows" => {
       let ok = Ref(0)
       let b = ffi_wallpaper_get(ok)
@@ -453,7 +512,7 @@ pub fn wp_get() -> Result[String, WallpaperError] {
         Ok(p)
       }
     }
-    _ => Err(Unsupported) // macOS 随平台批
+    _ => Err(Unsupported)
   }
 }
 
@@ -482,6 +541,7 @@ pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
   }
   match sys_platform() {
     "linux" => wp_set_linux(path)
+    "macos" => wp_set_mac(path)
     "windows" => {
       let ok = Ref(0)
       let _ = ffi_wallpaper_set(@utf8.encode(path), ok)
@@ -491,7 +551,7 @@ pub fn wp_set(path : String) -> Result[Unit, WallpaperError] {
         Err(CommandFailed("SystemParametersInfo 写壁纸失败"))
       }
     }
-    _ => Err(Unsupported) // macOS 随平台批
+    _ => Err(Unsupported)
   }
 }
 

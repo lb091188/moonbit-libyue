@@ -213,3 +213,18 @@ test "生命周期：enable → is_enabled → disable → 幂等再 disable（�
   }
   assert_false(autostart_is_enabled(AUTOSTART_TEST_APP_ID).unwrap())
 }
+
+test "macOS 的 plist 正文：Label/ProgramArguments/RunAtLoad 与 XML 转义" {
+  let p = autostart_mac_plist("com.example.my-app2", "/Applications/My App/a&b<c>.app/Contents/MacOS/x")
+  assert_true(p.has_prefix("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"))
+  assert_true(p.has_suffix("</plist>\n"))
+  assert_true(p.contains("<string>com.example.my-app2</string>"))
+  // & 与 < > 必须转义，否则 plist 不是合法 XML
+  assert_true(p.contains("/Applications/My App/a&amp;b&lt;c&gt;.app"))
+  assert_false(p.contains("a&b<c>"))
+  // 落点：HOME 设了才给目录（本机与 CI 都设，别的读者也可能没设，两态都合法）
+  match autostart_mac_dir() {
+    None => ()
+    Some(d) => assert_true(d.contains("/Library/LaunchAgents"))
+  }
+}

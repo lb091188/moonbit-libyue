@@ -6,7 +6,8 @@
 // 平台取数（C 桩：`sys_stub.c` 的空闲节）：
 //   Windows `GetLastInputInfo` + `GetTickCount`（差值按 DWORD 取模，扛 ~49.7 天回绕）
 //   Linux   X11 的 XScreenSaver 扩展（运行期 dlopen libX11 + libXss，不引入链接依赖）
-//   macOS   本批未实现（`idle_supported()` 为 false，`idle_seconds()` 给 Unsupported）
+//   macOS   CGEventSource 的 HID 系统态读数（`CGEventSourceSecondsSinceLastEventType`，
+ //           只问「距上次输入多久」，不读事件内容，故不需要辅助功能权限）
 //
 // **Wayland 会话**：没有 X 服务端（`DISPLAY` 为空）时 `idle_supported()` 就是
 // false，`idle_seconds()` 给 `Unsupported` 而**不给错数**——XWayland 下输入不进
@@ -21,7 +22,7 @@
 ///|
 /// 空闲查询错误（不支持与失败分开，不静默）。
 pub(all) enum IdleError {
-  /// 本平台 / 本会话不支持（macOS 本批未实现、Wayland 会话、无 X 服务端）
+  /// 本平台 / 本会话不支持（Wayland 原生会话、无 X 服务端）
   Unsupported
   /// 支持但这次查询失败（如 X 连接中途断开），带说明
   Failed(String)
@@ -64,7 +65,7 @@ extern "c" fn ffi_sys_idle_seconds_ms(ok : Ref[Int]) -> Int64 = "yue_sys_idle_se
 
 ///|
 /// 本平台 / 本会话是否提供空闲查询（运行期探测：Windows 恒真；Linux 要有
-/// `DISPLAY` 且 libX11 + libXss 能 dlopen；macOS 本批 false）。
+/// `DISPLAY` 且 libX11 + libXss 能 dlopen；macOS 恒真）。
 pub fn idle_supported() -> Bool {
   ffi_sys_idle_supported() == 1
 }

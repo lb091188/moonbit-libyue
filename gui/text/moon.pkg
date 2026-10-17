@@ -7,10 +7,13 @@ supported_targets = "native"
 
 // 文本层按「单一 stub.c 多分支 + prebuild 宏」组织（与 render/win 同例）：
 // Pango 端由 scripts/prebuild.py 带 -DWM_STUB_PANGO 编成静态库（link_configs
-// 只有链接期字段、native-stub 拿不到 pango 头，实测同 G0/G3）；dwrite_text.cpp
-// 是 Windows 的 DirectWrite 实现（dwrite.h 是 C++ 专属头，C TU 编不了），
-// 由 native-stub 直接编（moon 认 .cpp，实测）；两文件的平台分支互斥，非本平台
-// 各自编出空翻译单元。链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
+// 只有链接期字段、native-stub 拿不到 pango 头，实测同 G0/G3）；CoreText 端
+// （macOS）由同一脚本带 -DWM_STUB_MAC 编成 build/libyue_text_mac.a——两支的
+// 源码都是纯 C（CoreText 是 C API），非本平台的那次 native-stub 编译落不进
+// 任何分支、编出空翻译单元（防与归档双定义）。dwrite_text.cpp 是 Windows 的
+// DirectWrite 实现（dwrite.h 是 C++ 专属头，C TU 编不了），由 native-stub
+// 直接编（moon 认 .cpp，实测）；两文件的平台分支互斥，非本平台各自编出空
+// 翻译单元。链接参数按 AGENTS 规则 1 全部由 prebuild 托管。
 options(
   "native-stub": [ "stub.c", "dwrite_text.cpp" ],
 )

@@ -2,16 +2,27 @@
 
 系统能力族 API：系统音量、应用查找、夜间色温、壁纸、显示器配置、系统窗口管理、剪贴板监听、子进程执行、电源计划、系统信息、打印机、环境变量、目录枚举、最近文件、浏览器书签与 Firefox 历史、VS Code 本地历史。全部只读或经系统服务授权写入，统一返回 `Result`，不支持的环境给对应错误值而不是崩溃；`*_supported()` 每次调用真实探测当前环境。
 
-## 平台状态（2026-10-14，平台批①-⑥ 后）
+## 平台状态（2026-10-15，mac 平台批①-⑤ 后）
+
+> macOS 列的 **🚧 已接** = 代码在 `mac` 分支、CI 的 macOS job 证明编得过链得上，
+> **真机目视/读数额外未回证**（清单在 `_人工测试清单.md` 的 T 节）；**❌ Unsupported**
+> = 本批明确不做并让门面如实出声，两种都不等于「坏了」。
 
 | 能力 | Windows | Linux | macOS |
 |---|---|---|---|
-| 剪贴板 / 自启动 / 子进程 / 文件(fsx) / 环境变量(envx) | ✅ 直调 | ✅ | ❌ Unsupported |
-| 系统信息 / 窗口管理 / 壁纸 / 电源计划 / 启动器 | ✅ 直调 | ✅ | ❌ |
-| 应用查找 / 最近文件 / 音量 / 打印机(列表+默认+打印) | ✅ 直调 | ✅ | ❌ |
-| browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ❌ |
-| sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | ❌ |
-| 夜间色温（redshift/xrandr 命令线） | ❌ 无公开 API | ✅ | ❌ |
+| 剪贴板 / 自启动 / 子进程 / 文件(fsx) / 环境变量(envx) | ✅ 直调 | ✅ | 🚧 已接（pbpaste/pbcopy + NSPasteboard 桩；LaunchAgents plist + `launchctl load/unload`） |
+| 系统信息 / 壁纸 / 启动器（打开与定位） | ✅ 直调 | ✅ | 🚧 已接（`sw_vers`/`ioreg`/`sysctl` + 桩内 `host_statistics64`/`kern.boottime`；osascript 桌面图片，只动主屏；`open` / `open -R`） |
+| 音量 / 打印机(列表+默认+打印) | ✅ 直调 | ✅ | 🚧 已接（osascript 的 `volume settings`，sink 名这条口给不到按契约置空；macOS 自带 CUPS，与 Linux 同走 `lpstat`/`lp`——声明过的选择，不是漏跑到 Linux 分支） |
+| 用户空闲检测 | ✅ 直调 | ✅ | 🚧 已接（`CGEventSourceSecondsSinceLastEventType` 的 HID 系统态读数，不需辅助功能授权） |
+| 应用查找 | ✅ 直调 | ✅ | 🚧 已接（`.app` 包扫描 + `Contents/Info.plist` 公开键；`categories` 与本地化名没有公开对等物，按空/回退给） |
+| 最近文件 | ✅ 直调 | ✅ | ❌ Unsupported（sharedfilelist 是私有格式，另批做） |
+| 窗口管理 / 电源计划 | ✅ 直调 | ✅ | ❌ Unsupported（Accessibility 要用户先授权 / `pmset` 对不上三值方案语义） |
+| browser/vscode 数据 | ✅（LOCALAPPDATA 路径） | ✅ | ✅（`Library/Application Support/<厂商>/<产品>` 路径，平台批①-⑥ 时就已同步） |
+| sysmonitor 进程数据 | ✅（自带 stub/sysmon.c） | ✅ | 本批未动（示例模块自带桩，mac 路径按该模块的 stub 注释待验） |
+| 夜间色温（redshift/xrandr 命令线） | ❌ 无公开 API | ✅ | ❌ 无公开 API（CoreBrightness 私有） |
+| 显示器枚举（monitor） | ❌ | ✅（xrandr） | 🚧 已接（CoreGraphics 直调：`CGGetOnlineDisplayList` / `CGDisplayBounds` / `CGDisplayCopyAllDisplayModes`；只列「在线」屏，输出名给不了按 `Built-in` / `Display-<id>` 给；读数一律物理像素，故 `MonitorInfo` 不需要缩放比字段） |
+
+macOS 的公开口与底层（🚧 已接项）：`open`/`open -R`、`sw_vers`、`ioreg -rd1 -c IOPlatformExpertDevice`、`sysctl hw.model/hw.memsize/kern.boottime`、`osascript`（System Events 的 `volume settings` 与桌面图片）、`launchctl load/unload` + `~/Library/LaunchAgents/*.plist`、`lpstat`/`lp`，以及桩内的 `host_statistics64`、`CGEventSourceSecondsSinceLastEventType`、`CGGetOnlineDisplayList`/`CGDisplayBounds`/`CGDisplayCopyDisplayMode`/`CGDisplayCopyAllDisplayModes`/`CGDisplayScreenSize`。
 
 Windows 直调的底层：SystemParametersInfoW（壁纸）、ShellExecuteW（启动/定位/打印）、PowerGet/SetActiveScheme、注册表（产品与 DMI 信息）、GlobalMemoryStatusEx、GetTickCount64、EnumWindows、EnumPrintersW、IAudioEndpointVolume（COM）、GetLastInputInfo。踩坑与头文件/链接要求见 [adaptation.md](adaptation.md) 各平台批条目。
 
@@ -46,13 +57,13 @@ let _ = @sys.vol_set_mute(false)
 
 ## 应用查找
 
-两部分：已装应用清单与应用二进制查找。Linux 扫描 XDG `.desktop` 条目，用户目录覆盖系统目录；Windows 递归扫描开始菜单（用户级 + 全机级）的 `.lnk`，条目的 exec 为 lnk 全路径（ShellExecute 可直接启动）、categories 标 `StartMenu`；macOS `Unsupported`。
+两部分：已装应用清单与应用二进制查找。Linux 扫描 XDG `.desktop` 条目（用户目录覆盖系统目录）；Windows 递归扫描开始菜单（用户级 + 全机级）的 `.lnk`，条目的 exec 为 lnk 全路径（ShellExecute 可直接启动）、categories 标 `StartMenu`；macOS 扫 `/System/Applications`、`/Applications`（各带 `Utilities` 一层）与 `~/Applications` 下的 `.app` 包，读 `Contents/Info.plist` 的公开键：`name` 取 CFBundleDisplayName → CFBundleName → 包目录名，`id` 取 CFBundleIdentifier（缺则包名），`exec` 是 `Contents/MacOS/<CFBundleExecutable>`，`icon` 是 `Contents/Resources/<CFBundleIconFile>`（无扩展名补 `.icns`，无该键给空串）；二进制 plist 或读不到的包按包名给条目，不从清单里消失。macOS 侧两个字段是空的：`categories`（没有 desktop Categories 的对等物）与本地化名（在 `.lproj` 里，公开 plist 键给不到，`locale_name` 与 `name` 同值）。
 
 | 函数 | 说明 |
 |---|---|
 | `appfind_installed() -> Result[Array[AppEntry], AppFindError]` | 已装应用清单；全部扫描目录都不存在给 `NoScanDir` |
 | `appfind_installed_with(list_dir) -> Result[Array[AppEntry], AppFindError]` | 同上，目录枚举由调用方注入（供无 fsx 层的调用方与测试；仅 Linux 分支） |
-| `appfind_executable(name) -> Result[String, AppFindError]` | Linux 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 按序找；Windows 按 `PATH` 各目录找 name / name.exe；找不到给 `NotFound` |
+| `appfind_executable(name) -> Result[String, AppFindError]` | Linux 在 `~/.local/bin`、`/usr/local/bin`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin` 按序找；Windows 按 `PATH` 各目录找 name / name.exe；macOS 先按 `PATH` 各段（`:` 分隔，取绝对路径）再补 `~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/{bin,sbin}`、`/usr/bin`、`/bin`、`/usr/sbin`、`/sbin`；找不到给 `NotFound` |
 
 `AppEntry{ id, name, locale_name, exec, icon, categories }`：id 为 desktop id（.desktop 文件名去扩展名），name 为显示名，locale_name 为本地化名（`Name[zh_CN]` 优先回退 Name），exec / icon 原样，categories 按分号拆分。结果按 desktop id 去重（用户目录覆盖系统目录）、按 name 排序；Type 非 Application、NoDisplay=true、缺 Name 的条目已滤除。
 
@@ -245,6 +256,8 @@ let _ = @sys.wp_set("/home/me/Pictures/wall.png")
 
 解码走 ffmpeg FFI（进程内动态链，格式随系统 ffmpeg：MP3/OGG/M4A/AAC/FLAC/WAV…），输出由内嵌 miniaudio 设备层直出（s16 PCM 队列，零重采样）。无输出设备环境（CI/headless）自动静音降级，状态机照常。
 
+三平台都要系统给得出 ffmpeg：Linux 用发行版的 dev 包（`apt install libav*-dev`），Windows 用 vendor 进仓库的头与导入库（运行期 dll 自行放置），macOS 用 `brew install ffmpeg`（`modules/ffmpeg-mbt/prebuild.py` 走 pkg-config 探测，探不到就非零退出并给出这一行安装提示——媒体线不静默造一份「看着能链、跑起来没解码器」的桩）。音频设备后端按平台由 miniaudio 选：Linux ALSA/Pulse、Windows WASAPI、macOS CoreAudio，所以 `gui-media` 在 mac 上要多链三个框架（CoreAudio/AudioToolbox/Foundation），**不链** `-ldl`/`-latomic`（mac 的 dlopen 在 libSystem 里，也没有 libatomic 这个库）。
+
 ### AudioPlayer（对标浏览器 `<audio>`）
 
 ```moonbit
@@ -307,14 +320,16 @@ let view = @yuemedia.video_player_t(player)
 
 ## 显示器配置
 
-解析 `xrandr --query` 输出，给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点比较。
+Linux 解析 `xrandr --query` 输出，macOS 直调 CoreGraphics（`CGGetOnlineDisplayList` 一家），两处都给出每个输出的名称 / 连接状态 / 当前分辨率 × 刷新率 / 位置 / 物理尺寸 / 支持的模式列表；分辨率与位置都是**物理像素**。刷新率以厘赫兹整数表示（×100，如 5995 = 59.95Hz），避免浮点解析与比较。
 
 | 函数 | 说明 |
 |---|---|
-| `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举全部输出（含未连接），保持 xrandr 顺序 |
+| `mon_list() -> Result[Array[MonitorInfo], MonitorError]` | 枚举显示器输出，保持后端顺序 |
 | `mon_current() -> Result[Array[CurrentOutput], MonitorError]` | 当前输出简化快照（已连接且有当前模式），不含模式列表 |
 
-`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（非 Linux 或 xrandr 不可用）/ `CommandFailed(String)` / `ParseFailed(String)`（无任何输出条目）。
+`MonitorInfo{ name, connected, primary, width, height, refresh_centi, pos_x, pos_y, mm_width, mm_height, modes }`；`MonitorMode{ width, height, refresh_centi, preferred, current }`；`CurrentOutput{ name, width, height, refresh_centi, pos_x, pos_y }`。错误 `MonitorError`：`Unsupported`（Windows，或 macOS 上探不到在线显示器 / 非 macOS 平台的探测）/ `CommandFailed(String)`（Linux 的 xrandr 起不来或退出码非零）/ `ParseFailed(String)`（一条输出都没有）。
+
+macOS 侧四条读数差异：`connected` 恒真（macOS 没有「接了但关掉」的公开清单，离线屏不出现在表里）；`name` 是 `Built-in`（内建屏）或 `Display-<CGDirectDisplayID>`（其余）——公开的 CG 接口没有显示器名，`NSScreen.localizedName` 属于 ObjC 侧；`refresh_centi` 在内建面板的部分模式上给 0（后端报「未知」，不冒充数值），`mm_width`/`mm_height` 同档缺省时给 0；`MonitorMode.preferred` 恒 false——当前 SDK 没有公开的「首选/原生模式」信号，不拿「当前档」冒充它。
 
 ```moonbit
 match @sys.mon_current() {

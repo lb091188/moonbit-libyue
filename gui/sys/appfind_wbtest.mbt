@@ -331,3 +331,139 @@ test "appfind Windows 读数环：开始菜单扫到应用 + PATH 找得到 cmd"
     }
   }
 }
+
+///|
+/// macOS 的 Info.plist 样例（XML 档；带实体、数组值、假同名前缀标签三种边角）
+fn af_mac_plist() -> String {
+  let buf = StringBuilder()
+  for line in [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>", "<plist version=\"1.0\">",
+    "<dict>", "  <key>CFBundleDisplayName</key>",
+    "  <string>终端 &amp; Shell</string>", "  <key>CFBundleIdentifier</key>",
+    "  <string>com.apple.Terminal</string>", "  <key>CFBundleName</key>",
+    "  <string>Terminal</string>", "  <key>CFBundleExecutable</key>",
+    "  <string>Terminal</string>", "  <key>CFBundleIconFile</key>",
+    "  <string>Terminal</string>", "  <key>CFBundleVersion</key>",
+    "  <array><string>1</string></array>", "  <key>CFBundleStringify</key>",
+    "  <stringify>yes</stringify>", "</dict>", "</plist>",
+  ] {
+    buf.write_string(line)
+    buf.write_char('\n')
+  }
+  buf.to_string()
+}
+
+///|
+test "appfind_mac_dirs / bundle_label：扫描层与包名推导" {
+  let with_home = appfind_mac_dirs(Some("/Users/u"))
+  assert_eq(with_home.length(), 5)
+  assert_eq(with_home[0], "/System/Applications")
+  assert_eq(with_home[1], "/System/Applications/Utilities")
+  assert_eq(with_home[2], "/Applications")
+  assert_eq(with_home[3], "/Applications/Utilities")
+  assert_eq(with_home[4], "/Users/u/Applications")
+  // 无 home 就少用户级那一层
+  assert_eq(appfind_mac_dirs(None).length(), 4)
+  assert_eq(appfind_mac_dirs(Some("")).length(), 4)
+  // 包名推导
+  assert_eq(appfind_mac_bundle_label("Safari.app"), Some("Safari"))
+  assert_eq(appfind_mac_bundle_label("Visual Studio Code.app"),
+            Some("Visual Studio Code"))
+  assert_eq(appfind_mac_bundle_label("readme.txt"), None)
+  assert_eq(appfind_mac_bundle_label(".app"), None)
+  assert_eq(appfind_mac_bundle_label("app"), None)
+}
+
+///|
+test "appfind_plist_string：只取紧跟的 string 值，实体回解，别的类型给 None" {
+  let p = af_mac_plist()
+  assert_eq(appfind_plist_string(p, "CFBundleDisplayName"), Some("终端 & Shell"))
+  assert_eq(appfind_plist_string(p, "CFBundleIdentifier"),
+            Some("com.apple.Terminal"))
+  assert_eq(appfind_plist_string(p, "CFBundleName"), Some("Terminal"))
+  // 值是 <array> / <stringify> 这类非 string → None（不猜别的类型）
+  assert_eq(appfind_plist_string(p, "CFBundleVersion"), None)
+  assert_eq(appfind_plist_string(p, "CFBundleStringify"), None)
+  // 键不存在 / 空键名
+  assert_eq(appfind_plist_string(p, "CFBundleShortVersionString"), None)
+  assert_eq(appfind_plist_string(p, ""), None)
+  // 属性形式的 string 标签也认（<string xml:space="preserve">）
+  let q = "<key>A</key><string xml:space=\"preserve\">x y</string>"
+  assert_eq(appfind_plist_string(q, "A"), Some("x y"))
+  // 五个实体的回解；未知实体原样留着
+  let e = "<key>A</key><string>&lt;&gt;&quot;&apos;&amp;&nbsp;</string>"
+  assert_eq(appfind_plist_string(e, "A"), Some("<>\"'&&nbsp;"))
+}
+
+///|
+test "appfind_mac_entry：plist 键取名/标识/二进制/图标，缺键按包名回退" {
+  let dir = "/Applications/Terminal.app"
+  let e = appfind_mac_entry(dir, "Terminal", Some(af_mac_plist()))
+  assert_eq(e.name, "终端 & Shell") // DisplayName 优先
+  assert_eq(e.locale_name, "终端 & Shell")
+  assert_eq(e.id, "com.apple.Terminal")
+  assert_eq(e.exec, "/Applications/Terminal.app/Contents/MacOS/Terminal")
+  // IconFile 没写扩展名 → 补 .icns
+  assert_eq(e.icon, "/Applications/Terminal.app/Contents/Resources/Terminal.icns")
+  assert_eq(e.categories.length(), 0)
+
+  // 只有 CFBundleName：名字回退到它，id 仍是标识
+  let only_name =
+    "<key>CFBundleName</key><string>Notes</string><key>CFBundleExecutable</key><string>notes</string>"
+  let n = appfind_mac_entry("/System/Applications/Notes.app", "Notes",
+    Some(only_name))
+  assert_eq((n.name, n.id), ("Notes", "Notes"))
+  assert_eq(n.exec, "/System/Applications/Notes.app/Contents/MacOS/notes")
+  assert_eq(n.icon, "")
+
+  // 已带扩展名就照原样拼
+  let with_ext = "<key>CFBundleIconFile</key><string>Safari.icns</string>"
+  let s = appfind_mac_entry("/Applications/Safari.app", "Safari", Some(with_ext))
+  assert_eq(s.icon, "/Applications/Safari.app/Contents/Resources/Safari.icns")
+
+  // 二进制 plist / 读不到：全按包名回退，应用不从清单里消失
+  let f = appfind_mac_entry("/Applications/Odds.app", "Odds", None)
+  assert_eq((f.name, f.id, f.exec, f.icon), ("Odds", "Odds", "", ""))
+}
+
+///|
+test "appfind_mac_exec_dirs：PATH 绝对段在前，固定清单去重补齐" {
+  let dirs = appfind_mac_exec_dirs(
+    Some("a:/usr/bin::/opt/homebrew/bin:/usr/bin"), Some("/Users/u"))
+  assert_eq(dirs, [
+    "/usr/bin", "/opt/homebrew/bin", "/Users/u/.local/bin", "/usr/local/bin",
+    "/opt/homebrew/sbin", "/bin", "/usr/sbin", "/sbin",
+  ])
+  // 无 PATH / 无 home：只剩固定清单
+  assert_eq(appfind_mac_exec_dirs(None, None), [
+    "/usr/local/bin", "/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/bin",
+    "/bin", "/usr/sbin", "/sbin",
+  ])
+}
+
+///|
+test "appfind macOS 读数环：.app 扫到应用、which 找得到 sh" {
+  if sys_platform() != "macos" {
+    println("appfind: skip (macos-only 读数环)")
+    return
+  }
+  match appfind_installed() {
+    Ok(apps) => {
+      assert_true(apps.length() > 0)
+      let named = apps.filter(fn(a) { a.name != "" && a.id != "" })
+      assert_eq(named.length(), apps.length())
+      println("appfind mac: \{apps.length()} 个应用，首个 \{apps[0].name}/\{apps[0].id}")
+    }
+    Err(e) => {
+      println("appfind mac failed: \{e}")
+      assert_true(false)
+    }
+  }
+  match appfind_executable("sh") {
+    Ok(p) => assert_true(p.has_suffix("/sh"))
+    Err(e) => {
+      println("appfind mac sh: \{e}")
+      assert_true(false)
+    }
+  }
+}

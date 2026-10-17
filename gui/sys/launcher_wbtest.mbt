@@ -86,11 +86,9 @@ test {
     // 真开动作有系统副作用，只归示例与真机复验（S28）；这里只断纯判据 + 负例。
     assert_true(open_supported())
     assert_true(open_file("") is Err(NotFound))
-    // reveal 的 macOS 分支还没接（只 windows/linux），所以那里给 Unsupported
-    assert_true(
-      reveal_in_file_manager("") is Err(NotFound) ||
-        reveal_in_file_manager("") is Err(Unsupported),
-    )
+    // reveal 三平台都接了（windows 直调 / linux xdg-open / macos open -R），
+    // 空路径统一给 NotFound
+    assert_true(reveal_in_file_manager("") is Err(NotFound))
     assert_true(open_file_with("", "TODO.md") is Err(SpawnFailed))
   } else {
     assert_true(open_url("https://libyue.com") is Err(Unsupported))

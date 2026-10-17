@@ -147,6 +147,12 @@ fn nl_trim_msg(s : String) -> String {
 /// 探测可用后端：redshift -V 能退出 0 即存在（-V 只打印版本，无副作用），
 /// 否则看 xrandr --query 是否只读可用。每次调用真实探测。
 fn nl_backend() -> NlBackend? {
+  // macOS：Night Shift 没有公开控制口（CoreBrightness 是私有框架，
+  // `com.apple.CoreBrightness` 域随版本漂移，Control Center 的 UI 自动化不算
+  // API）——按「没做」出声，不去 spawn 一定不存在的 redshift/xrandr。
+  if sys_platform() == "macos" {
+    return None
+  }
   if !pr_available() {
     return None
   }

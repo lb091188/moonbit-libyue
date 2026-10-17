@@ -1,9 +1,11 @@
 // 打开外部：URL、文件（默认程序/指定程序）、文件管理器定位，单入口 + 单错误枚举。
 // Linux 走 xdg-open（argv 直传不经 shell，分离式启动不阻塞调用方）；Windows 直调
 // ShellExecuteW（URL/文件走系统关联，指定程序那条把路径放进 lpParameters）；
-// macOS 用 open。运行时探测分派，其余平台给 Unsupported。相对路径一律先按工作
-// 目录归一，Windows 侧再把分隔符统一成反斜杠。Ok 只表示「已交给系统」，系统侧
-// 能否打开由平台负责——所以交出去之前先判一次路径存在与否，不存在给 NotFound。
+// macOS 用 open（`open -R` 做文件管理器定位，选中态与 explorer /select 同档，
+// 不必为这一次调用引入 AppKit 归档）。运行时探测分派，其余平台给 Unsupported。
+// 相对路径一律先按工作目录归一，Windows 侧再把分隔符统一成反斜杠。Ok 只表示
+// 「已交给系统」，系统侧能否打开由平台负责——所以交出去之前先判一次路径存在
+// 与否，不存在给 NotFound。
 
 ///|
 /// 打开 URL 的错误类型。
@@ -302,6 +304,8 @@ pub fn open_supported() -> Bool {
 
 ///|
 /// 打开 URL 交给系统默认处理（http/https/mailto 等一律透传，不做校验）。
+/// 打开 URL 交给系统默认处理（http/https/mailto 等一律透传，不做校验）。
+/// 三平台后端：Windows `ShellExecuteW` / Linux `xdg-open` / macOS `open`。
 /// 有真实系统副作用（会拉起浏览器/协议处理程序），不要在测试里调。
 pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
   match sys_platform() {
@@ -319,6 +323,7 @@ pub fn open_url(url : String) -> Result[Unit, OpenUrlError] {
         Ok(_) => Ok(())
         Err(_) => Err(SpawnFailed)
       }
+    // macOS：Launch Services 的公开 CLI `open <url>`（单参数，走分离式启动不等待）
     "macos" =>
       match spawn_detached("open", url) {
         Ok(_) => Ok(())
@@ -338,7 +343,7 @@ pub fn reveal_in_file_manager(
 ) -> Result[Unit, FileManagerError] {
   let plat = sys_platform()
   // 平台门在前：不支持的平台连「路径不存在」都不该说
-  if plat != "windows" && plat != "linux" {
+  if plat != "windows" && plat != "linux" && plat != "macos" {
     return Err(Unsupported)
   }
   let abs = launcher_abs_path(path, current_dir())
@@ -356,6 +361,14 @@ pub fn reveal_in_file_manager(
         Err(SpawnFailed)
       }
     }
+    // macOS：`open -R <路径>` = 打开父目录并**选中**该项（对标 explorer /select）。
+    // 两个 argv 项，`spawn_detached` 只带一个参数，所以走 pr_run 那条同步线
+    // （`open` 交完活就退出，等待成本是一次进程往返）。
+    "macos" =>
+      match pr_run("open", ["-R", abs], timeout_ms=3000) {
+        Ok(o) if o.exit_code == 0 => Ok(())
+        _ => Err(SpawnFailed)
+      }
     _ =>
       match spawn_detached("xdg-open", parent_dir(abs)) {
         Ok(_) => Ok(())

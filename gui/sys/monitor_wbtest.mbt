@@ -262,3 +262,86 @@ test "mon_list 真机只读冒烟（无 X display / 无 xrandr 时跳过）" {
     Err(e) => println("mon: skip (\{e})")
   }
 }
+
+///|
+/// macOS 清单样例（yue_sys_mon_mac 的行式输出）：Built-in 为主屏、当前档
+/// 3024x1964（内建面板刷新率给 0=未知），副屏在右上、原点在负 y 方向，
+/// 另有一行孤儿 MODE 与一条字段不全的 MON 要被丢弃。
+fn mon_mac_sample() -> String {
+  mon_lines([
+    "MON\tBuilt-in\t1\t0\t0\t310\t194",
+    "MODE\t3024\t1964\t0\t1\t1",
+    "MODE\t2560\t1600\t0\t0\t0",
+    "MODE\t1280\t800\t6000\t0\t0",
+    "MON\tDisplay-69733\t0\t1920\t-1080\t527\t296",
+    "MODE\t3840\t2160\t6000\t0\t1",
+    "MODE\t1920\t1080\t5995\t0\t0",
+    "MON\tBad\t1",
+  ])
+}
+
+///|
+test "mon_split_tab：制表符分列并保留空字段" {
+  let t = mon_split_tab("MON\tBuilt-in\t1\t0\t0\t310\t194")
+  assert_eq(t.length(), 7)
+  assert_eq(t[0], "MON")
+  assert_eq(t[1], "Built-in")
+  assert_eq(t[6], "194")
+  // 空字段是「没有这个读数」，不能被当分隔符吞掉
+  let e = mon_split_tab("A\t\tB")
+  assert_eq(e.length(), 3)
+  assert_eq(e[1], "")
+  assert_eq(mon_split_tab("only").length(), 1)
+}
+
+///|
+test "mon_parse_mac：MON 开屏、MODE 归属、孤儿与坏行丢弃" {
+  let infos = mon_parse_mac(mon_mac_sample())
+  assert_eq(infos.length(), 2)
+  let a = infos[0]
+  assert_eq(a.name, "Built-in")
+  assert_eq(a.connected, true)
+  assert_eq(a.primary, true)
+  assert_eq(a.pos_x, 0)
+  assert_eq(a.pos_y, 0)
+  assert_eq(a.mm_width, 310)
+  assert_eq(a.mm_height, 194)
+  assert_eq(a.modes.length(), 3) // 首个 MODE 行在 MON 之前，已丢弃
+  assert_eq(a.width, 3024) // 当前档由带 current 的 MODE 导出（mon_finish）
+  assert_eq(a.height, 1964)
+  assert_eq(a.refresh_centi, 0) // 内建面板给 0=未知
+  assert_eq(a.modes[1].width, 2560)
+  assert_eq(a.modes[1].preferred, false)
+  assert_eq(a.modes[2].refresh_centi, 6000)
+  let b = infos[1]
+  assert_eq(b.name, "Display-69733")
+  assert_eq(b.primary, false)
+  assert_eq(b.pos_x, 1920)
+  assert_eq(b.pos_y, -1080) // 副屏原点在负方向（点位换算后仍带符号）
+  assert_eq(b.modes.length(), 2)
+  assert_eq(b.modes[0].preferred, true)
+  assert_eq(b.width, 0) // 无 current 档：在线但未启用
+  assert_eq(b.height, 0)
+}
+
+///|
+test "mon_parse_mac：空文本与整表畸形都给空清单" {
+  assert_eq(mon_parse_mac("").length(), 0)
+  assert_eq(mon_parse_mac("随便一行\n").length(), 0)
+  // 只有 MODE 没有 MON → 孤儿行，全丢
+  assert_eq(mon_parse_mac("MODE\t1\t1\t0\t1\t1\n").length(), 0)
+  // 字段数不对的 MODE 不进模式表
+  let one = mon_parse_mac("MON\tX\t0\t0\t0\t0\t0\nMODE\t800\t600\n")
+  assert_eq(one.length(), 1)
+  assert_eq(one[0].modes.length(), 0)
+}
+
+///|
+test "mon_current_from(mac 样例)：只取有当前档的屏" {
+  let cur = mon_current_from(mon_parse_mac(mon_mac_sample()))
+  assert_eq(cur.length(), 1)
+  assert_eq(cur[0].name, "Built-in")
+  assert_eq(cur[0].width, 3024)
+  assert_eq(cur[0].height, 1964)
+  assert_eq(cur[0].pos_x, 0)
+}

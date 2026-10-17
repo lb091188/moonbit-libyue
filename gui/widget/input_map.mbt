@@ -210,11 +210,11 @@ pub fn mac_vk_to_keysym(code : Int) -> Int {
     51 => KS_BACKSPACE // kVK_Delete（退格）
     53 => KS_ESCAPE
     76 => 65421 // kVK_ANSI_KeypadEnter → XK_KP_Enter
-    75 => 65454 // kVK_ANSI_KeypadDecimal → XK_KP_Decimal
+    65 => 65454 // kVK_ANSI_KeypadDecimal → XK_KP_Decimal
     67 => 65450 // kVK_ANSI_KeypadMultiply
     69 => 65451 // kVK_ANSI_KeypadPlus
     78 => 65453 // kVK_ANSI_KeypadMinus
-    71 => 65455 // kVK_ANSI_KeypadDivide
+    75 => 65455 // kVK_ANSI_KeypadDivide
     117 => KS_DELETE // kVK_ForwardDelete → XK_Delete
     115 => KS_HOME
     119 => KS_END

@@ -104,7 +104,7 @@ moon run examples/browser        # 内嵌 WebView 浏览器
 | Ubuntu 24.04（XFCE / GNOME / KDE） | ✅ | 主链路 X11 |
 | Deepin 23 / 25 | ✅ | |
 | Windows 10 / 11 | ✅ | 产物是 GUI 子系统 exe，双击不弹控制台 |
-| macOS | 🚧 | `mac` 分支落地中，Cocoa / CoreText / ImageIO / WKWebView；CI 全绿，待真机复验 |
+| macOS | 🚧 | 后端已并入 master（Cocoa / CoreText / ImageIO / WKWebView）；CI 全绿，待真机复验 |
 
 ## 文档导航
 
