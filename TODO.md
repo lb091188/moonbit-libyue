@@ -27,14 +27,6 @@
   - [ ] **焦点链会抢走窗口级兜底**：`ui.button` 的键盘口径是「空格/回车激活」。于是用户 Tab 过任何一个按钮之后，空格就不再是播放器的「播放/暂停」而是「按下那个按钮」——与 Web 一致，但播放器用户预期相反。待定口径：播放器快捷键是否要**优先于**焦点链（给 `add_key_fallthrough` 加「抢占档」），还是把按钮激活键收成只 `Enter`（改 ui 公共行为，波及所有表单）。先立判据再动：同一窗内「Tab 到按钮 + 按空格」的期望行为写进契约与 wbtest。
   - [ ] **方向键与滚动/焦点导航的归属**：`←/→/↑/↓` 在 `ui.slider`、`ui.input`（光标移动）、滚动容器与本批的播放器音量键之间目前**没有优先级记录**——同一条键谁先吃，靠的是「焦点链先问、兜底后问」这条隐式规则。要把可达路径写成表（哪个控件在焦点上时四个方向键分别归谁）。
   - [ ] **输入法门控下的按键可达性复验**：非输入框焦点时，ibus/fcitx 会话里字符键可能被 IM 吃掉只剩修饰键（真机旧症状：回显恒 65507 = Control_L）。`App` 侧有 IM 焦点门，但**播放器快捷键全走 keysym 字符键之外的键**只是绕开、不是解决；要在带 IM 的真机跑一轮「焦点在播放器上按空格/方向键」的复验并记结果。
-- [ ] **G11 GPU 合成与 3D 路径**（2026-10-17 定案，架构与依据见 [docs/zh/roadmap.md](docs/zh/roadmap.md)「GPU 合成与 3D 路径」小节）
-  - **两层落地 + 三级 fallback**：Layer 1 GPU 合成器（`wm_present` 改纹理上传 + 全屏 quad 合成，对外 API 零变化）；Layer 2 控件级 GPU 绘制（`Widget.on_render` 已留口子，当前恒 `Cpu(Painter)`）。Fallback：WebGPU 可用 → GPU 合成；不可用 → Cairo / Pure。
-  - **依赖口径**：wgpu-native 走 dlopen 动态 .so（9.3 MB，与 GTK3 同量级）；MoonBit 绑定 `moonbit-community/wgpu-mbt`（Apache-2.0，pin v29.0.1.1，同构 native-stub + prebuild）。
-  - **落地形态**：独立可选模块 `modules/gui-gpu`（对齐 gui-webview / gui-media），主链路不动。前置是 `@render.RenderCtx` 加 `Gpu(GpuContext)` 变体。
-  - **第一步验收**：X11 窗口里 wgpu 出三角形色块（用户真机肉眼确认，与 webview 首轮验收同形态）。
-  - **第二步**：`wm_present` 走纹理合成（Linux 分支先行，Win/mac 后端各自跟上）。
-  - **第三步**：开 `Gpu(GpuContext)`，视频控件先切；地图/3D 场景控件随后续批次。
-  - **档口待核**：Linux Vulkan 1.1+ 覆盖 deepin 20 需真机复验；Windows D3D12 FL 11_0 需 Win10 20H2+。任一档缺时语义化降级到 CPU 合成，不阻断构建。
 
 ## 2. 框架能力域 — 全部待在新栈重做
 
