@@ -572,6 +572,68 @@ pub fn Painter::set_line_width(self : Painter, width : Double) -> Unit {
 }
 
 ///|
+/// W35：端点形状。Cairo 档直连后端；纯软栅档暂存 state 不动效果（描边实现
+/// 未接端点扩展；这桩口留在那儿等光栅线端补齐时接上）。
+pub(all) enum LineCap {
+  Butt
+  Round
+  Square
+}
+
+pub(all) enum LineJoin {
+  Miter
+  Round
+  Bevel
+}
+
+fn line_cap_to_int(c : LineCap) -> Int {
+  match c {
+    Butt => 0
+    Round => 1
+    Square => 2
+  }
+}
+
+fn line_join_to_int(j : LineJoin) -> Int {
+  match j {
+    Miter => 0
+    Round => 1
+    Bevel => 2
+  }
+}
+
+pub fn Painter::set_line_cap(self : Painter, cap : LineCap) -> Unit {
+  match self.backend {
+    Some(CairoBackend(c)) => c.set_line_cap(line_cap_to_int(cap))
+    Some(PureBackend(_)) => ()
+    None => ()
+  }
+}
+
+pub fn Painter::set_line_join(self : Painter, join : LineJoin) -> Unit {
+  match self.backend {
+    Some(CairoBackend(c)) => c.set_line_join(line_join_to_int(join))
+    Some(PureBackend(_)) => ()
+    None => ()
+  }
+}
+
+///|
+/// W35：把已构造好的 `Path` 灌进当前画笔——Path 记录 move_to/line_to/曲线/
+/// 圆弧的段序列，回放成 backend 的 begin_path/move_to/line_to/… 序列。
+pub fn Painter::draw_path(self : Painter, path : Path) -> Unit {
+  self.begin_path()
+  for seg in path.segs {
+    match seg {
+      SegMove(x, y) => self.move_to(x, y)
+      SegLine(x, y) => self.line_to(x, y)
+      SegBezier(x1, y1, x2, y2, x3, y3) => self.bezier_curve_to(x1, y1, x2, y2, x3, y3)
+      SegClose => self.close_path()
+    }
+  }
+}
+
+///|
 /// 混合模式（对后续绘制生效；两后端同支持）。
 pub fn Painter::set_blend_mode(self : Painter, mode : BlendMode) -> Unit {
   match self.backend {

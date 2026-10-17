@@ -91,6 +91,12 @@ extern "c" fn cr_set_fill_rgba(
 extern "c" fn cr_set_line_width(id : Int64, w : Double) -> Unit = "cr_set_line_width"
 
 ///|
+extern "c" fn cr_set_line_cap(id : Int64, cap : Int) -> Unit = "cr_set_line_cap"
+
+///|
+extern "c" fn cr_set_line_join(id : Int64, join : Int) -> Unit = "cr_set_line_join"
+
+///|
 extern "c" fn cr_save(id : Int64) -> Unit = "cr_save"
 
 ///|
@@ -325,6 +331,18 @@ pub fn Cairo::set_stroke_color(self : Cairo, hex : String) -> Unit {
 /// 线宽为负按 0 处理。
 pub fn Cairo::set_line_width(self : Cairo, width : Double) -> Unit {
   cr_set_line_width(self.id, if width < 0.0 { 0.0 } else { width })
+}
+
+///|
+/// W35：端点形状（0=butt 1=round 2=square）。
+pub fn Cairo::set_line_cap(self : Cairo, cap : Int) -> Unit {
+  cr_set_line_cap(self.id, cap)
+}
+
+///|
+/// W35：拐角形状（0=miter 1=round 2=bevel）。
+pub fn Cairo::set_line_join(self : Cairo, join : Int) -> Unit {
+  cr_set_line_join(self.id, join)
 }
 
 ///|

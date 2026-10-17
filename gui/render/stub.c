@@ -268,6 +268,36 @@ void cr_set_line_width(int64_t id, double w) {
   }
 }
 
+/* W35 line_cap / line_join / dash：Cairo 直连；纯软栅档占位（Painter state
+ * 里保留字段，具体描边实现暂未吃这三个参数）。 */
+void cr_set_line_cap(int64_t id, int cap) {
+  cairo_t *cr = CR_OF(id);
+  if (!cr) return;
+  cairo_line_cap_t c = (cap == 1) ? CAIRO_LINE_CAP_ROUND
+                   : (cap == 2) ? CAIRO_LINE_CAP_SQUARE
+                   : CAIRO_LINE_CAP_BUTT;
+  cairo_set_line_cap(cr, c);
+}
+
+void cr_set_line_join(int64_t id, int join) {
+  cairo_t *cr = CR_OF(id);
+  if (!cr) return;
+  cairo_line_join_t j = (join == 1) ? CAIRO_LINE_JOIN_ROUND
+                      : (join == 2) ? CAIRO_LINE_JOIN_BEVEL
+                      : CAIRO_LINE_JOIN_MITER;
+  cairo_set_line_join(cr, j);
+}
+
+void cr_set_dash(int64_t id, const double* dashes, int n, double offset) {
+  cairo_t *cr = CR_OF(id);
+  if (!cr) return;
+  if (n <= 0) {
+    cairo_set_dash(cr, NULL, 0, 0.0);
+  } else {
+    cairo_set_dash(cr, dashes, n, offset);
+  }
+}
+
 void cr_save(int64_t id) {
   cairo_t *cr = CR_OF(id);
   if (cr) {
@@ -895,6 +925,11 @@ void cr_set_stroke_rgba(int64_t id, int r, int g, int b, int a) {
   (void)id; (void)r; (void)g; (void)b; (void)a;
 }
 void cr_set_line_width(int64_t id, double w) { (void)id; (void)w; }
+void cr_set_line_cap(int64_t id, int cap) { (void)id; (void)cap; }
+void cr_set_line_join(int64_t id, int join) { (void)id; (void)join; }
+void cr_set_dash(int64_t id, const double* dashes, int n, double offset) {
+  (void)id; (void)dashes; (void)n; (void)offset;
+}
 void cr_save(int64_t id) { (void)id; }
 void cr_restore(int64_t id) { (void)id; }
 void cr_translate(int64_t id, double dx, double dy) { (void)id; (void)dx; (void)dy; }
