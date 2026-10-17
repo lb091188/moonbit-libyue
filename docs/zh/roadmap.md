@@ -113,14 +113,21 @@ Linux 列带 **X11** 的格只在 X11 会话成立，带 **DE** 的格行为随�
 | 平台输入映射层 | ✅ | ✅ | 🚧 |
 | 输入法通道 | ✅ | ✅ | ❌ |
 | 应用宿主与多窗口 | ✅ | ✅ | 🚧 |
+| 多窗口公开 API（open_window/close_window/window_count/active_window/wid/is_primary） | ✅ | ✅ | 🚧 |
 | 窗口隐藏驻留（hide/show 唤回原位） | ✅ | ✅ | 🚧 |
+| 窗口透明（set_opacity 0–255） | 🚧 | ✅ | ❌ |
+| 窗口背景穿透（set_transparent_bg） | 🚧 | ✅ | ❌ |
+| 窗口层级嵌入（Normal/Desktop/AlwaysOnTop/Dock） | 🚧 | ✅ | ❌ |
 | 自绘控件宿主 | ✅ | ✅ | 🚧 |
 | 声明式层 | ✅ | ✅ | 🚧 |
 | 样式层 | ✅ | ✅ | 🚧 |
+| 命名样式类（StyleClass 注册表 + 主题变体） | ✅ | ✅ | ✅ |
 | 主题系统与跟随系统明暗 / 强调色 | ✅ | ✅ | 🚧 |
 | 窗口级按键兜底通道 | ✅ | ✅ | 🚧 |
+| 组合键解析与 bind_combo 便捷口 | ✅ | ✅ | ✅ |
+| 通用双击/三击检测（ClickTracker 挂 Widget） | ✅ | ✅ | ✅ |
 | 上屏帧缓冲所有权 | 🚧 | ✅ | ❌ |
-| 模块拆分 | 🚧 | 🚧 | 🚧 |
+| 模块拆分 | ✅ | ✅ | ✅ |
 | 窗口内按键路由补齐 | ⏳ |  | ⏳ |
 
 ### 绘图与资源
@@ -128,6 +135,11 @@ Linux 列带 **X11** 的格只在 X11 会话成立，带 **DE** 的格行为随�
 | 功能点 | Windows | Linux | macOS |
 |---|---|---|---|
 | 路径、曲线、变换、裁剪与渐变 | ✅ | ✅ | 🚧 |
+| `Painter.draw_path(Path)` 对象直通 | ✅ | ✅ | 🚧 |
+| `Painter.set_line_cap / set_line_join`（LineCap/LineJoin 枚举） | ✅ | ✅ | 🚧 |
+| `Painter.set_dashes`（数组 marshalling） | ❌ | ❌ | ❌ |
+| `Color::rgb/rgba` 构造 + `to_hex` 序列化 + `color_white` 常量 | ✅ | ✅ | ✅ |
+| `@widget` 门面 re-export 绘图类型（Painter/Color/Bitmap/Gradient/Canvas/Image/Animation） | ✅ | ✅ | ✅ |
 | 位图、画布与图像编解码 | ✅ | ✅ | 🚧 |
 | GIF 动画与 `gif` 组件 | ✅ | ✅ | ？ |
 | 矢量图标 | ✅ | ✅ | 🚧 |
@@ -220,6 +232,8 @@ Linux 列带 **X11** 的格只在 X11 会话成立，带 **DE** 的格行为随�
 | 解码引擎 | ✅ | ✅ | ❌ |
 | 音频输出 | ✅ | ✅ | ❌ |
 | 播放器组件 | 🚧 | ✅ | ❌ |
+| 无头播放接口（HeadlessAudio/HeadlessVideo，注入 schedule 通道自 pump） | ✅ | ✅ | ✅ |
+| 无头视频帧取回（current_frame → Bytes） | ✅ | ✅ | ✅ |
 | 字幕层 | 🚧 | ✅ | ❌ |
 | 歌词层 | 🚧 | ✅ | ❌ |
 | 实时频谱 | 🚧 | ✅ | ❌ |
