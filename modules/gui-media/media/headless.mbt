@@ -1,6 +1,15 @@
 // W36 无头播放便捷入口：不创建窗口、不挂组件树，纯代码驱动解码+输出。
-// 与 audio_player.mbt / video_player.mbt 的 UI 形态共享引擎（audio.mbt / video.mbt），
-// 区别只在这里给 tick 自驱动循环与完成回调。
+//
+// 与 audio_player.mbt / video_player.mbt 的 UI 形态**共享引擎**（audio.mbt / video.mbt），
+// 分工是：
+// - **无头消费者**（脚本批处理、无 UI 服务、后台混音、单元测试）走本文件的
+//   `HeadlessAudio::open` / `HeadlessVideo::open`，通过注入的 `schedule` 通道自
+//   驱动 pump；
+// - **UI 消费者**（组件形态、要挂进 Node 树）继续走 `audio_player_t` /
+//   `video_player_t`——那两条走 Store 反应式 + App 时钟 pump，与 widget 树
+//   重绘节奏对齐，硬套本文件的 schedule 反而多一层转发。
+//
+// 两条路径的引擎调用点、错误处理、循环/倍速/音量语义完全一致。
 
 ///|
 /// 无头音频播放器：建引擎 + 挂定时器自 pump + 播完回调。
