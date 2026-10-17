@@ -939,6 +939,24 @@ void wm_set_layer(int64_t id, int layer) {
   }
 }
 
+/* W33 背景透明：Win32 走 WS_EX_LAYERED + LWA_COLORKEY 一档（色键值当前留 0，
+ * 完整语义要接 UpdateLayeredWindow；本档仅打开 layered 位，供后续批次深化）。 */
+void wm_set_transparent_bg(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) return;
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) return;
+  LONG ex = GetWindowLongW(w->hwnd, GWL_EXSTYLE);
+  if (on) {
+    if (!(ex & WS_EX_LAYERED)) {
+      SetWindowLongW(w->hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
+    }
+  } else {
+    if (ex & WS_EX_LAYERED) {
+      SetWindowLongW(w->hwnd, GWL_EXSTYLE, ex & ~WS_EX_LAYERED);
+    }
+  }
+}
+
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -4269,6 +4287,16 @@ void wm_set_layer(int64_t id, int layer) {
   }
 }
 
+/* W33 背景透明（GTK 档）：开 app_paintable 让本窗自己填底色，配合
+ * RGBA visual 可实现真·透明背景（本档只切 paintable 位，visual 选 RGBA
+ * 的接入留到 prebuild/visual 探测批次一起做）。 */
+void wm_set_transparent_bg(int64_t id, int on) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) return;
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) return;
+  gtk_widget_set_app_paintable(w->window, on ? TRUE : FALSE);
+}
+
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -6270,6 +6298,7 @@ int wm_is_hidden(int64_t id) {
 
 void wm_set_opacity(int64_t id, int alpha) { (void)id; (void)alpha; }
 void wm_set_layer(int64_t id, int layer) { (void)id; (void)layer; }
+void wm_set_transparent_bg(int64_t id, int on) { (void)id; (void)on; }
 
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   (void)id;

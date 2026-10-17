@@ -123,6 +123,15 @@ pub fn Window::set_layer(self : Window, layer : WindowLayer) -> Unit {
 }
 
 ///|
+/// 背景透明：开启后由控件层自己填底色，未覆盖处透出桌面/下层内容。
+/// Linux/GTK 走 `gtk_widget_set_app_paintable`；Win32 走 `WS_EX_LAYERED` 位；
+/// macOS 分支随 mac 后端补齐。要真·透明像素还得配 RGBA visual / DWM 扩展，
+/// 与 set_opacity 组合使用覆盖多数场景。
+pub fn Window::set_transparent_bg(self : Window, on : Bool) -> Unit {
+  wm_set_transparent_bg(self.id, if on { 1 } else { 0 })
+}
+
+///|
 pub(all) enum WindowLayer {
   Normal
   Desktop
