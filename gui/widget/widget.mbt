@@ -82,6 +82,10 @@ pub(all) struct Widget {
   /// **不要再把控件句柄捕获进闭包**——控件持有回调、回调又持有控件就是引用环，
   /// 本工具链的计数式回收断不掉环，动态换树（bind_node 重挂）会稳定泄漏。
   mut on_draw : Option[(Widget, @render.Painter, Rect) -> Unit]
+  /// W38 3D/GPU 渲染口子：控件声明 `on_render` 时，paint_walk 优先派发它并
+  /// 传 RenderCtx；`on_draw` 作为 CPU 回退保留。当前 RenderCtx 恒为 Cpu 档，
+  /// 等价于把 Painter 包一层；WebGPU 后端落地时 Gpu 档才填实际句柄。
+  mut on_render : Option[(Widget, @render.RenderCtx, Rect) -> Unit]
   /// 指针回调：首参是控件本身（要读 `rect` 判「松开是否在自己范围内」、
   /// 拖动边界等，都由参数拿，不要把控件句柄捕获进闭包——见 `on_draw` 注）
   mut on_pointer : Option[(Widget, PointerEvent) -> Bool]
@@ -156,6 +160,7 @@ pub fn Widget::new() -> Widget {
     visible: true,
     paint_epoch: 0,
     on_draw: None,
+    on_render: None,
     on_pointer: None,
     on_key: None,
     on_scroll: None,
@@ -935,9 +940,13 @@ pub fn Widget::paint_at(self : Widget, p : @render.Painter, ox : Double, oy : Do
   if own < 1.0 || inherited < 1.0 {
     p.set_global_alpha(inherited * own)
   }
-  match self.on_draw {
-    Some(f) => f(self, p, self.rect)
-    None => ()
+  match self.on_render {
+    Some(f) => f(self, @render.Cpu(p), self.rect)
+    None =>
+      match self.on_draw {
+        Some(g) => g(self, p, self.rect)
+        None => ()
+      }
   }
   // 层序:按 resolved z_index **稳定**重排(同值保持 kids 数组序=尾画者赢,
   // design.md §1.2「层序按 kids 数组序」的过渡口径被 z_index 取代);未应用过
