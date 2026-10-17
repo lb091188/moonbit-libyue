@@ -2504,6 +2504,26 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **CI 已回证的点（2026-10-15，run 38616056855 三平台全绿）**：五支 mac 桩在新 SDK 上编得过；`moon check` 零警告；12 包 `moon test` 全绿——其中包含只在真实 macOS 上才跑的那几条读数环（`appfind` 扫 `/Applications` 拿到应用、`appfind_executable("sh")` 命中；`sys` 族 `host_statistics64`/`kern.boottime`/空闲读数；`render` 的 ImageIO 解码与 `text` 的 CoreText 测量），以及 `hello` 在 runner 的登录会话里**建窗并转起循环**活到 20 秒超时。
 - **仍待真机目视的点**（这些 CI 给不了）：T1-T6 的观感与交互（Retina 观感、输入法内联、拖窗期间的循环、通知在非 bundle 进程下是否弹出）、显示器枚举在多台外接屏下的读数、plist/launchctl 的实际生效、osascript 的自动化授权。
 
+## macOS 对齐批（2026-10-18，mac 本机把 merge 717d246 记的 17 函数缺口补平，全 workspace `moon test` 1236/1236 首次在本机回证）
+
+- **窗口面补平（hide/is_hidden/opacity/layer/transparent_bg/im_set_active/hotkey_\*）**：
+  1. **`wm_show` 必须清 `hidden` 标志**——Cocoa 的 `orderOut:` 不丢 frame，位置无需复位（与 GTK 那条「show 前要还原 saved geometry」刻意不同），但 W23 语义的「隐藏驻留窗口不进 `wm_wait` 枚举」靠的是我们自己记的 `hidden`，`orderFront:` 不顺手清它就会让 `hide_wbtest` 的「唤回后 is_hidden==0」判红。
+  2. 输入法焦点门 `im_active` 与 GTK 支同语义同默认值（首窗默认 1，`im_set_active(0)` 后键不再过 `NSTextInputContext`）。
+- **系统级拖放 mac 落地（dragdnd 八件）**：
+  1. **判据口径又一次只编码了一侧**：`dragdnd_wbtest` 的 `count`/`effect` 断的是 **Win32 语义**（count=已注册窗口数、未注册窗 `effect` 回 -1），而 GTK 支给的是恒 1 的另一种语义。mac 按 Win32 这条实现（`wm_dnd_registered[]` 数组记账），并把「GTK 不同」写进注释——三平台里两派语义并存时，新平台跟**测试认的那派**。
+  2. **拖出（send）要现场按下事件**：`beginDraggingSessionWithItems:event:source:` 的 `event:` 必须是本次 `mouseDown:` 的 `NSEvent`，不能凭空造——`mouseDown:` 里存档 `down_ev`，`send` 用掉即清（与 GTK「press 存档起拖」同一条契约）。
+  3. **阻塞语义靠嵌套泵**：起拖后 `nextEventMatchingMask:NSEventMaskAny untilDate:+4ms inMode:NSDefaultRunLoopMode` + `sendEvent:` 的小循环自己转，直到 `draggingSession:endedAtPoint:operation:` 置 done 或 60s 超时——`cancelDragOperation:` 已废弃不再支持，超时不取消、直接回 3。
+  4. **NSDragOperation 与门面效果位要显式映射**：Copy=1、Move=16、Link=512，回来是多位的按「没成交」给 0——mac 的原生枚举值与线协议位（0/1/2/4）数值全不同，不能透传。
+  5. 载荷线协议三平台同一条：`[kind:i32 LE][body]`，kind 1=文本、4=路径 `\n` 连接绝对路径；投递取回用 `readObjectsForClasses:` + `NSPasteboardURLReadingFileURLsOnlyKey` 拿文件 URL，否则退 `stringForType:NSPasteboardTypeString`。
+- **webview 模块 mac 链接补齐**：`webkit_stub.c` 的占位分支带 `!defined(__APPLE__)` 闸，mac 上 native-stub 那次编出的是**空翻译单元**——所以 `modules/gui-webview/prebuild.py` 必须自己带 Darwin 分支（`-DWB_HAVE_WKWEBVIEW -x objective-c -fobjc-arc` 编归档 + 链 WebKit/Cocoa 框架 + **主仓 `libyue_win_stub_mac.a`**：webview 要 win 桩的 `wm_surface_container`，extern 直链没有 MoonBit import 边，归档缺位就是整串 `_wb_*` Undefined symbols）。模块 prebuild 的失败形态是链接期一串符号炸，不是编译期一句错——查的时候先确认归档真的生成。
+  顺带一条**分支冻结在旧线上形态**的实证：master 修过「kind=7 JS 求值全文走专用 65536 缓冲（`wb_eval_text`），事件槽只留空串」，mac 臂没有这套——`_wb_eval_text` 链接错把它炸了出来。对齐批不只补新函数，**旧函数改过的 wire 形态也要逐臂核一遍**。
+- **sysmonitor mac 两支桩修复**：
+  1. **`mach_task_self_` 是数据符号，`_mach_task_self` 才是函数**——libSystem 里带尾下划线的那个以 `extern 函数` 声明编得过、链得上，调一下就是**跳进数据页 SIGBUS**（signal 10）。定位靠解析崩溃报告 `.ips` 的帧符号；小复现程序（只调一句 `vm_deallocate`）五十秒出真相，比 lldb 挂全套测试快。
+  2. **SIP 下 `proc_pidinfo(pid 1)` 返回 0 不是错误**：BSDINFO/TASKINFO 对 launchd 一律给 0 字节（非 root 拿不到），而 `proc_pidpath(1)` 可用——proc 表因此整列丢 launchd。修形态：读不到 stat 时由 path 的 basename 合成 comm、状态照实给运行中，让 pid 1 回到清单里（判据「0 字节」要与「失败」分开处理）。
+- **mac 剪贴板换 NSPasteboard 主路径（pbcopy 对非 ASCII 静默空写）**：命令线 `printf … | pbcopy` 传**纯 ASCII** 回环正常，传**含中文/换行**的文本 rc 仍是 0、粘贴板却被清空或没写（`clipboard info` 看着健康，纯 no-op）——探针文本「yue-clip 探针·第一行\n第二行」就是这样把回环测成 None 的；同串走 `NSPasteboard setString:forType:` 完好。修法与 Linux GtkClipboard 同路：`clipboard.mbt` 的 mac 分支优先走 `yue_sys_clipboard_gtk_*` 转发层（`sys_stub.c` 非 `_WIN32` 臂 → win 桩 mac 臂的 NSPasteboard 真实现，`available` 恒 1），pbcopy/pbpaste 只作降级兜底。`sys_stub.c` 那条「Windows/macOS 给哑实现」的注释是过期的——哑分支只圈 `_WIN32`，mac 一直走的真转发，已随批改注释。
+- **render mac 臂 W35 三支空桩**：`cr_set_line_cap/join/dash` 给空实现保链接——mac 走纯光栅路径（`cr_begin` 恒 0，Painter 从不进 cairo 会话），线帽语义归纯 MoonBit 光栅器，与 GTK/Win32 的 cairo 真实现刻意不同形态、同门面契约。
+- **验证口径**：这批在 mac 本机跑的（`moon test --target native` 全 workspace 1236/1236），是 master 合并 mac 后**首次**在真 macOS 上全量跑库测试；CI 的 macOS job 覆盖面不变，真机目视项仍按 `_人工测试清单.md` T 节走。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

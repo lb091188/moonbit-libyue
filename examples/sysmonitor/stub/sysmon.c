@@ -2044,7 +2044,10 @@ typedef unsigned int sysmon_mach_port_t;
 typedef int sysmon_kern_return_t;
 
 extern sysmon_mach_port_t mach_host_self(void);
-extern sysmon_mach_port_t mach_task_self_(void);
+/* 自任务端口走**函数** _mach_task_self：libSystem 里带下划线尾的
+   mach_task_self_ 是数据符号（端口值本体），拿它当函数调是往数据页跳转，
+   macOS 真机首跑在 /proc/stat 采样处 SIGBUS（2026-10-18 回改）。 */
+extern sysmon_mach_port_t mach_task_self(void);
 extern sysmon_kern_return_t host_processor_info(
     sysmon_mach_port_t host,
     int flavor,
@@ -2283,8 +2286,10 @@ static moonbit_bytes_t sysmon_apple_proc_stat(void) {
                          (unsigned long long)(unsigned int)p[SYSMON_CPU_STATE_IDLE]);
   }
   /* host_processor_info 返回的缓冲须 vm_deallocate（每次采样一块，泄漏
-     在 1Hz 下可积少成多） */
-  vm_deallocate(mach_task_self_(), (unsigned long long)(uintptr_t)info,
+     在 1Hz 下可积少成多）；task 端口取 mach_task_self()（函数）——写错成
+     带尾下划线的 mach_task_self_ 就是「调用一个数据符号」：跳进数据页，
+     macOS 26 真机一采样就 SIGBUS（本示例首轮复验实测） */
+  vm_deallocate(mach_task_self(), (unsigned long long)(uintptr_t)info,
                 (unsigned long long)count * sizeof(int));
   if (!ok) {
     free(b.p);
@@ -2493,7 +2498,20 @@ static moonbit_bytes_t sysmon_apple_pid_stat(int pid) {
   memset(&bi, 0, sizeof(bi));
   if (proc_pidinfo(pid, SYSMON_PROC_PIDTBSDINFO, 0, &bi, (int)sizeof(bi)) <=
       0) {
-    return NULL;
+    /* launchd(pid 1) 被 SIP 挡 proc_pidinfo（非 root 实测返回 0，2026-10-18
+       mac 首轮真机），直接丢弃会让全量清单缺 pid 1。proc_pidpath 不受这堵
+       墙：退回它合成一条——comm 取路径末段，ppid/nice 缺 0，状态按 S 给；
+       计时/RSS 读不到就是 0（下面的 taskinfo 失败回退同口径），不猜数。 */
+    char sb_path[4096];
+    if (proc_pidpath(pid, sb_path, sizeof(sb_path)) <= 0) {
+      return NULL;
+    }
+    sb_path[sizeof(sb_path) - 1] = '\0';
+    const char *base = strrchr(sb_path, '/');
+    base = (base != NULL ? base + 1 : sb_path);
+    strncpy(bi.pbi_name, base, sizeof(bi.pbi_name) - 1);
+    bi.pbi_name[sizeof(bi.pbi_name) - 1] = '\0';
+    bi.pbi_status = SYSMON_SRUN; /* 读不到真状态：按在跑给，差值口径不受影响 */
   }
   SysmonProcTaskinfo ti;
   memset(&ti, 0, sizeof(ti));
@@ -2527,6 +2545,8 @@ static moonbit_bytes_t sysmon_apple_pid_stat(int pid) {
     break;
   }
   bi.pbi_comm[sizeof(bi.pbi_comm) - 1] = '\0';
+  /* SIP 兜底那条 comm 是空的：改用 pbi_name（路径末段），别画一对空括号 */
+  const char *comm = bi.pbi_comm[0] != '\0' ? bi.pbi_comm : bi.pbi_name;
   SysmonBuf b = {0};
   /* 22 个状态后置字段：state ppid pgrp session tty tpgid flags minflt
      cminflt majflt cmajflt utime stime cutime cstime priority nice
@@ -2534,7 +2554,7 @@ static moonbit_bytes_t sysmon_apple_pid_stat(int pid) {
   if (!sysmon_buf_putf(&b,
                        "%d (%s) %c %u 0 0 0 0 0 0 0 0 0 %llu %llu 0 0 0 %d "
                        "%d 0 0 0 %llu 0\n",
-                       pid, bi.pbi_comm, state, (unsigned int)bi.pbi_ppid,
+                       pid, comm, state, (unsigned int)bi.pbi_ppid,
                        utime, stime, bi.pbi_nice, threads, rss)) {
     free(b.p);
     return NULL;
