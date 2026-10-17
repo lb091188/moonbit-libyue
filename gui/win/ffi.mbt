@@ -23,6 +23,9 @@ extern "c" fn wm_hide(id : Int64) -> Unit = "wm_hide"
 extern "c" fn wm_is_hidden(id : Int64) -> Int = "wm_is_hidden"
 
 ///|
+extern "c" fn wm_set_opacity(id : Int64, alpha : Int) -> Unit = "wm_set_opacity"
+
+///|
 #borrow(out_w, out_h)
 extern "c" fn wm_size(
   id : Int64,

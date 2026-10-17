@@ -110,6 +110,13 @@ pub fn Window::is_hidden(self : Window) -> Bool {
 }
 
 ///|
+/// 设置整窗透明度（0=全透，255=不透明）。Linux 需合成器在无合成器环境下静默无效。
+pub fn Window::set_opacity(self : Window, alpha : Int) -> Unit {
+  let a = if alpha < 0 { 0 } else if alpha > 255 { 255 } else { alpha }
+  wm_set_opacity(self.id, a)
+}
+
+///|
 /// 焦点归属（见 `FocusOwner`）：上层据此决定「让位给本窗子件要不要清自绘控件
 /// 的焦点栈」。GTK 分支真判；Win32 分支目前固定报 `Area`（= 行为与本改动之前
 /// 一致，失焦只交还输入法不清栈），真正的判定随 W 线接；macOS 分支待平台批。

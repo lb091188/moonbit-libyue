@@ -906,6 +906,26 @@ int wm_is_hidden(int64_t id) {
   return wm_windows[id].hidden;
 }
 
+/* W33 窗口透明度（0–255，255=不透明）。Win32 走 WS_EX_LAYERED + SetLayeredWindowAttributes。 */
+void wm_set_opacity(int64_t id, int alpha) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) return;
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) return;
+  LONG ex = GetWindowLongW(w->hwnd, GWL_EXSTYLE);
+  if (alpha >= 255) {
+    if (ex & WS_EX_LAYERED) {
+      SetLayeredWindowAttributes(w->hwnd, 0, 255, LWA_ALPHA);
+      SetWindowLongW(w->hwnd, GWL_EXSTYLE, ex & ~WS_EX_LAYERED);
+    }
+    return;
+  }
+  if (!(ex & WS_EX_LAYERED)) {
+    SetWindowLongW(w->hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
+  }
+  if (alpha < 0) alpha = 0;
+  SetLayeredWindowAttributes(w->hwnd, 0, (BYTE)alpha, LWA_ALPHA);
+}
+
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -4209,6 +4229,17 @@ int wm_is_hidden(int64_t id) {
   return wm_windows[id].hidden;
 }
 
+/* W33 窗口透明度（0–255，255=不透明）。GTK/X11 走 gdk_window_set_opacity（需合成器）。 */
+void wm_set_opacity(int64_t id, int alpha) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) return;
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) return;
+  GdkWindow *gw = gtk_widget_get_window(GTK_WIDGET(w->window));
+  if (gw == NULL) return;
+  double a = (alpha <= 0) ? 0.0 : ((alpha >= 255) ? 1.0 : (alpha / 255.0));
+  gdk_window_set_opacity(gw, a);
+}
+
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -6207,6 +6238,8 @@ int wm_is_hidden(int64_t id) {
   (void)id;
   return 0;
 }
+
+void wm_set_opacity(int64_t id, int alpha) { (void)id; (void)alpha; }
 
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   (void)id;
