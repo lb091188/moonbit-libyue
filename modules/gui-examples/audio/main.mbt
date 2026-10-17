@@ -105,14 +105,14 @@ fn main {
   let toast = @ui.toast_layer(duration_ms=2200)
   // 播放列表：完整路径表 + 选中名（menu 的 Store 存显示名）
   let tracks : Ref[Array[String]] = Ref([])
-  let selected : @core.Store[String] = @core.Store::new("")
-  let track_line : @core.Store[String] = @core.Store::new("（还没载入曲目）")
-  let tick_line : @core.Store[String] = @core.Store::new("")
-  let lyric_line : @core.Store[String] = @core.Store::new("")
-  let err_line : @core.Store[String] = @core.Store::new("")
-  let list_holder : Ref[@core.Widget?] = Ref(None)
-  let player_holder : Ref[@core.Widget?] = Ref(None)
-  let host : Ref[@core.App?] = Ref(None)
+  let selected : @base.Store[String] = @base.Store::new("")
+  let track_line : @base.Store[String] = @base.Store::new("（还没载入曲目）")
+  let tick_line : @base.Store[String] = @base.Store::new("")
+  let lyric_line : @base.Store[String] = @base.Store::new("")
+  let err_line : @base.Store[String] = @base.Store::new("")
+  let list_holder : Ref[@widget.Widget?] = Ref(None)
+  let player_holder : Ref[@widget.Widget?] = Ref(None)
+  let host : Ref[@widget.App?] = Ref(None)
   let loaded : Ref[Bool] = Ref(false)
   fn fail(msg : String) -> Unit {
     err_line.set(msg)
@@ -352,7 +352,7 @@ fn main {
                   @ui.bind_label(track_line, fn(s) { s }),
                   @ui.bind_label(tick_line, fn(s) { s }, font_size=12.0, color="text_secondary"),
                   @ui.bind_label(lyric_line, fn(s) { s }, font_size=12.0, color="text_secondary"),
-                  @core.bind_node(err_line.signal(), fn(e : String) -> @core.Node {
+                  @widget.bind_node(err_line.signal(), fn(e : String) -> @widget.Node {
                     if e.length() == 0 {
                       @ui.view([])
                     } else {
@@ -380,7 +380,7 @@ fn main {
     title="音频播放示例",
     width=1020,
     height=640,
-    handle=fn(a : @core.App) {
+    handle=fn(a : @widget.App) {
       host.val = Some(a)
       // 首帧后载入默认资产（此时挂载已完成，播放器能直接挂进右侧区域）
       let _ = a.timer(0, fn() -> Unit {

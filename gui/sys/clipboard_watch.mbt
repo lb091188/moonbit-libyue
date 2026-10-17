@@ -11,9 +11,9 @@
 // 拍，不触发回调。定时器由调用方注入（本包不引 GUI 核心层），[cbw_stop]
 // 置停靠标志，下一拍回调发现标志为 false 就不再续期。
 //
-// 典型用法（GUI 层把 @core.set_timeout 包成注入通道）：
+// 典型用法（GUI 层把 @shell.set_timeout 包成注入通道）：
 //   let watcher = cbw_start_watch(
-//     fn(ms, f) { let _ = @core.set_timeout(ms, f) },
+//     fn(ms, f) { let _ = @shell.set_timeout(ms, f) },
 //     cb=fn(text) { println("剪贴板新内容：\{text}") },
 //   )
 //   // ……需要时
@@ -155,7 +155,7 @@ fn cbw_tick(watcher : ClipboardWatcher, cb : (String) -> Unit) -> Bool {
 /// 启动剪贴板监听：按 interval_ms（默认 800ms，钳 100..60000）轮询读
 /// 剪贴板，文本变化时以新文本调 cb；基线取启动瞬间的剪贴板内容，初始
 /// 内容不触发回调。本包不认识事件循环——定时器由调用方注入 `schedule`
-/// （GUI 层给 `fn(ms, f) { let _ = @core.set_timeout(ms, f) }`，无头测试
+/// （GUI 层给 `fn(ms, f) { let _ = @shell.set_timeout(ms, f) }`，无头测试
 /// 给一个把回调收进表里的假通道），每拍结束再自行续下一拍。句柄交
 /// [cbw_stop] 停止（置停靠标志，至多再跑一拍即自行终止）。
 pub fn cbw_start_watch(

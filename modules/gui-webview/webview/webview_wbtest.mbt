@@ -3,9 +3,9 @@
 
 ///|
 /// 假宿主：窗口句柄取越界值（桩里所有 wm_*/wb_* 对越界句柄早退），
-/// 经 `@core.test_app(@core.fake_session(..))` 通道构造（App 字段已不对外）。
-fn fake_app() -> @core.App {
-  @core.test_app(@core.fake_session(900, 1, true, 10, 10))
+/// 经 `@widget.test_app(@shell.fake_session(..))` 通道构造（App 字段已不对外）。
+fn fake_app() -> @widget.App {
+  @widget.test_app(@shell.fake_session(900, 1, true, 10, 10))
 }
 
 ///|

@@ -125,7 +125,7 @@ test "funnel_layer_color：同系列自顶向下渐浅" {
 
 ///|
 test "漏斗图组件：出像素、换数据画面变" {
-  let d = @core.Store::new([
+  let d = @base.Store::new([
     BarItem::make("浏览", 1000.0),
     BarItem::make("加购", 400.0),
     BarItem::make("下单", 220.0),

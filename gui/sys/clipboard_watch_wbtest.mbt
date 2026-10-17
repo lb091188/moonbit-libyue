@@ -103,7 +103,7 @@ test "cbw_stop：置停靠标志，幂等" {
 ///|
 test "cbw_start_watch：注入假定时器通道，续拍与 stop 后不再续拍" {
   // 本包不认识事件循环：schedule 由调用方注入，测试用假通道把每拍回调
-  // 收进表里手动派拍（GUI 层给 fn(ms, f) { let _ = @core.set_timeout(ms, f) }）
+  // 收进表里手动派拍（GUI 层给 fn(ms, f) { let _ = @shell.set_timeout(ms, f) }）
   let pending : Array[(() -> Unit)] = []
   let seen : Array[String] = []
   let intervals : Array[Int] = []

@@ -4,7 +4,7 @@
 // ② master 那套 `stateful_item(自持 hover/focus)` 在这里换成「底色与文字色由回调
 //    现取 + 悬停读宿主维护的 `Widget.hovered`」——交互态归宿主统一置位，组件不
 //    再自己处理 enter/leave，也不会留下随重建漂移的私有状态。
-// 选中态一律走 `@core.Store[T]`：画法现取 Store，所以外部 `set` 立刻换高亮，
+// 选中态一律走 `@base.Store[T]`：画法现取 Store，所以外部 `set` 立刻换高亮，
 // 订阅只为请求重绘（`follow_store`）。
 
 ///|
@@ -44,18 +44,18 @@ fn nav_item(
   size : Double,
   weight? : @text.FontWeight = @text.Normal,
   width? : Double = 0.0,
-  bg? : (@core.Widget) -> String = fn(_w : @core.Widget) -> String { "" },
-  fg? : (@core.Widget) -> String = fn(_w : @core.Widget) -> String {
+  bg? : (@widget.Widget) -> String = fn(_w : @widget.Widget) -> String { "" },
+  fg? : (@widget.Widget) -> String = fn(_w : @widget.Widget) -> String {
     @theme.theme_text_regular()
   },
   on_click? : () -> Unit = fn() -> Unit { () },
   focusable? : Bool = false,
   on_step? : (Int) -> Unit = fn(_d : Int) -> Unit { () },
   skin? : @style.Style = @style.empty_style(),
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let font = @text.Font::new("", size, weight=weight)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let tw = text_width(text, font)
     let box_w = if width > 0.0 { width } else { tw + pad_x * 2.0 }
@@ -63,19 +63,19 @@ fn nav_item(
     w.node.set_height(@yoga.fixed(height))
     if focusable {
       w.focus_id = auto_focus_id(0)
-      w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
         if !ev.press {
           return false
         }
         let ks = ev.keysym
-        if ks == @core.KS_SPACE || ks == @core.KS_RETURN {
+        if ks == @base.KS_SPACE || ks == @base.KS_RETURN {
           on_click()
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if ks == @core.KS_LEFT || ks == @core.KS_UP {
+        } else if ks == @base.KS_LEFT || ks == @base.KS_UP {
           on_step(-1)
           true
-        } else if ks == @core.KS_RIGHT || ks == @core.KS_DOWN {
+        } else if ks == @base.KS_RIGHT || ks == @base.KS_DOWN {
           on_step(1)
           true
         } else {
@@ -85,9 +85,9 @@ fn nav_item(
     }
     @style.apply(w, skin)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 「选中 × 悬停」两轴的取色分支是数据态（不是状态桶，§1.5），留在调用方的
       // 调色回调里；样式槽给了同名属性就以样式为准（class 覆盖内置皮肤）
@@ -115,10 +115,10 @@ fn nav_item(
         p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       }
     })
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -126,7 +126,7 @@ fn nav_item(
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
           if inside {
             on_click()
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -140,7 +140,7 @@ fn nav_item(
 
 ///|
 /// 悬停才有的底色（未悬停给空串 = 不铺底）。
-fn hover_bg(w : @core.Widget, color : String) -> String {
+fn hover_bg(w : @widget.Widget, color : String) -> String {
   if w.hovered { color } else { "" }
 }
 
@@ -150,12 +150,12 @@ fn hover_bg(w : @core.Widget, color : String) -> String {
 /// （到头环绕，选中随键走；焦点停在按键那一段）。
 pub fn segmented(
   options : Array[String],
-  selected : @core.Store[String],
+  selected : @base.Store[String],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(selected)
-  let items : Array[@core.Node] = []
+  let items : Array[@widget.Node] = []
   let n = options.length()
   for i = 0; i < n; i = i + 1 {
     let opt = options[i]
@@ -166,14 +166,14 @@ pub fn segmented(
         30.0,
         16.0,
         13.0,
-        bg=fn(w : @core.Widget) -> String {
+        bg=fn(w : @widget.Widget) -> String {
           if selected.get() == opt {
             @theme.theme_bg_panel()
           } else {
             hover_bg(w, @theme.theme_border())
           }
         },
-        fg=fn(_w : @core.Widget) -> String {
+        fg=fn(_w : @widget.Widget) -> String {
           if selected.get() == opt {
             @theme.theme_primary()
           } else {
@@ -207,12 +207,12 @@ pub fn segmented(
 /// 按位置判会让末项永远点不动，而末项未必是当前页。
 pub fn breadcrumb(
   items : Array[String],
-  selected : @core.Store[String],
+  selected : @base.Store[String],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(selected)
-  let nodes : Array[@core.Node] = []
+  let nodes : Array[@widget.Node] = []
   let n = items.length()
   for i = 0; i < n; i = i + 1 {
     if i > 0 {
@@ -222,8 +222,8 @@ pub fn breadcrumb(
           24.0,
           2.0,
           13.0,
-          bg=fn(_w : @core.Widget) -> String { "" },
-          fg=fn(_w : @core.Widget) -> String { @theme.theme_text_secondary() },
+          bg=fn(_w : @widget.Widget) -> String { "" },
+          fg=fn(_w : @widget.Widget) -> String { @theme.theme_text_secondary() },
           on_click=fn() -> Unit { () },
           skin=paint_subset(class),
         ),
@@ -236,8 +236,8 @@ pub fn breadcrumb(
         24.0,
         4.0,
         13.0,
-        bg=fn(_w : @core.Widget) -> String { "" },
-        fg=fn(w : @core.Widget) -> String {
+        bg=fn(_w : @widget.Widget) -> String { "" },
+        fg=fn(w : @widget.Widget) -> String {
           if selected.get() == mine {
             @theme.theme_text_primary()
           } else if w.hovered {
@@ -268,17 +268,17 @@ pub fn breadcrumb(
 /// 分页（EP Pagination）：`‹ 1 2 … ›`，当前页主题色实底白字，悬停浅底。
 /// `current` 从 1 起；两侧箭头越界时夹到首/末页。
 pub fn pagination(
-  current : @core.Store[Int],
+  current : @base.Store[Int],
   pages : Int,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(current)
-  let items : Array[@core.Node] = []
+  let items : Array[@widget.Node] = []
   let hi = if pages > 0 { pages } else { 1 }
-  fn step(delta : Int) -> @core.Node {
+  fn step(delta : Int) -> @widget.Node {
     let right = delta > 0
-    @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
       watch_theme()
       w.node.set_width(@yoga.fixed(28.0))
       w.node.set_height(@yoga.fixed(28.0))
@@ -288,9 +288,9 @@ pub fn pagination(
       )
       @style.apply(w, paint_subset(class))
       w.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         // 悬停底色由 hover 桶供（样式没给就是不铺底）
         let st = @style.style_for(self)
@@ -308,10 +308,10 @@ pub fn pagination(
           @style.color_of(st.color, @theme.theme_text_regular()),
         )
       })
-      w.cursor = @core.CURSOR_HAND
+      w.cursor = @widget.CURSOR_HAND
       w.on_pointer = Some(fn(
-        _self : @core.Widget,
-        ev : @core.PointerEvent,
+        _self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => true
@@ -324,7 +324,7 @@ pub fn pagination(
             } else {
               v
             })
-            @core.invalidate()
+            @widget.invalidate()
             false
           }
           _ => false
@@ -344,14 +344,14 @@ pub fn pagination(
         0.0,
         13.0,
         width=28.0,
-        bg=fn(w : @core.Widget) -> String {
+        bg=fn(w : @widget.Widget) -> String {
           if current.get() == page {
             @theme.theme_primary()
           } else {
             hover_bg(w, @theme.theme_primary_light())
           }
         },
-        fg=fn(_w : @core.Widget) -> String {
+        fg=fn(_w : @widget.Widget) -> String {
           if current.get() == page {
             "#ffffff"
           } else {
@@ -379,27 +379,27 @@ pub fn pagination(
 /// 连线；`current` 是 0 起始的当前步下标。
 pub fn steps(
   items : Array[String],
-  current : @core.Store[Int],
+  current : @base.Store[Int],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(current)
-  let nodes : Array[@core.Node] = []
+  let nodes : Array[@widget.Node] = []
   let n = items.length()
   for i = 0; i < n; i = i + 1 {
     if i > 0 {
       let idx = i
       nodes.push(
-        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+        @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
           watch_theme()
           w.node.set_flex_grow(1.0)
           w.node.set_min_width(@yoga.fixed(8.0))
           w.node.set_height(@yoga.fixed(2.0))
           @style.apply(w, paint_subset(class))
           w.on_draw = Some(fn(
-            self : @core.Widget,
+            self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             let st = @style.style_for(self)
             p.set_fill_color(
@@ -425,7 +425,7 @@ pub fn steps(
         0.0,
         13.0,
         width=24.0,
-        bg=fn(_w : @core.Widget) -> String {
+        bg=fn(_w : @widget.Widget) -> String {
           if i > current.get() {
             @theme.theme_info_light()
           } else if i == current.get() {
@@ -434,7 +434,7 @@ pub fn steps(
             @theme.theme_primary_light()
           }
         },
-        fg=fn(_w : @core.Widget) -> String {
+        fg=fn(_w : @widget.Widget) -> String {
           if i > current.get() {
             @theme.theme_text_secondary()
           } else if i == current.get() {
@@ -450,7 +450,7 @@ pub fn steps(
     let mine = items[i]
     let idx = i
     nodes.push(
-      @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+      @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
         watch_theme()
         let font = @text.Font::new("", 13.0)
         // 宽度在挂载时按测量定（绘制回调里改布局会把 paint 变成布局的写入方）
@@ -458,9 +458,9 @@ pub fn steps(
         w.node.set_height(@yoga.fixed(24.0))
         @style.apply(w, paint_subset(class))
         w.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           let _ = @text.draw_box_at(
@@ -502,11 +502,11 @@ pub fn steps(
 /// 折叠面板（EP Collapse）：点标题行切换内容显隐，各面板独立开合，
 /// 默认只有第一个展开。
 pub fn collapse(
-  panels : Array[(String, Array[@core.Node])],
+  panels : Array[(String, Array[@widget.Node])],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  let blocks : Array[@core.Node] = []
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  let blocks : Array[@widget.Node] = []
   let n = panels.length()
   for i = 0; i < n; i = i + 1 {
     let input = panels[i]
@@ -519,23 +519,23 @@ pub fn collapse(
 /// 折叠面板的一块：标题行（底色 + 箭头 + 标题）+ 内容区（预建，靠显隐切换）。
 fn collapse_panel(
   title : String,
-  body : Array[@core.Node],
+  body : Array[@widget.Node],
   open0 : Bool,
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Node {
+) -> @widget.Node {
   let open = Ref(open0)
   let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.percent(100.0))
-    let body_w = @core.Widget::new()
+    let body_w = @widget.Widget::new()
     body_w.node.set_flex_direction(@yoga.Column)
     body_w.node.set_width(@yoga.percent(100.0))
     body_w.set_padding(top=6.0, left=12.0)
-    @core.mount_children(body_w, body)
+    @widget.mount_children(body_w, body)
     body_w.set_visible(open0)
-    let head = @core.Widget::new()
+    let head = @widget.Widget::new()
     head.node.set_flex_direction(@yoga.Row)
     head.node.set_width(@yoga.percent(100.0))
     head.node.set_height(@yoga.fixed(34.0))
@@ -547,9 +547,9 @@ fn collapse_panel(
     )
     @style.apply(head, skin)
     head.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_info_light()))
@@ -564,17 +564,17 @@ fn collapse_panel(
         @style.color_of(st.color, @theme.theme_text_primary()),
       )
     })
-    head.cursor = @core.CURSOR_HAND
+    head.cursor = @widget.CURSOR_HAND
     head.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
         @widget.PointerKind::Up => {
           open.val = !open.val
           body_w.set_visible(open.val)
-          @core.invalidate()
+          @widget.invalidate()
           false
         }
         _ => false
@@ -607,14 +607,14 @@ pub fn fill_round_rect(
 fn menu_item(
   text : String,
   width : Double,
-  selected : @core.Store[String],
+  selected : @base.Store[String],
   icon : @icons.IconKind?,
   skin~ : @style.Style = @style.empty_style(),
   focusable~ : Bool = false,
   step~ : (Int) -> Unit = fn(_d : Int) { () },
-) -> @core.Node {
+) -> @widget.Node {
   let font = @text.Font::new("", 13.0)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(40.0))
@@ -622,18 +622,18 @@ fn menu_item(
       // 导航菜单的键盘口径（与 segmented 同一条）：Tab 链内移动焦点，空格/
       // 回车选中本项，↑/← 上一项、↓/→ 下一项（到头环绕由 step 的取模保证）
       w.focus_id = auto_focus_id(0)
-      w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
         if !ev.press {
           return false
         }
-        if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+        if ev.keysym == @base.KS_SPACE || ev.keysym == @base.KS_RETURN {
           selected.set(text)
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if ev.keysym == @core.KS_LEFT || ev.keysym == @core.KS_UP {
+        } else if ev.keysym == @base.KS_LEFT || ev.keysym == @base.KS_UP {
           step(-1)
           true
-        } else if ev.keysym == @core.KS_RIGHT || ev.keysym == @core.KS_DOWN {
+        } else if ev.keysym == @base.KS_RIGHT || ev.keysym == @base.KS_DOWN {
           step(1)
           true
         } else {
@@ -648,9 +648,9 @@ fn menu_item(
     )
     @style.apply(w, skin)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let rad = @style.number_of(st.border_radius, 4.0)
@@ -699,10 +699,10 @@ fn menu_item(
         p.stroke_round_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0, 4.0)
       }
     })
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -710,7 +710,7 @@ fn menu_item(
           let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
           if inside {
             selected.set(text)
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -735,14 +735,14 @@ fn icon_for(icons : Array[(String, @icons.IconKind)], name : String) -> @icons.I
 /// `selected` 是共享状态，主区可以订阅同一个 Store 做页面联动。
 pub fn menu(
   items : Array[String],
-  selected : @core.Store[String],
+  selected : @base.Store[String],
   icons? : Array[(String, @icons.IconKind)] = [],
   width? : Double = 180.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(selected)
-  let nodes : Array[@core.Node] = []
+  let nodes : Array[@widget.Node] = []
   for it in items {
     nodes.push(
       menu_item(
@@ -770,19 +770,19 @@ pub fn menu(
 /// `foldable=true` 时点标题收起/展开组内项（默认全展开）。
 pub fn menu_sections(
   sections : Array[(String, Array[String])],
-  selected : @core.Store[String],
+  selected : @base.Store[String],
   icons? : Array[(String, @icons.IconKind)] = [],
   foldable? : Bool = true,
   width? : Double = 180.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(selected)
-  let blocks : Array[@core.Node] = []
+  let blocks : Array[@widget.Node] = []
   for sec in sections {
     let title = sec.0
     let items = sec.1
-    let nodes : Array[@core.Node] = []
+    let nodes : Array[@widget.Node] = []
     let skin = paint_subset(class)
     let n = items.length()
     for i = 0; i < n; i = i + 1 {
@@ -799,7 +799,7 @@ pub fn menu_sections(
           step=fn(d : Int) {
             // 组内环绕换选：方向键的落点与点击一致（换 selected 本身）
             selected.set(items[((idx + d) % n + n) % n])
-            @core.invalidate()
+            @widget.invalidate()
           },
         ),
       )
@@ -807,21 +807,21 @@ pub fn menu_sections(
     let open = Ref(true)
     let head_font = @text.Font::new("", 12.0)
     // 组内项直接建控件（不是 Node）：标题行的收起回调要拿得到它
-    let body = @core.Widget::new()
+    let body = @widget.Widget::new()
     body.node.set_flex_direction(@yoga.Column)
     body.node.set_gap(2.0, 0.0)
     body.node.set_align_items(@yoga.AlignItems::FlexStart)
-    @core.mount_children(body, nodes)
-    let head = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    @widget.mount_children(body, nodes)
+    let head = @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
       watch_theme()
       w.node.set_width(@yoga.fixed(width - 12.0))
       w.node.set_height(@yoga.fixed(24.0))
       @style.apply(w, @style.style(color="text_secondary"))
       @style.apply(w, paint_subset(class))
       w.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         let _ = @text.draw_box_at(
@@ -841,10 +841,10 @@ pub fn menu_sections(
           fold_arrow(p, r.w - 10.0, r.h / 2.0, 3.5, open.val, @theme.theme_text_secondary())
         }
       })
-      w.cursor = @core.CURSOR_HAND
+      w.cursor = @widget.CURSOR_HAND
       w.on_pointer = Some(fn(
-        _self : @core.Widget,
-        ev : @core.PointerEvent,
+        _self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => foldable
@@ -852,7 +852,7 @@ pub fn menu_sections(
             if foldable {
               open.val = !open.val
               body.set_visible(open.val)
-              @core.invalidate()
+              @widget.invalidate()
             }
             false
           }
@@ -862,7 +862,7 @@ pub fn menu_sections(
       w
     })
     blocks.push(head)
-    blocks.push(@core.node_of(body))
+    blocks.push(@widget.node_of(body))
   }
   view(blocks, row_gap=2.0, padding=6.0, width=width, class=class, handle=handle)
 }
@@ -877,7 +877,7 @@ pub(all) struct TreeNode {
 ///|
 /// 树形控件（EP Tree）：缩进层级 + 点击展开/收起（有子节点才画箭头）。
 fn build_tree_rows(
-  into : @core.Widget,
+  into : @widget.Widget,
   nodes : Array[TreeNode],
   level : Int,
   skin~ : @style.Style = @style.empty_style(),
@@ -886,7 +886,7 @@ fn build_tree_rows(
   for nd in nodes {
     let has_kids = nd.children.length() > 0
     let open = Ref(false)
-    let row = @core.Widget::new()
+    let row = @widget.Widget::new()
     row.node.set_flex_direction(@yoga.Row)
     row.node.set_width(@yoga.fixed(260.0))
     row.node.set_height(@yoga.fixed(32.0))
@@ -898,9 +898,9 @@ fn build_tree_rows(
     )
     @style.apply(row, skin)
     row.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let bg = @style.color_of(st.background_color, "")
@@ -937,16 +937,16 @@ fn build_tree_rows(
         valign=@text.Center,
       )
     })
-    let kids = @core.Widget::new()
+    let kids = @widget.Widget::new()
     kids.node.set_flex_direction(@yoga.Column)
     kids.set_visible(false)
     if has_kids {
       build_tree_rows(kids, nd.children, level + 1, skin=skin)
     }
-    row.cursor = @core.CURSOR_HAND
+    row.cursor = @widget.CURSOR_HAND
     row.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => has_kids
@@ -954,7 +954,7 @@ fn build_tree_rows(
           if has_kids {
             open.val = !open.val
             kids.set_visible(open.val)
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -971,9 +971,9 @@ fn build_tree_rows(
 pub fn tree(
   root : Array[TreeNode],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.percent(100.0))
@@ -989,27 +989,27 @@ pub fn tree(
 /// 悬停变深）+ 内容区预建、靠显隐切换。`selected` 是页序号 Store（0 起始），
 /// 不传则内部建一个。
 pub fn tabs(
-  pages : Array[(String, @core.Node)],
-  selected? : @core.Store[Int],
+  pages : Array[(String, @widget.Node)],
+  selected? : @base.Store[Int],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let n = pages.length()
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let sel = match selected {
       Some(s) => s
-      None => @core.Store::new(0)
+      None => @base.Store::new(0)
     }
     follow_store(sel)
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.percent(100.0))
     let font = @text.Font::new("", 13.0)
-    let head = @core.Widget::new()
+    let head = @widget.Widget::new()
     head.node.set_flex_direction(@yoga.Row)
     head.node.set_height(@yoga.fixed(36.0))
     head.node.set_width(@yoga.percent(100.0))
-    let panels : Array[@core.Widget] = []
+    let panels : Array[@widget.Widget] = []
     w.append_child(head)
     fn show(i : Int) -> Unit {
       // 先显示新页再隐藏旧页：反序会让「新页未显示、旧页已隐藏」的
@@ -1022,14 +1022,14 @@ pub fn tabs(
           panels[j].set_visible(false)
         }
       }
-      @core.invalidate()
+      @widget.invalidate()
     }
 
     for i = 0; i < n; i = i + 1 {
       let idx = i
       let title = pages[i].0
       let tw = text_width(title, font)
-      let tab = @core.Widget::new()
+      let tab = @widget.Widget::new()
       tab.node.set_width(@yoga.fixed(tw + 28.0))
       tab.node.set_height(@yoga.fixed(36.0))
       tab.set_margin(right=8.0)
@@ -1040,9 +1040,9 @@ pub fn tabs(
       )
       @style.apply(tab, paint_subset(class))
       tab.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         let act = sel.get() == idx
@@ -1069,10 +1069,10 @@ pub fn tabs(
           p.fill_rect(0.0, r.h - 2.0, r.w, 2.0)
         }
       })
-      tab.cursor = @core.CURSOR_HAND
+      tab.cursor = @widget.CURSOR_HAND
       tab.on_pointer = Some(fn(
-        _self : @core.Widget,
-        ev : @core.PointerEvent,
+        _self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => true
@@ -1084,7 +1084,7 @@ pub fn tabs(
         }
       })
       head.append_child(tab)
-      let page = @core.Widget::new()
+      let page = @widget.Widget::new()
       page.node.set_flex_direction(@yoga.Column)
       page.node.set_width(@yoga.percent(100.0))
       page.set_padding(top=6.0, left=6.0)
@@ -1094,7 +1094,7 @@ pub fn tabs(
       panels.push(page)
     }
     let sid = sel.signal().subscribe(fn(i : Int) -> Unit { show(i) })
-    @core.sub_bag_register(fn() { sel.signal().remove(sid) })
+    @base.sub_bag_register(fn() { sel.signal().remove(sid) })
     fold_style(w, @style.empty_style(), class)
     handle(w)
     w
@@ -1108,15 +1108,15 @@ pub fn tabs(
 /// 重建；重建式列表的行不持订阅（选中集合是自持的两张表），所以重建次数不会
 /// 累积死订阅。
 pub fn transfer(
-  left_items : @core.Store[Array[String]],
-  right_items : @core.Store[Array[String]],
+  left_items : @base.Store[Array[String]],
+  right_items : @base.Store[Array[String]],
   width? : Double = 200.0,
   height? : Double = 160.0,
   item_height? : Double = 24.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Row)
     w.node.set_align_items(@yoga.AlignItems::Center)
@@ -1124,8 +1124,8 @@ pub fn transfer(
     let font = @text.Font::new("", 13.0)
     let left_sel : Ref[Array[String]] = Ref([])
     let right_sel : Ref[Array[String]] = Ref([])
-    let left_box = @core.Widget::new()
-    let right_box = @core.Widget::new()
+    let left_box = @widget.Widget::new()
+    let right_box = @widget.Widget::new()
     left_box.node.set_flex_direction(@yoga.Column)
     right_box.node.set_flex_direction(@yoga.Column)
     for box in [left_box, right_box] {
@@ -1137,9 +1137,9 @@ pub fn transfer(
       )
       @style.apply(box, paint_subset(class))
       box.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -1176,13 +1176,13 @@ pub fn transfer(
     }
 
     fn build_list(
-      box : @core.Widget,
-      items : @core.Store[Array[String]],
+      box : @widget.Widget,
+      items : @base.Store[Array[String]],
       sel : Ref[Array[String]],
     ) -> Unit {
       for name in items.get() {
         let mine = name
-        let row_w = @core.Widget::new()
+        let row_w = @widget.Widget::new()
         row_w.node.set_width(@yoga.percent(100.0))
         row_w.node.set_height(@yoga.fixed(item_height))
         @style.apply(
@@ -1191,9 +1191,9 @@ pub fn transfer(
         )
         @style.apply(row_w, paint_subset(class))
         row_w.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           let on = contains(sel.val, mine)
@@ -1223,10 +1223,10 @@ pub fn transfer(
             valign=@text.Center,
           )
         })
-        row_w.cursor = @core.CURSOR_HAND
+        row_w.cursor = @widget.CURSOR_HAND
         row_w.on_pointer = Some(fn(
-          _self : @core.Widget,
-          ev : @core.PointerEvent,
+          _self : @widget.Widget,
+          ev : @widget.PointerEvent,
         ) -> Bool {
           match ev.kind {
             @widget.PointerKind::Down => true
@@ -1236,7 +1236,7 @@ pub fn transfer(
               } else {
                 with_added(sel.val, mine)
               }
-              @core.invalidate()
+              @widget.invalidate()
               false
             }
             _ => false
@@ -1251,21 +1251,21 @@ pub fn transfer(
       right_box.clear_children()
       build_list(left_box, left_items, left_sel)
       build_list(right_box, right_items, right_sel)
-      @core.invalidate()
+      @widget.invalidate()
     }
 
     let sid_l = left_items.signal().subscribe(fn(_v : Array[String]) -> Unit {
       render_all()
     })
-    @core.sub_bag_register(fn() { left_items.signal().remove(sid_l) })
+    @base.sub_bag_register(fn() { left_items.signal().remove(sid_l) })
     let sid_r = right_items.signal().subscribe(fn(_v : Array[String]) -> Unit {
       render_all()
     })
-    @core.sub_bag_register(fn() { right_items.signal().remove(sid_r) })
+    @base.sub_bag_register(fn() { right_items.signal().remove(sid_r) })
 
     fn move_items(
-      from : @core.Store[Array[String]],
-      to : @core.Store[Array[String]],
+      from : @base.Store[Array[String]],
+      to : @base.Store[Array[String]],
       sel : Ref[Array[String]],
     ) -> Unit {
       let moving = sel.val
@@ -1284,8 +1284,8 @@ pub fn transfer(
       sel.val = []
     }
 
-    fn mid_btn(to_right : Bool) -> @core.Widget {
-      let b = @core.Widget::new()
+    fn mid_btn(to_right : Bool) -> @widget.Widget {
+      let b = @widget.Widget::new()
       b.node.set_width(@yoga.fixed(32.0))
       b.node.set_height(@yoga.fixed(28.0))
       @style.apply(
@@ -1295,19 +1295,19 @@ pub fn transfer(
       )
       @style.apply(b, paint_subset(class))
       b.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         p.set_fill_color(@style.color_of(st.background_color, @theme.theme_info_light()))
         p.fill_rect(0.0, 0.0, r.w, r.h)
         draw_chevron(p, r.w / 2.0, r.h / 2.0, 4.0, to_right, @style.color_of(st.color, @theme.theme_text_regular()))
       })
-      b.cursor = @core.CURSOR_HAND
+      b.cursor = @widget.CURSOR_HAND
       b.on_pointer = Some(fn(
-        _self : @core.Widget,
-        ev : @core.PointerEvent,
+        _self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => true

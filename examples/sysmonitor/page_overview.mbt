@@ -36,14 +36,14 @@ fn view_index(v : ViewId) -> Int {
 /// 手型光标由外层 cursor_group 统一下发（本栈光标按悬停路径最深请求
 /// 生效，不再逐子控件各设一份）。
 fn sparkline_box(
-  hist : @core.Store[Array[@charts.LineSeries]],
+  hist : @base.Store[Array[@charts.LineSeries]],
   y_range : (Double, Double)?,
   floor : Double,
-) -> @core.Node {
-  @core.node_of_new(fn(c : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(c : @widget.Widget) -> @widget.Widget {
     c.node.set_height(@yoga.fixed(34.0))
     c.node.set_width(@yoga.percent(100.0))
-    c.on_draw = Some(fn(_s : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
+    c.on_draw = Some(fn(_s : @widget.Widget, p : @render.Painter, r : @base.Rect) -> Unit {
       let t = @theme.theme_current()
       let (lo, hi) = match y_range {
         Some((a, bb)) => (a, bb)
@@ -65,8 +65,8 @@ fn sparkline_box(
         draw_sparkline(p, 0.0, 2.0, r.w, r.h - 4.0, s.points, lo, hi, color)
       }
     })
-    hist.subscribe(fn(_s) { @core.invalidate() })
-    ignore(@theme.on_theme_change(fn() { @core.invalidate() }))
+    hist.subscribe(fn(_s) { @widget.invalidate() })
+    ignore(@theme.on_theme_change(fn() { @widget.invalidate() }))
     c
   })
 }
@@ -79,14 +79,14 @@ fn sparkline_box(
 fn res_card(
   icon : @icons.IconKind,
   title : String,
-  value : @core.Store[String],
-  hist : @core.Store[Array[@charts.LineSeries]]?,
-  view : @core.Store[ViewId],
+  value : @base.Store[String],
+  hist : @base.Store[Array[@charts.LineSeries]]?,
+  view : @base.Store[ViewId],
   target : ViewId,
   y_range? : (Double, Double)? = None,
   floor? : Double = 1.0,
-) -> @core.Node {
-  let spark : Array[@core.Node] = match hist {
+) -> @widget.Node {
+  let spark : Array[@widget.Node] = match hist {
     None => []
     Some(h) => [sparkline_box(h, y_range, floor)]
   }
@@ -113,7 +113,7 @@ fn res_card(
     padding=12.0,
     handle=fn(c) {
       // 覆盖 container 的默认底色绘制：选中态主题色描边 + 浅底
-      c.on_draw = Some(fn(_s : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
+      c.on_draw = Some(fn(_s : @widget.Widget, p : @render.Painter, r : @base.Rect) -> Unit {
         let t = @theme.theme_current()
         let act = view_index(view.get()) == view_index(target)
         p.set_fill_color(if act { t.fill_hover } else { t.bg_panel })
@@ -123,9 +123,9 @@ fn res_card(
         p.stroke_rect(0.0, 0.0, r.w, r.h)
       })
       // 主题切换 / 选中态变化都只请求一次全窗重绘
-      ignore(@theme.on_theme_change(fn() { @core.invalidate() }))
-      view.subscribe(fn(_v) { @core.invalidate() })
-      c.on_pointer = Some(fn(_s : @core.Widget, ev : @core.PointerEvent) -> Bool {
+      ignore(@theme.on_theme_change(fn() { @widget.invalidate() }))
+      view.subscribe(fn(_v) { @widget.invalidate() })
+      c.on_pointer = Some(fn(_s : @widget.Widget, ev : @widget.PointerEvent) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down =>
             if ev.button == 1 {
@@ -137,7 +137,7 @@ fn res_card(
           _ => false
         }
       })
-      c.cursor = @core.CURSOR_HAND
+      c.cursor = @widget.CURSOR_HAND
     },
   )
 }
@@ -145,8 +145,8 @@ fn res_card(
 ///|
 /// 左栏：资源卡片导航（显单一列，超高滚动）。显卡按硬件实况出卡
 /// （核显 / 独显各一张，均指向传感器页）。
-fn left_pane(app : App, view : @core.Store[ViewId]) -> @core.Node {
-  let cards : Array[@core.Node] = [
+fn left_pane(app : App, view : @base.Store[ViewId]) -> @widget.Node {
+  let cards : Array[@widget.Node] = [
     res_card(
       @icons.Cpu,
       "处理器",
@@ -229,8 +229,8 @@ fn left_pane(app : App, view : @core.Store[ViewId]) -> @core.Node {
 ///|
 /// 右栏：全部详情页一次性挂载，按 view 切可见性（页内选中态 /
 /// 滚动位置不丢）。
-fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
-  let items : Array[(ViewId, @core.Node)] = [
+fn view_area(app : App, view : @base.Store[ViewId]) -> @widget.Node {
+  let items : Array[(ViewId, @widget.Node)] = [
     (VCpu, page_cpu_detail(app)),
     (VMem, page_mem_detail(app)),
     (VDisk, page_disk(app)),
@@ -242,10 +242,10 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
     [],
     grow=1.0,
     handle=fn(area) {
-      let boxes : Array[@core.Widget] = []
+      let boxes : Array[@widget.Widget] = []
       for item in items {
         let (_, node) = item
-        let pc = @core.Widget::new()
+        let pc = @widget.Widget::new()
         pc.node.set_flex_direction(@yoga.Column)
         pc.node.set_flex_grow(1.0)
         pc.node.set_min_width(@yoga.fixed(0.0))
@@ -261,7 +261,7 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
         for j in 0..<boxes.length() {
           boxes[j].set_visible(view_index(items[j].0) == view_index(cur))
         }
-        @core.invalidate()
+        @widget.invalidate()
       })
     },
   )
@@ -270,7 +270,7 @@ fn view_area(app : App, view : @core.Store[ViewId]) -> @core.Node {
 ///|
 /// 处理器详情：总占用曲线（0-100 固定轴）+ 各核占用柱状（0-100，
 /// 自动量程会让 5% 看起来像满格）。
-fn page_cpu_detail(app : App) -> @core.Node {
+fn page_cpu_detail(app : App) -> @widget.Node {
   @ui.col(
     [
       @ui.text("总占用（%）", role=@ui.Section),
@@ -294,7 +294,7 @@ fn page_cpu_detail(app : App) -> @core.Node {
 
 ///|
 /// 内存详情：已用曲线 + swap 曲线（自适应轴看细节）。
-fn page_mem_detail(app : App) -> @core.Node {
+fn page_mem_detail(app : App) -> @widget.Node {
   @ui.col(
     [
       @ui.text("内存（GB）", role=@ui.Section),
@@ -310,8 +310,8 @@ fn page_mem_detail(app : App) -> @core.Node {
 ///|
 /// 双栏应用壳：左栏卡片导航 + 右栏详情页。手型光标套 cursor_group，
 /// 组内任意位置（含卡片子控件）都是手型。
-fn app_shell(app : App) -> @core.Node {
-  let view : @core.Store[ViewId] = @core.Store::new(VCpu)
+fn app_shell(app : App) -> @widget.Node {
+  let view : @base.Store[ViewId] = @base.Store::new(VCpu)
   // 壳必须自己撑满窗口。`cursor_group` 只是 `container` 的壳，**本身既没有
   // `flex_grow` 也没有宽度**，而它外层那个 hbox 是 Row：不补下面这两句，整棵树
   // 就退化成「按内容撑」——主轴（水平）缩到内容宽，交叉轴（垂直）又被外层 hbox
@@ -326,7 +326,7 @@ fn app_shell(app : App) -> @core.Node {
         align_items=@yoga.AlignItems::Stretch,
       ),
     ],
-    handle=fn(w : @core.Widget) -> Unit {
+    handle=fn(w : @widget.Widget) -> Unit {
       w.node.set_flex_grow(1.0)
       w.node.set_align_self(Some(@yoga.AlignItems::Stretch))
     },

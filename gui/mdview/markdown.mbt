@@ -375,8 +375,8 @@ fn md_scan_blocks(blocks : Array[@mdast.Block], s : MDFootScan) -> Unit {
 
 ///|
 /// 列表项内容:段落直接展平(不套段落外距,行距一致),其余块递归。
-fn md_item_content(children : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.Node] {
-  let nodes : Array[@core.Node] = []
+fn md_item_content(children : Array[@mdast.Block], ctx : MDCtx) -> Array[@widget.Node] {
+  let nodes : Array[@widget.Node] = []
   for b in children {
     match b {
       Paragraph(children=inl, ..) => nodes.push(md_rich_label(md_flatten_inline(inl, ctx), 13.0, ctx))
@@ -391,8 +391,8 @@ fn md_item_content(children : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.N
 
 ///|
 /// 定宽标记列(列表圆点/序号/定义点)。
-fn md_marker(text : String, w : Double) -> @core.Node {
-  @core.node_of_new(fn(mk : @core.Widget) -> @core.Widget {
+fn md_marker(text : String, w : Double) -> @widget.Node {
+  @widget.node_of_new(fn(mk : @widget.Widget) -> @widget.Widget {
     mk.node.set_width(@yoga.fixed(w))
     // 行盒高度必须注册测量：这个格子只有绘制、没有子件，不注册就是**零高度**，
     // 而 hbox 默认 align_items=Center——0 高的格子被摆到行的中点，序号整个
@@ -405,9 +405,9 @@ fn md_marker(text : String, w : Double) -> @core.Node {
       }
     })
     mk.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let _ = @text.draw_box_at(
         p,
@@ -431,15 +431,15 @@ fn md_marker(text : String, w : Double) -> @core.Node {
 
 ///|
 /// 引用/提示块:主题色竖条 + 缩进内容。
-fn md_quoted(content : Array[@core.Node]) -> @core.Node {
-  let bar = @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
+fn md_quoted(content : Array[@widget.Node]) -> @widget.Node {
+  let bar = @widget.node_of_new(fn(b : @widget.Widget) -> @widget.Widget {
     b.node.set_width(@yoga.fixed(3.0))
     b.node.set_min_height(@yoga.fixed(24.0))
     b.node.set_align_self(Some(@yoga.AlignItems::Stretch))
     b.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_primary())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -453,7 +453,7 @@ fn md_quoted(content : Array[@core.Node]) -> @core.Node {
 /// 块级图片:本地路径加载显示(等比缩放,宽度上限取 ctx.width);加载
 /// 失败或网络地址降级为 alt 富文本(链接样式)——富文本行不支持行内
 /// 嵌图。
-fn md_image(url : String, alt : String, ctx : MDCtx) -> @core.Node {
+fn md_image(url : String, alt : String, ctx : MDCtx) -> @widget.Node {
   let img = @render.Image::new_from_file(md_image_path(url))
   if img.is_empty() {
     md_rich_label([md_plain_span(alt, link=true)], 13.0, ctx)
@@ -462,14 +462,14 @@ fn md_image(url : String, alt : String, ctx : MDCtx) -> @core.Node {
     let ih = img.get_height()
     let w = if iw > 1.0 { iw.min(ctx.width) } else { 1.0 }
     let h = if iw > 1.0 { (w * ih / iw).max(1.0) } else { 1.0 }
-    @core.node_of_new(fn(c : @core.Widget) -> @core.Widget {
+    @widget.node_of_new(fn(c : @widget.Widget) -> @widget.Widget {
       c.node.set_width(@yoga.fixed(w))
       c.node.set_height(@yoga.fixed(h))
       c.node.set_margin_bottom(@yoga.fixed(10.0))
       c.on_draw = Some(fn(
-        _self : @core.Widget,
+        _self : @widget.Widget,
         p : @render.Painter,
-        _r : @core.Rect,
+        _r : @base.Rect,
       ) -> Unit {
         let _ = p.draw_image(img, 0.0, 0.0, w, h)
       })
@@ -501,10 +501,10 @@ fn md_table(
   alignments : Array[@mdast.TableAlign],
   rows : Array[Array[@mdast.TableCell]],
   ctx : MDCtx,
-) -> @core.Node {
+) -> @widget.Node {
   let n = header.length().max(1)
-  let cells_of = fn(row : Array[@mdast.TableCell], head : Bool) -> Array[@core.Node] {
-    let cells : Array[@core.Node] = []
+  let cells_of = fn(row : Array[@mdast.TableCell], head : Bool) -> Array[@widget.Node] {
+    let cells : Array[@widget.Node] = []
     for i, cell in row {
       let al = match alignments.get(i) {
         Some(a) => md_align_of(a)
@@ -514,7 +514,7 @@ fn md_table(
         @ui.view(
           [md_rich_label(md_table_cell_spans(cell, head, ctx), 13.0, ctx)],
           align_items=al,
-          handle=fn(cw : @core.Widget) -> Unit {
+          handle=fn(cw : @widget.Widget) -> Unit {
             cw.node.set_width(@yoga.percent(100.0 / n.to_double()))
           },
         ),
@@ -522,7 +522,7 @@ fn md_table(
     }
     cells
   }
-  let nodes : Array[@core.Node] = [@ui.row(cells_of(header, true))]
+  let nodes : Array[@widget.Node] = [@ui.row(cells_of(header, true))]
   nodes.push(@ui.divider())
   for row in rows {
     nodes.push(@ui.row(cells_of(row, false)))
@@ -533,8 +533,8 @@ fn md_table(
 ///|
 /// 块级渲染:mdast Block 17 变体 → 节点序列。不渲染的变体:HtmlBlock、
 /// BlankLines、FootnoteDefinition(定义在 markdown_view 文末统一渲染)。
-fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.Node] {
-  let nodes : Array[@core.Node] = []
+fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@widget.Node] {
+  let nodes : Array[@widget.Node] = []
   for block in blocks {
     match block {
       Heading(level~, children~, ..) =>
@@ -582,7 +582,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
         // 引用收块:子块(段落/列表/嵌套引用)整体递归进竖条内容区
         nodes.push(md_quoted(md_render_blocks(children, ctx)))
       Alert(kind~, children~, ..) => {
-        let content : Array[@core.Node] = [
+        let content : Array[@widget.Node] = [
           @ui.text(md_alert_title(kind), weight=@text.SemiBold),
         ]
         for n in md_render_blocks(children, ctx) {
@@ -597,7 +597,7 @@ fn md_render_blocks(blocks : Array[@mdast.Block], ctx : MDCtx) -> Array[@core.No
             Some(ck) =>
               nodes.push(
                 @ui.row([
-                  @ui.checkbox("", @core.Store::new(ck)),
+                  @ui.checkbox("", @base.Store::new(ck)),
                   @ui.col(md_item_content(item.children, ctx)),
                 ]),
               )
@@ -748,7 +748,7 @@ fn md_rich_label(
   size : Double,
   ctx : MDCtx,
   max_w? : Double = 0.0,
-) -> @core.Node {
+) -> @widget.Node {
   let limit = if max_w > 0.0 { max_w } else { ctx.width }
   let regular = @text.Font::new("", size)
   let bold = @text.Font::new("", size, weight=@text.Bold)
@@ -918,15 +918,15 @@ fn md_rich_label(
     None => size * 1.5
   }
   let box_h = line_h * rows.length().to_double()
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     let fps = Ref("")
     w.node.set_width(@yoga.fixed(row_w))
     w.node.set_height(@yoga.fixed(box_h))
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let cur_fp = @theme.theme_fingerprint_of(@theme.theme_current())
       if cur_fp != fps.val {
@@ -975,8 +975,8 @@ fn md_rich_label(
 
       let hover = Ref(false)
       w.on_pointer = Some(fn(
-        _self : @core.Widget,
-        ev : @core.PointerEvent,
+        _self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => {
@@ -992,7 +992,7 @@ fn md_rich_label(
             let h = hit_url(ev.x, ev.y) != ""
             if h != hover.val {
               hover.val = h
-              w.cursor = if h { @core.CURSOR_HAND } else { 0 }
+              w.cursor = if h { @widget.CURSOR_HAND } else { 0 }
             }
             true
           }
@@ -1021,8 +1021,8 @@ pub fn markdown_view(
   source : String,
   width? : Double = 560.0,
   on_link? : (String) -> Unit = fn(_u : String) -> Unit { () },
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   let res = @mdast.parse(source)
   let doc = res.document
   let foot : MDFootScan = { no: (Map([]) : Map[String, Int]), order: [], counter: Ref(0) }

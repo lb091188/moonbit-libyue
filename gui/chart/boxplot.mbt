@@ -303,15 +303,15 @@ fn draw_boxplot(
 /// 过密时自动抽稀截断。数据经 Store 驱动：set 后只重绘画布不重建
 /// 视图树；主题切换现取色自动跟随。
 pub fn boxplot_t(
-  groups : @core.Store[Array[(String, Array[Double])]],
+  groups : @base.Store[Array[(String, Array[Double])]],
   y_range? : (Double, Double)? = None,
   width? : Double = 0.0,
   height? : Double = 280.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(groups)
   let yr = y_range
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -321,9 +321,9 @@ pub fn boxplot_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

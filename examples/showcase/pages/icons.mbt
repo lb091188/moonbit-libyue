@@ -6,10 +6,10 @@
 
 ///|
 /// 一组图标的网格:vbox 包行,每行 per_row 个,悬停 tooltip 显示名称。
-fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @core.Node {
-  let rows : Array[@core.Node] = []
+fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @widget.Node {
+  let rows : Array[@widget.Node] = []
   for row in 0..<((kinds.length() + per_row - 1) / per_row) {
-    let items : Array[@core.Node] = []
+    let items : Array[@widget.Node] = []
     for col in 0..<per_row {
       let idx = row * per_row + col
       if idx < kinds.length() {
@@ -27,7 +27,7 @@ fn icon_grid(kinds : Array[@icons.IconKind], per_row : Int) -> @core.Node {
 }
 
 ///|
-pub fn page_icons(_app : @shared.App) -> @core.Node {
+pub fn page_icons(_app : @shared.App) -> @widget.Node {
   @shared.page([
     @shared.section(
       "表单与表格",

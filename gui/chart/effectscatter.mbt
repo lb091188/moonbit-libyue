@@ -66,7 +66,7 @@ pub fn EffPoint::make(
 }
 
 ///|
-/// 动画句柄：持有涟漪定时器（@core.set_timeout 句柄）与运行开关。
+/// 动画句柄：持有涟漪定时器（@shell.set_timeout 句柄）与运行开关。
 /// 新栈的延时通道有真取消 API（clear_timeout），eff_stop 即时摘除待
 /// 触发回调；同一句柄传给多个 eff_chart_t 时联动控制这些实例。
 pub(all) struct EffAnim {
@@ -93,7 +93,7 @@ pub fn EffAnim::is_running(self : EffAnim) -> Bool {
 /// 挂载随应用存活；仍建议调用方在主动卸载组件前 eff_stop。
 pub fn eff_stop(anim : EffAnim) -> Unit {
   anim.running.val = false
-  @core.clear_timeout(anim.timer.val)
+  @shell.clear_timeout(anim.timer.val)
   anim.timer.val = 0
 }
 
@@ -381,7 +381,7 @@ fn eff_draw(
 /// 停止：动画句柄经 anim 参数传入（未传则每次构造自建），卸载前对句柄
 /// 调 [eff_stop] 即时取消待触发回调。
 pub fn eff_chart_t(
-  points : @core.Store[Array[EffPoint]],
+  points : @base.Store[Array[EffPoint]],
   period_ms? : Int = 3000,
   rings? : Int = 3,
   x_range? : (Double, Double)? = None,
@@ -389,17 +389,17 @@ pub fn eff_chart_t(
   anim? : EffAnim = EffAnim::make(),
   width? : Double = 0.0,
   height? : Double = 320.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(points)
   let ringn = rings
   let xr = x_range
   let yr = y_range
   let an = anim
   // 相位 Store：定时器推进 + 订阅重绘（与其余图表 Store 订阅模式一致）
-  let phase = @core.Store::new(0.0)
+  let phase = @base.Store::new(0.0)
   @ui.follow_store(phase)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     let step_fn : Ref[() -> Unit] = Ref(fn() { () })
     w.node.set_height(@yoga.fixed(height))
@@ -410,9 +410,9 @@ pub fn eff_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -428,11 +428,11 @@ pub fn eff_chart_t(
     step_fn.val = fn() -> Unit {
       if an.running.val {
         phase.update(fn(t) { eff_phase_advance(t, step) })
-        an.timer.val = @core.set_timeout(tick, fn() { (step_fn.val)() })
+        an.timer.val = @shell.set_timeout(tick, fn() { (step_fn.val)() })
       }
     }
     if an.running.val && ringn > 0 && step > 0.0 {
-      an.timer.val = @core.set_timeout(tick, fn() { (step_fn.val)() })
+      an.timer.val = @shell.set_timeout(tick, fn() { (step_fn.val)() })
     }
     handle(w)
     w

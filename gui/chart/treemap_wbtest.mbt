@@ -339,7 +339,7 @@ test "tm_sibling_color：兄弟同色系不同明度（主题主色现取）" {
 
 ///|
 test "TmItem 数据经 Store 驱动：set 换表 + 订阅通知" {
-  let st : @core.Store[Array[TmItem]] = @core.Store::new([
+  let st : @base.Store[Array[TmItem]] = @base.Store::new([
     TmItem::make("A", value=1.0),
     TmItem::make("B", value=2.0),
   ])
@@ -383,7 +383,7 @@ test "tm_layout：大表（300 叶）面积守恒 / 不出界 / 宽高比有界"
 
 ///|
 test "矩形树图组件：出像素、hover 提亮、换数据画面变" {
-  let d = @core.Store::new([
+  let d = @base.Store::new([
     TmItem::make("甲", value=60.0),
     TmItem::make("乙", value=30.0),
     TmItem::make("丙", value=10.0),

@@ -98,7 +98,7 @@ const WB_EVAL_CAP = 65536
 /// 一扇窗里的一个 webview 区（pane）。owner = 原生子件：它占一块由 yoga 算出的
 /// 矩形，矩形内是 WebKit 自己画的，我们的 Painter 不参与，也不被 `clip_rect` 裁。
 pub(all) struct Webview {
-  app : @core.App
+  app : @widget.App
   mut surface : @win.ChildSurface?
   mut handle : Int64
   mut url : String
@@ -125,13 +125,13 @@ pub(all) struct Webview {
 ///|
 /// 建一个 webview pane 并给出起始 URL。引擎不可用返回 None（调用方降级）。
 /// 此刻还没有矩形（要等布局），页面在第一次绘制时随子件槽一起挂上。
-pub fn webview_new(app : @core.App, url : String) -> Webview? {
+pub fn webview_new(app : @widget.App, url : String) -> Webview? {
   webview_open(app, webview_options(url))
 }
 
 ///|
 /// 带参数地建 pane（profile / UA 这类引擎原生开关走这里）。
-pub fn webview_open(app : @core.App, opts : WebviewOptions) -> Webview? {
+pub fn webview_open(app : @widget.App, opts : WebviewOptions) -> Webview? {
   if !webview_supported() {
     return None
   }
@@ -199,9 +199,9 @@ pub fn Webview::node(
   width? : Double = 0.0,
   height? : Double = 0.0,
   grow? : Double = 0.0,
-) -> @core.Node {
-  @core.node_of_new(fn(parent : @core.Widget) -> @core.Widget {
-    let w = @core.Widget::new()
+) -> @widget.Node {
+  @widget.node_of_new(fn(parent : @widget.Widget) -> @widget.Widget {
+    let w = @widget.Widget::new()
     if width > 0.0 {
       w.node.set_width(@yoga.fixed(width))
     }
@@ -212,9 +212,9 @@ pub fn Webview::node(
       w.node.set_flex_grow(grow)
     }
     w.on_draw = Some(fn(
-      self_w : @core.Widget,
+      self_w : @widget.Widget,
       _p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let r = (self_w.rect.x, self_w.rect.y, self_w.rect.w, self_w.rect.h)
       if self.surface is None && r.2 > 1.0 && r.3 > 1.0 {
@@ -283,9 +283,9 @@ fn Webview::start_pump(self : Webview) -> Unit {
       return
     }
     self.pump()
-    let _ = @core.set_timeout(30, tick.val)
+    let _ = @shell.set_timeout(30, tick.val)
   }
-  let _ = @core.set_timeout(30, tick.val)
+  let _ = @shell.set_timeout(30, tick.val)
 }
 
 ///|

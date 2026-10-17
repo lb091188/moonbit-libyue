@@ -16,7 +16,7 @@ let drop_hook_installed : Ref[Bool] = Ref(false)
 fn install_drop_hook() -> Unit {
   if !drop_hook_installed.val {
     drop_hook_installed.val = true
-    @core.set_widget_discard_hook(fn(id : Int) -> Unit {
+    @widget.set_widget_discard_hook(fn(id : Int) -> Unit {
       let _ = resolved_table.remove(id)
       forget_anim(id)
     })
@@ -33,7 +33,7 @@ pub fn resolved_count() -> Int {
 /// 把样式落到控件：布局字段进 Yoga 节点，外观字段进侧表；`visibility` 落宿主
 /// `set_visible`，`cursor` 落 `Widget.cursor`，`z_index` 落绘制层序键。
 /// 多次 apply 逐属性叠加（与 merge 同一规则：后写的属性赢）。
-pub fn apply(w : @core.Widget, s : Style) -> Unit {
+pub fn apply(w : @widget.Widget, s : Style) -> Unit {
   install_drop_hook()
   let n = w.node
   match s.width {
@@ -196,7 +196,7 @@ pub fn apply(w : @core.Widget, s : Style) -> Unit {
 ///|
 /// 控件上的基块（未应用过样式给空样式）。绘制期一般用 [style_for]——它按状态
 /// 选桶（`hovered` / `pressed` / `focused`，三桶可同时命中并按桶内逐属性层叠）。
-pub fn resolved(w : @core.Widget) -> Style {
+pub fn resolved(w : @widget.Widget) -> Style {
   match resolved_table.get(w.id) {
     Some(s) => s
     None => empty_style()
@@ -249,7 +249,7 @@ pub fn resolved_for_measure(id : Int) -> Style {
 /// 布局期不读它（状态桶签名里没有布局属性，§1.5 第五条）。
 /// 写了 `transition_ms` 的块，出口再过一道按帧插值（§5 P5）：交出去的是
 /// 「这一帧该画的值」，不是目标值。
-pub fn style_for(w : @core.Widget) -> Style {
+pub fn style_for(w : @widget.Widget) -> Style {
   let base = resolved(w)
   let mut out = base
   if w.hovered {
@@ -275,7 +275,7 @@ pub fn style_for(w : @core.Widget) -> Style {
     None => false
   }
   if animated {
-    step(w.id, out, @core.now_ms())
+    step(w.id, out, @shell.now_ms())
   } else {
     // 没配过渡的控件不留账
     forget_anim(w.id)

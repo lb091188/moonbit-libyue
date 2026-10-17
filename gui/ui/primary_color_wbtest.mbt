@@ -5,11 +5,11 @@
 test "主色调像素：Solid 按钮 / 选中 checkbox / progress 都出 primary 色" {
   let (root_b, _) = mounted(button("保存", variant=Solid), 140.0, 44.0)
   let (root_c, _) = mounted(
-    checkbox("复选", @core.Store::new(true)),
+    checkbox("复选", @base.Store::new(true)),
     140.0,
     32.0,
   )
-  let (root_p, _) = mounted(progress(@core.Store::new(0.6)), 240.0, 12.0)
+  let (root_p, _) = mounted(progress(@base.Store::new(0.6)), 240.0, 12.0)
   let bm_b = @render.Bitmap::new(140, 44)
   let pb = @render.Painter::new(bm_b)
   root_b.paint(pb)

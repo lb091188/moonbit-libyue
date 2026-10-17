@@ -96,7 +96,7 @@ pub fn auto_focus_id(explicit : Int) -> Int {
 /// 单行输入框。文本经 `store` 双向投影；`focus_id` 决定它能否吃键盘焦点
 /// （宿主的 Tab 环绕与按键投递都按它走），**不给就自动分配**——输入框默认就该能点进能打字。
 pub fn input(
-  store : @core.Store[String],
+  store : @base.Store[String],
   placeholder? : String = "",
   password? : Bool = false,
   read_only? : Bool = false,
@@ -109,8 +109,8 @@ pub fn input(
   on_change? : (String) -> Unit = fn(_s : String) { () },
   clearable? : Bool = false,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let ed = @input.Editor::new()
   attach_system_clipboard(ed)
   let _ = ed.insert_text(store.get())
@@ -123,10 +123,10 @@ pub fn input(
   let change_cb = on_change
   let can_clear = clearable
   // 清空热区：右缘 14x14 一块（✕ 画在它中心）
-  let clear_box = fn(r : @core.Rect) -> (Double, Double, Double, Double) {
+  let clear_box = fn(r : @base.Rect) -> (Double, Double, Double, Double) {
     (r.w - 18.0, ((r.h - 14.0) / 2.0).max(0.0), 14.0, 14.0)
   }
-  let clear_shown = fn(self : @core.Widget) -> Bool {
+  let clear_shown = fn(self : @widget.Widget) -> Bool {
     can_clear && !ro && ed.get_text().length() > 0 && (self.hovered || self.focused)
   }
   let last_down = Ref(-1000000L)
@@ -142,11 +142,11 @@ pub fn input(
     if mask { mask_of(ed.get_text()) } else { ed.get_text() }
   }
   let caret_x = fn() -> Double { pad + prefix_width(ed, ed.caret_pos(), font) }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let off = enabled_cell(None, false)
     w.focus_id = auto_focus_id(focus_id)
-    w.cursor = @core.CURSOR_TEXT
+    w.cursor = @widget.CURSOR_TEXT
     w.node.set_height(@yoga.fixed(@theme.control_height))
     if width > 0.0 {
       w.node.set_width(@yoga.fixed(width))
@@ -154,9 +154,9 @@ pub fn input(
       w.node.set_min_width(@yoga.fixed(80.0))
     }
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let lh = @text.line_height_font(font).unwrap_or(18).to_double()
       let ty = ((r.h - lh) / 2.0).max(0.0)
@@ -221,19 +221,19 @@ pub fn input(
         p.stroke()
       }
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || off.off {
         return false
       }
-      if ev.keysym == @core.KS_RETURN {
+      if ev.keysym == @base.KS_RETURN {
         enter_cb()
         return true
       }
       // 导航键：方向/Home/End/PageUp-Down/Tab（65360..65367 是这一族）与带修饰的组合
-      let nav = (ev.mods & (@core.MOD_CTRL | @core.MOD_SHIFT)) != 0 || (
+      let nav = (ev.mods & (@base.MOD_CTRL | @base.MOD_SHIFT)) != 0 || (
         ev.keysym >= 65360 && ev.keysym <= 65367
-      ) || ev.keysym == @core.KS_TAB
-      let editing = ev.keysym == @core.KS_BACKSPACE || ev.keysym == @core.KS_DELETE
+      ) || ev.keysym == @base.KS_TAB
+      let editing = ev.keysym == @base.KS_BACKSPACE || ev.keysym == @base.KS_DELETE
       if ro && (editing || !nav) {
         // 只读：导航与复制照旧，编辑类按键（含退格/删除/可打印字符）一律不吃
         return false
@@ -244,21 +244,21 @@ pub fn input(
         if ed.get_text() != before {
           push()
         }
-        @core.invalidate()
+        @widget.invalidate()
       }
       handled
     })
     w.on_commit = Some(fn(t : String) -> Bool {
       let _ = ed.insert_text(t)
       push()
-      @core.invalidate()
+      @widget.invalidate()
       true
     })
     w.on_preedit = Some(fn(t : String, _caret : Int) -> Unit {
       ed.set_preedit(t)
-      @core.invalidate()
+      @widget.invalidate()
     })
-    w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
+    w.on_pointer = Some(fn(_self : @widget.Widget, ev : @widget.PointerEvent) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => {
           if clear_shown(_self) && !off.off {
@@ -268,11 +268,11 @@ pub fn input(
               ed.set_text("")
               push()
               dragging.val = false
-              @core.invalidate()
+              @widget.invalidate()
               return true
             }
           }
-          let now = @core.now_ms()
+          let now = @shell.now_ms()
           let dbl = (now - last_down.val) < 400L && (ev.x - last_x.val).abs() < 4.0
           last_down.val = now
           last_x.val = ev.x
@@ -285,14 +285,14 @@ pub fn input(
             ed.select_range(at, at)
             anchor.val = at
           }
-          @core.invalidate()
+          @widget.invalidate()
           true
         }
         @widget.PointerKind::Move => {
           if dragging.val {
             // 拖出的部分靠宿主的捕获期投递，选区可以越过框边缘继续走
             ed.select_range(anchor.val, byte_at_x(ed, ev.x, pad, font))
-            @core.invalidate()
+            @widget.invalidate()
           }
           dragging.val
         }
@@ -306,7 +306,7 @@ pub fn input(
     w.im_context = Some(fn() -> (String, Int)? {
       Some((ed.get_text(), ed.caret_pos()))
     })
-    w.im_cursor = Some(fn(self : @core.Widget) -> @core.Rect? {
+    w.im_cursor = Some(fn(self : @widget.Widget) -> @base.Rect? {
       let rect = self.rect
       Some({
         x: rect.x + caret_x(),
@@ -319,10 +319,10 @@ pub fn input(
     let sid = store.subscribe_id(fn(t : String) -> Unit {
       if t != ed.get_text() {
         ed.set_text(t)
-        @core.invalidate()
+        @widget.invalidate()
       }
     })
-    @core.sub_bag_register(fn() { store.remove(sid) })
+    @base.sub_bag_register(fn() { store.remove(sid) })
     // 内置皮肤（底色/描边/文字色 + 焦点框色）先折槽，class 同名属性覆盖
     fold_style(
       w,

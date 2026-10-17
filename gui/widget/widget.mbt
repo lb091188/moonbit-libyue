@@ -123,7 +123,7 @@ pub(all) struct Widget {
   /// 给 None（返回 None 同理）表示这一拖不成立。
   mut drag_payload : Option[() -> DragData?]
   /// 投放回调（W21c）：拖拽松手且本控件是**最深命中者**时调用，返回是否接受。
-  /// 悬停高亮不靠回调：绘制方读 `@core.drag_hover() == self.id` 自判（见 drag.mbt）。
+  /// 悬停高亮不靠回调：绘制方读 `@widget.drag_hover() == self.id` 自判（见 drag.mbt）。
   mut on_drop : Option[(DragData, Double, Double) -> Bool]
   /// 悬停期的「收不收」查询（W23a 系统级拖入用）：系统要在拖拽**过程中**就知道
   /// 落点接不接这份数据（决定光标），而 `on_drop` 一调就真投了，所以查询另开一条。

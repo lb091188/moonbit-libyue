@@ -215,17 +215,17 @@ fn funnel_draw(
 /// 全部正值总和。数据经 Store 驱动：set 后只重绘画布不重建视图树；
 /// 主题切换现取色自动跟随。
 pub fn funnel_t(
-  data : @core.Store[Array[BarItem]],
+  data : @base.Store[Array[BarItem]],
   alignment? : FunnelAlign = FunnelCenter,
   pct_of_total? : Bool = false,
   width? : Double = 0.0,
   height? : Double = 280.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let align = alignment
   let pct_total = pct_of_total
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -235,9 +235,9 @@ pub fn funnel_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

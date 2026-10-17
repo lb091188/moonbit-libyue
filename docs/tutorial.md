@@ -60,7 +60,9 @@ The project `moon new` generates needs three manual adjustments:
 
   ```
   import {
-    "NoahLiu/native-gui/core",
+    "NoahLiu/native-gui/base",
+    "NoahLiu/native-gui/shell",
+    "NoahLiu/native-gui/widget" @widget,,
     "NoahLiu/native-gui/ui",
   }
 
@@ -69,7 +71,7 @@ The project `moon new` generates needs three manual adjustments:
   supported_targets = "native"
   ```
 
-  `import` gives the code access to the library: `@ui.*` provides widgets, components, and the declarative entries (`mount_window` and the node constructors), `@core.*` provides the app host and reactive state (`Store` / `Signal`). `pkgtype(kind: "executable")` and `supported_targets = "native"` declare this package an executable entry that builds only for the native target.
+  `import` gives the code access to the library: `@ui.*` provides widgets, components, and the declarative entries (`mount_window` and the node constructors), `@base.*`/`@shell.*`/`@widget.*` provides the app host and reactive state (`Store` / `Signal`). `pkgtype(kind: "executable")` and `supported_targets = "native"` declare this package an executable entry that builds only for the native target.
 
 ## 3. Your first window
 
@@ -77,7 +79,7 @@ Replace `main.mbt` entirely with:
 
 ```moonbit
 fn main {
-  let count : @core.Store[Int] = @core.Store::new(0)
+  let count : @base.Store[Int] = @base.Store::new(0)
   let app = match @ui.mount_window(
     [
       @ui.col(
@@ -117,7 +119,7 @@ A window appears: a title, a button, and a "Clicked 0 times" line. Click the but
 | Syntax | Meaning |
 |---|---|
 | `fn main { ... }` | program entry |
-| `let count : @core.Store[Int] = ...` | type annotation: `Store[Int]` is a box of integer state |
+| `let count : @base.Store[Int] = ...` | type annotation: `Store[Int]` is a box of integer state |
 | `match expr { ... }` | pattern matching, take a value per branch (here, unwrapping an `Option`) |
 | `None => ... / Some(a) => a` | the two states of an optional value: `None` absent, `Some(x)` present |
 | `fn(n) { n + 1 }` | anonymous function (lambda), passed in as a callback |
@@ -133,7 +135,7 @@ Once your first app runs, pick a path by goal:
 **Make it look good** — out of the box the app already follows the system light/dark mode and accent color; connect it in one `follow_system_theme` line:
 
 ```moonbit
-handle=fn(a : @core.App) -> Unit {
+handle=fn(a : @widget.App) -> Unit {
   let _ = a.follow_system_theme(interval_ms=2000)
 }
 ```

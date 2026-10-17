@@ -89,14 +89,14 @@ pub fn text_width(text : String, font : @text.Font) -> Double {
 ///|
 /// `*_dyn` 的共用接线：订阅信号、把新值映射成内核要的文本喂给 `set`，退订随本代
 /// 回收袋（重挂不留死订阅，同 `text_dyn` 的口径）。
-fn[T] bind_value(sig : @core.Signal[T], of_value : (T) -> String, set : (String) -> Unit) -> Unit {
+fn[T] bind_value(sig : @base.Signal[T], of_value : (T) -> String, set : (String) -> Unit) -> Unit {
   let sid = sig.subscribe(fn(v : T) -> Unit { set(of_value(v)) })
-  @core.sub_bag_register(fn() { sig.remove(sid) })
+  @base.sub_bag_register(fn() { sig.remove(sid) })
 }
 
 ///|
 /// 文本就是值的场合（`tag` / `avatar` 那类）直接走这条。
-fn bind_text(sig : @core.Signal[String], set : (String) -> Unit) -> Unit {
+fn bind_text(sig : @base.Signal[String], set : (String) -> Unit) -> Unit {
   bind_value(sig, fn(v : String) -> String { v }, set)
 }
 
@@ -116,7 +116,7 @@ fn chip(
   clickable : Bool,
   bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let font = @text.Font::new("", size)
   let blocks : Array[@style.Style] = [
     match bg_block(bg) {
@@ -134,7 +134,7 @@ fn chip(
   } else {
     @style.merge_all(blocks)
   }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     fold_style(w, anon, class)
     let txt : Ref[String] = Ref(text)
@@ -149,9 +149,9 @@ fn chip(
     sync_width()
     w.node.set_height(@yoga.fixed(height))
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       p.set_fill_color(@style.color_of(s.background_color, ""))
@@ -167,8 +167,8 @@ fn chip(
     })
     if clickable {
       w.on_pointer = Some(fn(
-        self : @core.Widget,
-        ev : @core.PointerEvent,
+        self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => true
@@ -186,7 +186,7 @@ fn chip(
       txt.val = v
       tw.val = text_width(v, font)
       sync_width()
-      @core.invalidate()
+      @widget.invalidate()
     })
     w
   })
@@ -199,7 +199,7 @@ pub fn tag_of_type(
   t : SemanticType,
   font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   chip(
     text,
     type_token(t),
@@ -218,11 +218,11 @@ pub fn tag_of_type(
 /// 语义色标签的信号版（§3 通则：`x` 收值 + `x_dyn` 收 `Signal[T]`）：文本变了就地
 /// 改字并重算宽度，不重建子树。
 pub fn tag_of_type_dyn(
-  text : @core.Signal[String],
+  text : @base.Signal[String],
   t : SemanticType,
   font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   chip(
     text.get(),
     type_token(t),
@@ -245,18 +245,18 @@ pub fn tag(
   color : String,
   font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   chip(text, "#ffffff", color, 24.0, font_size, 8.0, 0.0, fn() { () }, false, class=class)
 }
 
 ///|
 /// 自定色标签的信号版：用法同 [tag_of_type_dyn]。
 pub fn tag_dyn(
-  text : @core.Signal[String],
+  text : @base.Signal[String],
   color : String,
   font_size? : Double = 12.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   chip(
     text.get(),
     "#ffffff",
@@ -285,7 +285,7 @@ pub fn badge_count(
   max? : Int = 99,
   color? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   chip(
     badge_text(value, max),
     "#ffffff",
@@ -303,11 +303,11 @@ pub fn badge_count(
 ///|
 /// 数字徽标的信号版：未读数这类整数源直接进 `Signal[Int]`，截断规则与静态版同一份。
 pub fn badge_count_dyn(
-  value : @core.Signal[Int],
+  value : @base.Signal[Int],
   max? : Int = 99,
   color? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   chip(
     badge_text(value.get(), max),
     "#ffffff",
@@ -331,10 +331,10 @@ pub fn badge_dot(
   size? : Double = 8.0,
   color? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let d = size
   let bg = if color.length() > 0 { color } else { "danger" }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(d))
     w.node.set_height(@yoga.fixed(d))
@@ -344,9 +344,9 @@ pub fn badge_dot(
     }
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       p.set_fill_color(@style.color_of(s.background_color, ""))
@@ -374,7 +374,7 @@ fn avatar_of(
   background_color : String,
   bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let d = size
   let font = @text.Font::new("", size * 0.45)
   let blocks : Array[@style.Style] = [
@@ -388,16 +388,16 @@ fn avatar_of(
     },
   ]
   let anon = @style.merge_all(blocks)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let ch : Ref[String] = Ref(one)
     w.node.set_width(@yoga.fixed(d))
     w.node.set_height(@yoga.fixed(d))
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       p.set_fill_color(@style.color_of(s.background_color, ""))
@@ -408,7 +408,7 @@ fn avatar_of(
     })
     bind(fn(v : String) -> Unit {
       ch.val = v
-      @core.invalidate()
+      @widget.invalidate()
     })
     w
   })
@@ -421,18 +421,18 @@ pub fn avatar(
   size? : Double = 32.0,
   background_color? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   avatar_of(first_char(text), size, background_color, class=class)
 }
 
 ///|
 /// 头像的信号版：昵称/用户名换了就换首字符，尺寸不变。
 pub fn avatar_dyn(
-  text : @core.Signal[String],
+  text : @base.Signal[String],
   size? : Double = 32.0,
   background_color? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   avatar_of(
     first_char(text.get()),
     size,
@@ -454,7 +454,7 @@ fn statistic_of(
   precision_color : String,
   bind? : ((String) -> Unit) -> Unit = fn(_set : (String) -> Unit) -> Unit { () },
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let vfont = @text.Font::new("", 22.0)
   let tfont = @text.Font::new("", 12.0)
   let anon = match fg_block(if precision_color.length() > 0 {
@@ -465,7 +465,7 @@ fn statistic_of(
     Some(b) => b
     None => @style.empty_style()
   }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let txt : Ref[String] = Ref(line)
     // 宽度在挂载与订阅回调里按测量算定（绘制回调里改布局会把 paint 变成布局的写入方）
@@ -478,9 +478,9 @@ fn statistic_of(
     w.node.set_height(@yoga.fixed(56.0))
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let _ = @text.draw_at(p, 0.0, 2.0, title, tfont, @theme.theme_text_secondary())
@@ -490,7 +490,7 @@ fn statistic_of(
       txt.val = v
       vw.val = text_width(v, vfont)
       sync_width()
-      @core.invalidate()
+      @widget.invalidate()
     })
     w
   })
@@ -504,7 +504,7 @@ pub fn statistic(
   precision_color? : String = "",
   prefix? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   statistic_of(title, prefix + value, precision_color, class=class)
 }
 
@@ -513,11 +513,11 @@ pub fn statistic(
 /// 标题与前缀建树时定死。
 pub fn statistic_dyn(
   title : String,
-  value : @core.Signal[String],
+  value : @base.Signal[String],
   precision_color? : String = "",
   prefix? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   statistic_of(
     title,
     prefix + value.get(),
@@ -544,7 +544,7 @@ pub fn alert(
   closable? : Bool = false,
   on_close? : () -> Unit = fn() { () },
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let tf = @text.Font::new("", 13.0, weight=@text.SemiBold)
   let df = @text.Font::new("", 12.0)
   let blocks : Array[@style.Style] = [
@@ -558,15 +558,15 @@ pub fn alert(
     },
   ]
   let anon = @style.merge_all(blocks)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_height(@yoga.fixed(if description.length() > 0 { 56.0 } else { 36.0 }))
     w.node.set_width(@yoga.percent(100.0))
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let light = @style.color_of(s.background_color, "")
@@ -587,8 +587,8 @@ pub fn alert(
     })
     if closable {
       w.on_pointer = Some(fn(
-        self : @core.Widget,
-        ev : @core.PointerEvent,
+        self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => true
@@ -598,7 +598,7 @@ pub fn alert(
             // 下方内容整列回流，走全窗置脏
             if ev.x >= self.rect.w - 24.0 && ev.y <= 24.0 {
               self.set_visible(false)
-              @core.invalidate()
+              @widget.invalidate()
               on_close()
             }
             false
@@ -614,13 +614,13 @@ pub fn alert(
 ///|
 /// 卡片：可选标题栏 + 内容区，面板底 + 描边（`class` 交给外层容器）。
 pub fn card(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   title? : String = "",
   padding? : Double = 12.0,
   row_gap? : Double = 6.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
-  let body : Array[@core.Node] = []
+) -> @widget.Node {
+  let body : Array[@widget.Node] = []
   if title.length() > 0 {
     body.push(
       text(title, font_size=14.0, weight=@text.SemiBold, color="text_primary"),
@@ -647,8 +647,8 @@ pub fn descriptions(
   title? : String = "",
   label_width? : Double = 96.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
-  let rows : Array[@core.Node] = []
+) -> @widget.Node {
+  let rows : Array[@widget.Node] = []
   if title.length() > 0 {
     rows.push(text(title, font_size=14.0, weight=@text.SemiBold))
   }
@@ -660,7 +660,7 @@ pub fn descriptions(
           text(
             kv.1,
             font_size=12.0,
-            handle=fn(w : @core.Widget) -> Unit {
+            handle=fn(w : @widget.Widget) -> Unit {
               w.node.set_min_width(@yoga.fixed(label_width))
             },
           ),
@@ -678,7 +678,7 @@ pub fn descriptions(
 pub fn empty(
   description? : String = "暂无数据",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   view(
     [
       icon(@icons.IconKind::Box, size=42.0, color="border"),
@@ -698,7 +698,7 @@ pub fn result(
   subtitle? : String = "",
   t? : SemanticType = Success,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let kind = match t {
     Success => @icons.IconKind::Finished
     Danger => @icons.IconKind::CircleClose
@@ -727,26 +727,26 @@ pub fn result(
 ///|
 /// 折线进度（带百分比文字）：`state` 取 0..max。
 pub fn progress_line(
-  state : @core.Store[Double],
+  state : @base.Store[Double],
   max? : Double = 1.0,
   width? : Double = 200.0,
   label_side? : Bool = true,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   follow_store(state)
   let hi = if max > 0.0 { max } else { 1.0 }
   let bar = progress(state, max=hi, width=(width - 44.0).max(20.0), height=8.0)
   if label_side {
-    let pct = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    let pct = @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
       watch_theme()
       // 百分比列要按字高占位，否则 11px 的字被 8px 的条高裁掉
       w.node.set_width(@yoga.fixed(40.0))
       w.node.set_height(@yoga.fixed(16.0))
       let font = @text.Font::new("", 11.0)
       w.on_draw = Some(fn(
-        _self : @core.Widget,
+        _self : @widget.Widget,
         p : @render.Painter,
-        _r : @core.Rect,
+        _r : @base.Rect,
       ) -> Unit {
         let ratio = (state.get() / hi).clamp(min=0.0, max=1.0)
         let txt = (ratio * 100.0).round().to_int().to_string() + "%"
@@ -776,7 +776,7 @@ fn timeline_row(
   last : Bool,
   height : Double,
   pad : Double,
-) -> @core.Node {
+) -> @widget.Node {
   // 行间距画进**本行**里（marker 与行盒一起长到 height+pad）：
   // 用 `row_gap` 分行会让连接线在每一处间隙断开
   let box_h = height + pad
@@ -791,14 +791,14 @@ fn timeline_row(
     },
   ]
   let anon = @style.merge_all(blocks)
-  let mark = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  let mark = @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     w.node.set_width(@yoga.fixed(20.0))
     w.node.set_height(@yoga.fixed(box_h))
     fold_style(w, anon, [])
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let cy = height / 2.0
@@ -823,7 +823,7 @@ fn timeline_row(
           text(desc, font_size=12.0, color="text_secondary"),
         ],
         grow=1.0,
-        handle=fn(w : @core.Widget) -> Unit { w.set_padding(top=2.0, left=8.0) },
+        handle=fn(w : @widget.Widget) -> Unit { w.set_padding(top=2.0, left=8.0) },
       ),
     ],
     direction=@yoga.Row,
@@ -840,8 +840,8 @@ pub fn timeline(
   item_height? : Double = 56.0,
   gap? : Double = 12.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
-  let rows : Array[@core.Node] = []
+) -> @widget.Node {
+  let rows : Array[@widget.Node] = []
   let n = items.length()
   for i = 0; i < n; i = i + 1 {
     let input = items[i]
@@ -915,7 +915,7 @@ pub fn carousel_pause(handle : CarouselHandle, v : Bool) -> Unit {
 /// 不认识视图已移除，不退就会继续对销毁掉的子树空转。
 pub fn carousel_stop(handle : CarouselHandle) -> Unit {
   handle.running.val = false
-  @core.clear_timeout(handle.timer.val)
+  @shell.clear_timeout(handle.timer.val)
   handle.timer.val = 0
 }
 
@@ -924,23 +924,23 @@ pub fn carousel_stop(handle : CarouselHandle) -> Unit {
 /// `interval_ms > 0` 且页数大于 1 时自动轮播（每 `interval_ms` 毫秒前进一页，
 /// 指针停在轮播上暂停、离开恢复）；面板全部预建，切页只翻显隐。
 pub fn carousel(
-  pages : Array[@core.Node],
+  pages : Array[@widget.Node],
   width? : Double = 360.0,
   height? : Double = 180.0,
   interval_ms? : Int = 3000,
   rotation? : CarouselHandle = CarouselHandle::make(),
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let n = pages.length()
   let cur = rotation.cur
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(height + 24.0))
     if n > 0 {
-      let panels : Array[@core.Widget] = []
+      let panels : Array[@widget.Widget] = []
       // 切页：越界回绕；面板只显示当前页（预建 + 显隐，不销毁子树）
       fn do_switch(i : Int) -> Unit {
         let idx = if i < 0 { n - 1 } else if i >= n { 0 } else { i }
@@ -948,18 +948,18 @@ pub fn carousel(
           panels[cur.val].set_visible(false)
           panels[idx].set_visible(true)
           cur.val = idx
-          @core.invalidate()
+          @widget.invalidate()
         }
       }
 
       rotation.switch.val = fn(i : Int) -> Unit { do_switch(i) }
-      let stage = @core.Widget::new()
+      let stage = @widget.Widget::new()
       stage.node.set_flex_direction(@yoga.Column)
       stage.node.set_flex_grow(1.0)
       stage.node.set_min_width(@yoga.fixed(0.0))
       stage.node.set_min_height(@yoga.fixed(0.0))
       for i = 0; i < n; i = i + 1 {
-        let pc = @core.Widget::new()
+        let pc = @widget.Widget::new()
         pc.node.set_flex_direction(@yoga.Column)
         // 面板撑满舞台：固定宽会让两侧箭头的热区被盖住
         pc.node.set_flex_grow(1.0)
@@ -971,14 +971,14 @@ pub fn carousel(
         panels.push(pc)
       }
 
-      fn arrow(right : Bool) -> @core.Widget {
-        let a = @core.Widget::new()
+      fn arrow(right : Bool) -> @widget.Widget {
+        let a = @widget.Widget::new()
         a.node.set_width(@yoga.fixed(24.0))
         a.node.set_height(@yoga.fixed(height))
         a.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           if self.hovered {
             p.set_fill_color(@theme.theme_fill_hover())
@@ -1000,10 +1000,10 @@ pub fn carousel(
           p.close_path()
           p.fill()
         })
-        a.cursor = @core.CURSOR_HAND
+        a.cursor = @widget.CURSOR_HAND
         a.on_pointer = Some(fn(
-          _self : @core.Widget,
-          ev : @core.PointerEvent,
+          _self : @widget.Widget,
+          ev : @widget.PointerEvent,
         ) -> Bool {
           match ev.kind {
             @widget.PointerKind::Down => {
@@ -1016,7 +1016,7 @@ pub fn carousel(
         a
       }
 
-      let stage_row = @core.Widget::new()
+      let stage_row = @widget.Widget::new()
       stage_row.node.set_flex_direction(@yoga.Row)
       stage_row.node.set_height(@yoga.fixed(height))
       stage_row.append_child(arrow(false))
@@ -1024,20 +1024,20 @@ pub fn carousel(
       stage_row.append_child(arrow(true))
       w.append_child(stage_row)
 
-      let dots_row = @core.Widget::new()
+      let dots_row = @widget.Widget::new()
       dots_row.node.set_flex_direction(@yoga.Row)
       dots_row.node.set_height(@yoga.fixed(24.0))
       dots_row.node.set_justify_content(@yoga.JustifyContent::Center)
       for i = 0; i < n; i = i + 1 {
-        let dot = @core.Widget::new()
+        let dot = @widget.Widget::new()
         dot.node.set_width(@yoga.fixed(8.0))
         dot.node.set_height(@yoga.fixed(8.0))
         dot.set_margin(top=8.0, bottom=4.0, left=4.0, right=4.0)
         let di = i
         dot.on_draw = Some(fn(
-          _self : @core.Widget,
+          _self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           p.set_fill_color(
             if cur.val == di {
@@ -1048,10 +1048,10 @@ pub fn carousel(
           )
           p.fill_rect(0.0, 0.0, r.w, r.h)
         })
-        dot.cursor = @core.CURSOR_HAND
+        dot.cursor = @widget.CURSOR_HAND
         dot.on_pointer = Some(fn(
-          _self : @core.Widget,
-          ev : @core.PointerEvent,
+          _self : @widget.Widget,
+          ev : @widget.PointerEvent,
         ) -> Bool {
           match ev.kind {
             @widget.PointerKind::Down => {
@@ -1068,8 +1068,8 @@ pub fn carousel(
       // 悬停暂停：指针进到本控件（父链才会收到移动）即停，离开（宿主补发的
       // Leave 沿同一条路径上来）即恢复
       w.on_pointer = Some(fn(
-        _self : @core.Widget,
-        ev : @core.PointerEvent,
+        _self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Move => {
@@ -1087,7 +1087,7 @@ pub fn carousel(
         // 一次性延时自排下一拍：句柄存进 rotation，停转时取消待触发那次
         let tick : Ref[() -> Unit] = Ref(fn() { () })
         tick.val = fn() {
-          rotation.timer.val = @core.set_timeout(interval_ms, fn() {
+          rotation.timer.val = @shell.set_timeout(interval_ms, fn() {
             if rotation.running.val {
               // 所在页被隐藏（这一帧没被画到）时不切页也不置脏：整窗重绘白做
               if !rotation.paused.val && w.is_painted() {

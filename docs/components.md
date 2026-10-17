@@ -1,6 +1,6 @@
 # Component reference (@ui)
 
-Every self-drawn widget and the component library live in `NoahLiu/native-gui/ui` (alias `@ui`). Each component is a **constructor returning `@core.Node`** — you describe the interface as a node tree and mount it once with `@ui.mount_window([...])`. This page lists each family's entry signatures and purposes as a quick reference; parameters always follow the code (`gui/ui/*.mbt`).
+Every self-drawn widget and the component library live in `NoahLiu/native-gui/ui` (alias `@ui`). Each component is a **constructor returning `@widget.Node`** — you describe the interface as a node tree and mount it once with `@ui.mount_window([...])`. This page lists each family's entry signatures and purposes as a quick reference; parameters always follow the code (`gui/ui/*.mbt`).
 
 > Runnable examples for every component are gathered in `examples/showcase` — a 14-page demo board, one source file per page, the fastest way in.
 
@@ -8,9 +8,9 @@ Every self-drawn widget and the component library live in `NoahLiu/native-gui/ui
 
 **Typed parameters + a `class` style channel.** Components take typed parameters only — size, colour, value — not CSS string tables. Overriding the look goes two ways: loose parameters (`font_size` / `background_color` and friends), or `class? : Array[@style.Style]` layering `Style` value blocks, where the last `class` in the array wins. The full style layer is in [design.md (Chinese)](/zh/design).
 
-**State lives in `Store`, no glue code.** The current value of a value control (checkbox / radio / switch / slider / input / progress …) is held by an `@core.Store[T]`: the component reads and writes it, and an external change refreshes the component. Display components come through two entries — `x` takes a value, `x_dyn` takes a `Signal[T]` — sharing one drawing path.
+**State lives in `Store`, no glue code.** The current value of a value control (checkbox / radio / switch / slider / input / progress …) is held by an `@base.Store[T]`: the component reads and writes it, and an external change refreshes the component. Display components come through two entries — `x` takes a value, `x_dyn` takes a `Signal[T]` — sharing one drawing path.
 
-**Events are always `on_*`.** Callbacks are named `on_click` / `on_change` / `on_drop` …; `handle?` is an escape hatch — take back the internal `@core.Widget` handle for operations the framework does not expose — not an event.
+**Events are always `on_*`.** Callbacks are named `on_click` / `on_change` / `on_drop` …; `handle?` is an escape hatch — take back the internal `@widget.Widget` handle for operations the framework does not expose — not an event.
 
 **Keyboard accessibility is built in.** Form-family controls (button / checkbox / radio / switch / stepper / slider / rate / select / color picker / date-time / segmented) claim a focus id by default and join the Tab chain; the focus border turns the theme accent. Space/Enter activate, arrow keys adjust the value or move the selection per control semantics.
 
@@ -139,7 +139,7 @@ Value model (`ui/datetime.mbt`): `DateYMD{y,m,d}`, `TimeHM{h,m}`, `DateRange`, `
 | `time_range_picker(value : Store[TimeRange], on_change?, …)` | Time-range picker: stepper form, not `input` |
 | `datetime_range_picker(value : Store[DateTimeRange], on_change?, …)` | Date-time range picker |
 
-> "Today" goes through `wm_local_date` → `@core.local_ymd()` for system calendar time; the monotonic `now_ms` clock cannot derive a date.
+> "Today" goes through `wm_local_date` → `@shell.local_ymd()` for system calendar time; the monotonic `now_ms` clock cannot derive a date.
 
 ## Reactive control
 
@@ -148,7 +148,7 @@ Value model (`ui/datetime.mbt`): `DateYMD{y,m,d}`, `TimeHM{h,m}`, `DateRange`, `
 | `when(cond : Signal[T], then : Node, pred?)` | Signal show/hide: true mounts `then`, false hides it — nothing is destroyed, state survives; `when_bool` is the common boolean-source form |
 | `when_else(cond, then, otherwise, pred?)` | Both branches stay resident and the signal switches visibility; `swap_node` lands the change with zero rebuilds; `when_else_bool` is the boolean-source form |
 | `when_store` / `when_store_bool` / `when_else_store` / `when_else_store_bool` | The `Store[T]` forms of the above |
-| `for_list(ls : @core.ListStore[T], build : (T, Int) -> Node, key~, eq?)` | Keyed list diff: `build(item, index)` builds each row; the default criterion is "same key, same value", so mutable fields become their own Store |
+| `for_list(ls : @base.ListStore[T], build : (T, Int) -> Node, key~, eq?)` | Keyed list diff: `build(item, index)` builds each row; the default criterion is "same key, same value", so mutable fields become their own Store |
 | `for_list_indexed(ls, build)` | Index-aligned, equivalent to no `:key`: extra rows unload only when the length shrinks |
 
 > Replacing the whole tree goes through `bind_node`; `ListStore` keyed diffing belongs to the `@core` reactive layer (details in [declarative.md](declarative.md)).

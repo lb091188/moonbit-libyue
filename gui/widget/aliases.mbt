@@ -1,6 +1,5 @@
 // 包内别名与裸名转发（G9 Batch 2）：base/shell 提层后，widget 各文件的书写
-// 形态保持原样。只在本包可见；对外的门面别名在 `core`（迁移期 `@core.*`
-// 调用点不改写）。
+// 形态保持原样。只在本包可见。
 
 ///|
 pub type Rect = @base.Rect

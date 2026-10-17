@@ -10,7 +10,7 @@
 //   - 旧栈 yue/declarative/components 三个别名全部换 core/ui/theme；
 //     style 字符串列表换组件的具名参数（padding/row_gap/grow/width）。
 //   - 自绘容器重绘从「schedule_paint + on_theme_change」换成
-//     「Store.subscribe + @core.invalidate()」（进程级 host_repaint_all）；
+//     「Store.subscribe + @widget.invalidate()」（进程级 host_repaint_all）；
 //     主题切换重绘同样走 invalidate（on_draw 每次实时读 theme_current）。
 //   - 手型光标从「逐子控件 set_cursor」换成 cursor_group（宿主取
 //     悬停路径最深的非零请求，组内一处即可盖住全部）。
@@ -114,29 +114,29 @@ struct App {
   // fdinfo 聚合）与 fdinfo 前样本差值状态
   gpu : GpuMonitor
   // 概览页：资源卡片值行（标题行右侧，紧凑格式防溢出）
-  card_cpu : @core.Store[String]
-  card_mem : @core.Store[String]
-  card_net : @core.Store[String]
-  card_proc : @core.Store[String]
+  card_cpu : @base.Store[String]
+  card_mem : @base.Store[String]
+  card_net : @base.Store[String]
+  card_proc : @base.Store[String]
   // 磁盘卡：每个用户挂载一张（数量取启动枚举结果，热插拔不重建）
-  card_disk_vals : Array[@core.Store[String]]
-  disk_hists : Array[@core.Store[Array[@charts.LineSeries]]]
+  card_disk_vals : Array[@base.Store[String]]
+  disk_hists : Array[@base.Store[Array[@charts.LineSeries]]]
   // 概览页：实时曲线（定长滚动窗口 120 点 = 2 分钟 @1Hz）
-  cpu_hist : @core.Store[Array[@charts.LineSeries]]
-  core_bars : @core.Store[Array[@charts.BarItem]]
-  mem_hist : @core.Store[Array[@charts.LineSeries]]
-  swap_hist : @core.Store[Array[@charts.LineSeries]]
-  net_hist : @core.Store[Array[@charts.LineSeries]]
+  cpu_hist : @base.Store[Array[@charts.LineSeries]]
+  core_bars : @base.Store[Array[@charts.BarItem]]
+  mem_hist : @base.Store[Array[@charts.LineSeries]]
+  swap_hist : @base.Store[Array[@charts.LineSeries]]
+  net_hist : @base.Store[Array[@charts.LineSeries]]
   // GPU 详情页与卡值：每块物理卡一套（数量取启动枚举结果，热插拔不重建）
-  card_gpu_vals : Array[@core.Store[String]]
-  gpu_busy_hists : Array[@core.Store[Array[@charts.LineSeries]]]
-  gpu_vram_hists : Array[@core.Store[Array[@charts.LineSeries]]]
+  card_gpu_vals : Array[@base.Store[String]]
+  gpu_busy_hists : Array[@base.Store[Array[@charts.LineSeries]]]
+  gpu_vram_hists : Array[@base.Store[Array[@charts.LineSeries]]]
   // 其余页数据源（进程 / 传感器 / 磁盘 / 网络页订阅）
-  procs : @core.Store[Array[ProcInfo]]
-  sensors : @core.Store[Array[TempSensor]]
-  gpus : @core.Store[Array[GpuInfo]]
-  disks : @core.Store[Array[DiskInfo]]
-  nets : @core.Store[Array[NetInfo]]
+  procs : @base.Store[Array[ProcInfo]]
+  sensors : @base.Store[Array[TempSensor]]
+  gpus : @base.Store[Array[GpuInfo]]
+  disks : @base.Store[Array[DiskInfo]]
+  nets : @base.Store[Array[NetInfo]]
 }
 
 ///|
@@ -282,34 +282,34 @@ fn main {
     disk: disk_mon,
     net: NetMonitor::new(),
     gpu: gpu_mon,
-    card_cpu: @core.Store::new("—"),
-    card_mem: @core.Store::new("—"),
-    card_net: @core.Store::new("—"),
-    card_proc: @core.Store::new("—"),
-    card_disk_vals: disks0.map(fn(_d) { @core.Store::new("—") }),
+    card_cpu: @base.Store::new("—"),
+    card_mem: @base.Store::new("—"),
+    card_net: @base.Store::new("—"),
+    card_proc: @base.Store::new("—"),
+    card_disk_vals: disks0.map(fn(_d) { @base.Store::new("—") }),
     disk_hists: disks0.map(fn(_d) {
-      @core.Store::new([@charts.LineSeries::make("已用", max_points=120)])
+      @base.Store::new([@charts.LineSeries::make("已用", max_points=120)])
     }),
-    cpu_hist: @core.Store::new([@charts.LineSeries::make("CPU", max_points=120)]),
-    core_bars: @core.Store::new([]),
-    mem_hist: @core.Store::new([@charts.LineSeries::make("内存", max_points=120)]),
-    swap_hist: @core.Store::new([@charts.LineSeries::make("swap", max_points=120)]),
-    net_hist: @core.Store::new([
+    cpu_hist: @base.Store::new([@charts.LineSeries::make("CPU", max_points=120)]),
+    core_bars: @base.Store::new([]),
+    mem_hist: @base.Store::new([@charts.LineSeries::make("内存", max_points=120)]),
+    swap_hist: @base.Store::new([@charts.LineSeries::make("swap", max_points=120)]),
+    net_hist: @base.Store::new([
       @charts.LineSeries::make("接收", max_points=120),
       @charts.LineSeries::make("发送", max_points=120),
     ]),
-    card_gpu_vals: gpus0.map(fn(_g) { @core.Store::new("—") }),
+    card_gpu_vals: gpus0.map(fn(_g) { @base.Store::new("—") }),
     gpu_busy_hists: gpus0.map(fn(_g) {
-      @core.Store::new([@charts.LineSeries::make("占用", max_points=120)])
+      @base.Store::new([@charts.LineSeries::make("占用", max_points=120)])
     }),
     gpu_vram_hists: gpus0.map(fn(_g) {
-      @core.Store::new([@charts.LineSeries::make("显存", max_points=120)])
+      @base.Store::new([@charts.LineSeries::make("显存", max_points=120)])
     }),
-    procs: @core.Store::new([]),
-    sensors: @core.Store::new([]),
-    gpus: @core.Store::new([]),
-    disks: @core.Store::new([]),
-    nets: @core.Store::new([]),
+    procs: @base.Store::new([]),
+    sensors: @base.Store::new([]),
+    gpus: @base.Store::new([]),
+    disks: @base.Store::new([]),
+    nets: @base.Store::new([]),
   }
   // 首帧立即采一次（第二帧起差值速率才有值）；定时与主题跟随在挂载后接
   sample_once(app)
@@ -318,7 +318,7 @@ fn main {
     title=MON_TITLE,
     width=1240,
     height=840,
-    handle=fn(a : @core.App) {
+    handle=fn(a : @widget.App) {
       println("SYSMON-READY cores=\{info.cores}")
       // 深浅与主色启动跟随系统并实时联动（1s 轮询，指纹变了才 apply）
       ignore(a.follow_system_theme())

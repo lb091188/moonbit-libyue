@@ -328,14 +328,14 @@ test "SankeyData 构造与 sankey_t 组件可编译（不 mount，真机验证�
   assert_eq(data.links[1].target, 2)
   // 组件构造只建未挂载片段（无平台副作用）；绘制路径走 on_draw，
   // 由用户真机验证
-  let store : @core.Store[SankeyData] = @core.Store::new(data)
+  let store : @base.Store[SankeyData] = @base.Store::new(data)
   let node = sankey_t(store)
   ignore(node.mount)
 }
 
 ///|
 test "桑基图组件：出像素、换数据画面变" {
-  let d = @core.Store::new(
+  let d = @base.Store::new(
     SankeyData::make(
       [SankeyNode::make("浏览"), SankeyNode::make("加购"), SankeyNode::make("下单")],
       [SankeyLink::make(0, 1, 100.0), SankeyLink::make(1, 2, 60.0)],

@@ -355,14 +355,14 @@ test "GeoFlight / GeoRegion 构造与 geo_map_t 组件可编译（不 mount，�
   assert_eq(regions.rings[0].length(), 4)
   // 组件构造只建未挂载片段（无平台副作用）；绘制路径走 on_draw，
   // 由用户真机验证
-  let store : @core.Store[Array[GeoRegion]] = @core.Store::new([regions])
+  let store : @base.Store[Array[GeoRegion]] = @base.Store::new([regions])
   let node = geo_map_t(store, flights=[flight])
   ignore(node.mount)
   // 解析 → Store → 组件 全链路（不 mount）
   let parsed = geojson_parse(geo_sample_fc())
   match parsed {
     Ok(rs) => {
-      let s2 : @core.Store[Array[GeoRegion]] = @core.Store::new(rs)
+      let s2 : @base.Store[Array[GeoRegion]] = @base.Store::new(rs)
       let n2 = geo_map_t(s2, show_labels=false)
       ignore(n2.mount)
     }
@@ -376,8 +376,8 @@ test "地图组件：区域与飞线出像素、换区域画面变" {
   let regions = match geojson_parse(
       "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"properties\":{\"name\":\"测试区\"},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[20,-40],[160,-40],[160,60],[20,60]]]}}]}",
     ) {
-    Ok(rs) => @core.Store::new(rs)
-    Err(_) => @core.Store::new([])
+    Ok(rs) => @base.Store::new(rs)
+    Err(_) => @base.Store::new([])
   }
   assert_true(regions.get().length() == 1)
   let (root, w) = mounted(

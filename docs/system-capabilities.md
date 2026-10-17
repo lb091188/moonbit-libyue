@@ -192,7 +192,7 @@ The freedesktop notification protocol has no progress field, and native progress
 | `Notification::set_progress(body : String, percent : Double, width? : Int = 10) -> Unit` | set the notification body: the first line keeps the original text, the second line shows progress |
 
 ```moonbit
-let n = @core.Notification::new()
+let n = @shell.Notification::new()
 n.set_title("Exporting")
 n.set_progress("Exporting 3/8 files", 37.5, width=4)
 n.show()

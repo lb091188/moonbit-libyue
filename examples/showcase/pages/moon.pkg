@@ -3,7 +3,8 @@
 import {
   "moonbitlang/core/encoding/utf8",
   "NoahLiu/yoga-mbt/src" @yoga,
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/base",
+
   "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/shell" @shell,
   "NoahLiu/native-gui/render" @render,

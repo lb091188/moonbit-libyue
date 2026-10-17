@@ -494,26 +494,26 @@ pub fn Editor::handle_key(
   keysym : Int,
   modifiers : Int,
 ) -> Bool {
-  let shift = (modifiers & @core.MOD_SHIFT) != 0
-  let ctrl = (modifiers & @core.MOD_CTRL) != 0
-  let alt = (modifiers & (@core.MOD_ALT | @core.MOD_META)) != 0
+  let shift = (modifiers & @base.MOD_SHIFT) != 0
+  let ctrl = (modifiers & @base.MOD_CTRL) != 0
+  let alt = (modifiers & (@base.MOD_ALT | @base.MOD_META)) != 0
   let mut handled = false
-  if keysym == @core.KS_BACKSPACE {
+  if keysym == @base.KS_BACKSPACE {
     self.backspace()
     handled = true
-  } else if keysym == @core.KS_DELETE {
+  } else if keysym == @base.KS_DELETE {
     self.delete_forward()
     handled = true
-  } else if keysym == @core.KS_LEFT {
+  } else if keysym == @base.KS_LEFT {
     self.move_caret(-1, if ctrl { 1 } else { 0 }, shift)
     handled = true
-  } else if keysym == @core.KS_RIGHT {
+  } else if keysym == @base.KS_RIGHT {
     self.move_caret(1, if ctrl { 1 } else { 0 }, shift)
     handled = true
-  } else if keysym == @core.KS_HOME {
+  } else if keysym == @base.KS_HOME {
     self.move_caret(-1, 2, shift)
     handled = true
-  } else if keysym == @core.KS_END {
+  } else if keysym == @base.KS_END {
     self.move_caret(1, 2, shift)
     handled = true
   } else if ctrl && !alt && keysym == 'a'.to_int() {

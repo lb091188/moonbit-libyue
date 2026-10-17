@@ -153,12 +153,12 @@ test "RadarIndicator / RadarSeries 构造与 Store 驱动" {
   assert_eq(s.name, "本机")
   debug_inspect(s.values, content="[1, 2, 3]")
   // Store 驱动：set 换整表，订阅收到通知
-  let inds : @core.Store[Array[RadarIndicator]] = @core.Store::new([
+  let inds : @base.Store[Array[RadarIndicator]] = @base.Store::new([
     RadarIndicator::make("a", 10.0),
     RadarIndicator::make("b", 20.0),
     RadarIndicator::make("c", 30.0),
   ])
-  let sers : @core.Store[Array[RadarSeries]] = @core.Store::new([
+  let sers : @base.Store[Array[RadarSeries]] = @base.Store::new([
     RadarSeries::make("s1", [1.0, 2.0, 3.0]),
     RadarSeries::make("s2", [4.0, 5.0, 6.0]),
   ])
@@ -174,13 +174,13 @@ test "RadarIndicator / RadarSeries 构造与 Store 驱动" {
 
 ///|
 test "雷达图组件：出像素、换系列画面变、维度不足提示不崩" {
-  let inds = @core.Store::new([
+  let inds = @base.Store::new([
     RadarIndicator::make("速度", 100.0),
     RadarIndicator::make("精度", 100.0),
     RadarIndicator::make("稳定", 100.0),
     RadarIndicator::make("生态", 100.0),
   ])
-  let sers = @core.Store::new([
+  let sers = @base.Store::new([
     RadarSeries::make("本栈", [80.0, 90.0, 70.0, 60.0]),
     RadarSeries::make("对标", [60.0, 75.0, 85.0, 90.0]),
   ])

@@ -58,9 +58,9 @@ fn sp_pp_name(p : @sys.PowerProfile) -> String {
 /// 探针面板：标题 + 多行读数（Err 一律落成可读行，不影响其余部分）。
 fn sp_panel(
   title : String,
-  body : @core.Signal[String],
+  body : @base.Signal[String],
   width : Double,
-) -> @core.Node {
+) -> @widget.Node {
   @ui.view(
     [
       @ui.text(title, font_size=13.0, weight=@text.SemiBold),
@@ -80,12 +80,12 @@ fn sp_panel(
 fn sp_group(
   btn_label : String,
   collect_a : () -> String,
-  store_a : @core.Store[String],
+  store_a : @base.Store[String],
   title_a : String,
   collect_b : () -> String,
-  store_b : @core.Store[String],
+  store_b : @base.Store[String],
   title_b : String,
-) -> Array[@core.Node] {
+) -> Array[@widget.Node] {
   let refresh = fn() -> Unit {
     store_a.set(collect_a())
     store_b.set(collect_b())
@@ -454,17 +454,17 @@ fn sp_dbus_media() -> String {
 
 ///|
 /// 系统能力探测页。五段各带「重新探测」；每组两块面板并排。
-pub fn page_sysprobe(_app : @shared.App) -> @core.Node {
-  let sys_a : @core.Store[String] = @core.Store::new("")
-  let sys_b : @core.Store[String] = @core.Store::new("")
-  let mon_a : @core.Store[String] = @core.Store::new("")
-  let mon_b : @core.Store[String] = @core.Store::new("")
-  let app_a : @core.Store[String] = @core.Store::new("")
-  let app_b : @core.Store[String] = @core.Store::new("")
-  let brw_a : @core.Store[String] = @core.Store::new("")
-  let brw_b : @core.Store[String] = @core.Store::new("")
-  let ses_a : @core.Store[String] = @core.Store::new("")
-  let ses_b : @core.Store[String] = @core.Store::new("")
+pub fn page_sysprobe(_app : @shared.App) -> @widget.Node {
+  let sys_a : @base.Store[String] = @base.Store::new("")
+  let sys_b : @base.Store[String] = @base.Store::new("")
+  let mon_a : @base.Store[String] = @base.Store::new("")
+  let mon_b : @base.Store[String] = @base.Store::new("")
+  let app_a : @base.Store[String] = @base.Store::new("")
+  let app_b : @base.Store[String] = @base.Store::new("")
+  let brw_a : @base.Store[String] = @base.Store::new("")
+  let brw_b : @base.Store[String] = @base.Store::new("")
+  let ses_a : @base.Store[String] = @base.Store::new("")
+  let ses_b : @base.Store[String] = @base.Store::new("")
   @shared.page([
     @shared.section(
       "系统桌面",

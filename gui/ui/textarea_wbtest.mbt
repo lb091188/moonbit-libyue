@@ -11,7 +11,7 @@ fn area_font() -> @text.Font {
 /// 建一个已挂载并布局好的多行框，返回 (根, 控件, Store)。
 ///|
 /// 在控件内部坐标点一下（按下 + 抬起）。
-fn click_in(root : @core.Widget, w : @core.Widget, fx : Double, fy : Double) -> Unit {
+fn click_in(root : @widget.Widget, w : @widget.Widget, fx : Double, fy : Double) -> Unit {
   let _ = root.dispatch_pointer({
     kind: @widget.PointerKind::Down,
     x: w.rect.x + fx,
@@ -34,8 +34,8 @@ fn mounted_area(
   width : Double,
   height : Double,
   read_only? : Bool = false,
-) -> (@core.Widget, @core.Widget, @core.Store[String]) {
-  let store = @core.Store::new(text)
+) -> (@widget.Widget, @widget.Widget, @base.Store[String]) {
+  let store = @base.Store::new(text)
   let (root, w) = mounted(
     textarea(store, width=width, height=height, focus_id=1, read_only=read_only),
     width + 40.0,
@@ -100,7 +100,7 @@ test "多行框：回车插入换行、上下键按显示行移动并记住 x、
   assert_eq((w.rect.w, w.rect.h), (200.0, 90.0))
   key(root, w, 'a'.to_int(), 0)
   key(root, w, 'b'.to_int(), 0)
-  key(root, w, @core.KS_RETURN, 0)
+  key(root, w, @base.KS_RETURN, 0)
   // 两行给同样的内容：上下键按「记住的像素 x」映射，两行字宽不等时落点随字体变
   // （"ab\ncd" 在 DejaVu 上第二行更窄，上键就回到行中而不是行尾），而这里要验的是
   // 「按显示行移动并记住 x」这条规则本身，不是某个字体的宽度关系
@@ -112,24 +112,24 @@ test "多行框：回车插入换行、上下键按显示行移动并记住 x、
   let lines = layout_lines(store.get(), 200.0 - 8.0, area_font())
   assert_eq((lines.length(), lines[0].end, lines[1].start), (2, 2, 3))
   // 上键：回到第 0 行的同一 x（两行等长 → 落在行尾 2）
-  key(root, w, @core.KS_UP, 0)
+  key(root, w, @base.KS_UP, 0)
   assert_eq(caret_of(w), 2)
-  key(root, w, @core.KS_DOWN, 0)
+  key(root, w, @base.KS_DOWN, 0)
   assert_eq(caret_of(w), 5)
   // Home/End 走行首行尾（不带 Ctrl）
-  key(root, w, @core.KS_HOME, 0)
+  key(root, w, @base.KS_HOME, 0)
   assert_eq(caret_of(w), 3)
-  key(root, w, @core.KS_END, 0)
+  key(root, w, @base.KS_END, 0)
   assert_eq(caret_of(w), 5)
   // Shift+Home 扩选到行首（只扩选，内容不动）
-  key(root, w, @core.KS_HOME, @core.MOD_SHIFT)
+  key(root, w, @base.KS_HOME, @base.MOD_SHIFT)
   assert_eq(store.get(), "ab\nab")
   key(root, w, 'x'.to_int(), 0)
   assert_eq(store.get(), "ab\nx")
   // 回到行首再退格：删掉的是换行符，两行并回一行
-  key(root, w, @core.KS_HOME, 0)
+  key(root, w, @base.KS_HOME, 0)
   assert_eq(caret_of(w), 3)
-  key(root, w, @core.KS_BACKSPACE, 0)
+  key(root, w, @base.KS_BACKSPACE, 0)
   assert_eq(store.get(), "abx")
 }
 
@@ -168,12 +168,12 @@ test "多行框：点击定位到第几行、拖选跨行、只读不吃编辑�
     button: 1,
     mods: 0,
   })
-  key(root2, w2, @core.KS_DELETE, 0)
+  key(root2, w2, @base.KS_DELETE, 0)
   assert_eq(store2.get(), "")
   // 只读：编辑键不改文本
   let (root3, _w3, store3) = mounted_area("只读文本", 220.0, 60.0, read_only=true)
   key(root3, _w3, 'q'.to_int(), 0)
-  key(root3, _w3, @core.KS_BACKSPACE, 0)
+  key(root3, _w3, @base.KS_BACKSPACE, 0)
   assert_eq(store3.get(), "只读文本")
 }
 
@@ -214,7 +214,7 @@ test "多行框：内容超视口才出滚动条，滚轮下滚后拇指下移�
   let (root2, w2, _s2) = mounted_area(text, 200.0, 70.0)
   let (bm_b, _, _) = shot(w2)
   click_in(root2, w2, 6.0, 60.0)
-  key(root2, w2, @core.KS_DOWN, 0)
+  key(root2, w2, @base.KS_DOWN, 0)
   let (bm_a, _, _) = shot(w2)
   let mut moved = 0
   for y = 0; y < 24; y = y + 1 {

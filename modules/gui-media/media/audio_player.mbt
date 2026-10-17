@@ -6,7 +6,7 @@
 //    读数是设备已消费字节，`video` 的是墙钟 + 帧时间戳，塞进同一个组件
 //    等于让两条时钟互相冒充；
 // ② 时钟在引擎里，UI 每 tick 调一次 `pump` 推进队列并重绘，排期走
-//    `@core.set_timeout`，组件不起线程；
+//    `@shell.set_timeout`，组件不起线程；
 // ③ seek 防抖同 `video`：拖动期间只挪显示位置，抬手才真 seek；音量相反，
 //    每步都生效（它不触发解码，没有关键帧代价）。
 
@@ -53,8 +53,8 @@ pub fn audio(
   /// 「配上了但还没唱」，不必去猜引擎状态。
   on_lyric? : (Int) -> Unit = fn(_n : Int) -> Unit { () },
   on_error? : (String) -> Unit = fn(_s : String) -> Unit { () },
-  handle? : (@core.Widget) -> Unit = fn(_w : @core.Widget) -> Unit { () },
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = fn(_w : @widget.Widget) -> Unit { () },
+) -> @widget.Node {
   let sp = Spectrum::make()
   let engine = match AudioPlayer::make(
     path,
@@ -77,9 +77,9 @@ pub fn audio(
   let dragging : Ref[Bool] = Ref(false)
   let speed_i : Ref[Int] = Ref(0)
   // 按钮行是真控件，档位/态变了要重挂，所以读数走 Store（等值不重发）
-  let playing : @core.Store[Bool] = @core.Store::new(false)
-  let speed_st : @core.Store[Double] = @core.Store::new(1.0)
-  let full_st : @core.Store[Bool] = @core.Store::new(false)
+  let playing : @base.Store[Bool] = @base.Store::new(false)
+  let speed_st : @base.Store[Double] = @base.Store::new(1.0)
+  let full_st : @base.Store[Bool] = @base.Store::new(false)
   if auto_play {
     engine.play()
   }
@@ -91,12 +91,12 @@ pub fn audio(
       engine.play()
     }
     playing.set(engine.is_playing())
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn skip_by(delta : Double) -> Unit {
     engine.seek(ap_skip(engine.current(), engine.duration(), delta))
     sp.reset()
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn cycle_speed() -> Unit {
     speed_i.val = speed_i.val + 1
@@ -104,27 +104,27 @@ pub fn audio(
     engine.set_speed(v)
     speed_st.set(v)
     on_speed(v)
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn toggle_full() -> Unit {
     let on = !full_st.get()
     if player_set_fullscreen(on) {
       full_st.set(on)
-      @core.invalidate()
+      @widget.invalidate()
     }
   }
   fn bump_vol(d : Double) -> Unit {
     engine.set_volume(bar_clamp01(engine.get_volume() + d))
-    @core.invalidate()
+    @widget.invalidate()
   }
   // 舞台区：撑高时占住多出来的高度，歌词写在底部，无输出设备的降级说明写在中间。
-  let stage = @core.Widget::new()
+  let stage = @widget.Widget::new()
   stage.node.set_flex_grow(1.0)
   stage.node.set_min_height(@yoga.fixed(0.0))
   stage.on_draw = Some(fn(
-    _w : @core.Widget,
+    _w : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     if r.h <= 0.0 {
       return
@@ -180,16 +180,16 @@ pub fn audio(
     fn() -> Double { engine.get_volume() },
     fn(v : Double) -> Unit {
       engine.set_volume(v)
-      @core.invalidate()
+      @widget.invalidate()
     },
     fn(t : Double) -> Unit {
       engine.seek(t)
       sp.reset()
-      @core.invalidate()
+      @widget.invalidate()
     },
     dragging,
   )
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.node.set_flex_direction(@yoga.Column)
   root.node.set_width(@yoga.fixed(width))
   root.node.set_height(@yoga.fixed(height))
@@ -224,11 +224,11 @@ pub fn audio(
     playing.set(engine.is_playing())
     on_tick(engine.current(), engine.is_playing())
     if engine.is_playing() || dragging.val {
-      @core.invalidate()
+      @widget.invalidate()
     }
-    let _ = @core.set_timeout(ap_tick_ms, tick.val)
+    let _ = @shell.set_timeout(ap_tick_ms, tick.val)
   }
-  let _ = @core.set_timeout(ap_tick_ms, tick.val)
+  let _ = @shell.set_timeout(ap_tick_ms, tick.val)
   handle(root)
-  @core.node_of(root)
+  @widget.node_of(root)
 }

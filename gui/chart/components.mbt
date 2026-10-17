@@ -1,6 +1,6 @@
-// 图表组件层（新栈）：五种通用图，一律返回 `@core.Node`。
+// 图表组件层（新栈）：五种通用图，一律返回 `@widget.Node`。
 //
-// 数据都走 `@core.Store`：换数据只请求重绘（`follow_store` 的订阅只为重绘，
+// 数据都走 `@base.Store`：换数据只请求重绘（`follow_store` 的订阅只为重绘，
 // 退订随本代回收袋），绘制在 `on_draw` 里现取现值——不重建控件树。
 // 悬停高亮（柱状/环形）由组件自己记索引：宿主只给「是否悬停」，给不了「第几根」，
 // 而分槽几何必须与绘制同源（都用 `bar_hit`/扇区角度那套纯函数）。
@@ -9,19 +9,19 @@
 /// 折线/面积图：定长滚动窗口多序列（≤4，主题色循环），y 轴自适应或经 `y_range`
 /// 手动指定；横向网格 + 左侧刻度；`area=true` 半透明填充；`show_last` 右端标最新值。
 pub fn line_chart_t(
-  series : @core.Store[Array[LineSeries]],
+  series : @base.Store[Array[LineSeries]],
   area? : Bool = false,
   y_range? : (Double, Double)? = None,
   show_last? : Bool = true,
   width? : Double = 0.0,
   height? : Double = 200.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(series)
   let fill = area
   let yr = y_range
   let tail = show_last
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -31,9 +31,9 @@ pub fn line_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -48,17 +48,17 @@ pub fn line_chart_t(
 /// 柱状/条形图：`horizontal=true` 为横向条；正负值有基线，悬停那根换浅底 +
 /// 描边并在行内标数值（自绘，无弹层）。
 pub fn bar_chart_t(
-  data : @core.Store[Array[BarItem]],
+  data : @base.Store[Array[BarItem]],
   horizontal? : Bool = false,
   y_range? : (Double, Double)? = None,
   width? : Double = 0.0,
   height? : Double = 200.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let horiz = horizontal
   let yr = y_range
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     let hover : Ref[Int] = Ref(-1)
     w.node.set_height(@yoga.fixed(height))
@@ -69,31 +69,31 @@ pub fn bar_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
       draw_bar_chart(p, r.w, r.h, data.get(), horiz, hover.val, y_range=yr)
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Move => {
           let h = bar_hit(horiz, data.get().length(), self.rect.w, self.rect.h, ev.x, ev.y)
           if h != hover.val {
             hover.val = h
-            @core.invalidate()
+            @widget.invalidate()
           }
           true
         }
         @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -108,17 +108,17 @@ pub fn bar_chart_t(
 ///|
 /// 环形图：占比扇区 + 中心汇总（`center` 传空用总和）+ 右侧图例；悬停扇区外扩。
 pub fn donut_chart_t(
-  data : @core.Store[Array[DonutSlice]],
+  data : @base.Store[Array[DonutSlice]],
   thickness? : Double = 26.0,
   center? : String = "",
   width? : Double = 0.0,
   height? : Double = 180.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let thick = thickness
   let mid = center
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     let hover : Ref[Int] = Ref(-1)
     w.node.set_height(@yoga.fixed(height))
@@ -129,9 +129,9 @@ pub fn donut_chart_t(
       w.node.set_min_width(@yoga.fixed(160.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -139,22 +139,22 @@ pub fn donut_chart_t(
     })
     // 命中：按极坐标判扇区（12 点起顺时针），中心孔与图例区不算
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Move => {
           let h = donut_hit(self.rect.h, data.get(), ev.x, ev.y)
           if h != hover.val {
             hover.val = h
-            @core.invalidate()
+            @widget.invalidate()
           }
           true
         }
         @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -211,17 +211,17 @@ pub fn donut_hit(h : Double, data : Array[DonutSlice], px : Double, py : Double)
 /// 仪表盘：单值百分比环 + 中心大数字 + 阈值分段着色。值一变就用定时器插值平滑
 /// （非动画帧驱动），`smooth=false` 时直接跳到位。
 pub fn gauge_t(
-  value : @core.Store[Double],
+  value : @base.Store[Double],
   thresholds? : Array[(Double, String)] = [],
   width? : Double = 220.0,
   height? : Double = 180.0,
   smooth? : Bool = true,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(value)
   let bands = thresholds
   let do_smooth = smooth
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     let disp : Ref[Double] = Ref(value.get().clamp(min=0.0, max=1.0))
     let timer : Ref[Int] = Ref(0)
@@ -234,17 +234,17 @@ pub fn gauge_t(
         disp.val = target
       } else {
         disp.val = disp.val + diff * 0.25
-        timer.val = @core.set_timeout(30, fn() { (step.val)() })
+        timer.val = @shell.set_timeout(30, fn() { (step.val)() })
       }
-      @core.invalidate()
+      @widget.invalidate()
     }
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(height))
     w.node.set_flex_shrink(0.0)
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -257,9 +257,9 @@ pub fn gauge_t(
       } else if timer.val == 0 {
         (step.val)()
       }
-      @core.invalidate()
+      @widget.invalidate()
     })
-    @core.sub_bag_register(fn() { value.remove(sid) })
+    @base.sub_bag_register(fn() { value.remove(sid) })
     handle(w)
     w
   })
@@ -269,17 +269,17 @@ pub fn gauge_t(
 /// 散点图：x/y 点列 + 可选最小二乘趋势线；绘制区裁剪，点用半透明圆点（不依赖字形）。
 /// `dot` 是点直径（像素）：千点级要按「点面积 × 点数 ≤ 绘制区面积」取值，默认 3.0。
 pub fn scatter_t(
-  points : @core.Store[Array[(Double, Double)]],
+  points : @base.Store[Array[(Double, Double)]],
   trend? : Bool = false,
   dot? : Double = 3.0,
   width? : Double = 0.0,
   height? : Double = 200.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(points)
   let line = trend
   let d = dot
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -289,9 +289,9 @@ pub fn scatter_t(
       w.node.set_min_width(@yoga.fixed(160.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

@@ -4,10 +4,10 @@
 // 与旧栈的一条差（记档）：旧链路的拖源/投放是**平台回调**（GTK `gtk_drag_*` /
 // Win32 `IDropTarget`），且要分别注册 enter/update/leave 三件；本栈全自绘，
 // **应用内拖放**不需要任何平台接口，三个回调也收成一个 `on_drop`——拖入高亮由
-// 绘制方读 `@core.drag_hover()` 自判（见 `drop_target`）。系统级**拖入**（Windows/
+// 绘制方读 `@widget.drag_hover()` 自判（见 `drop_target`）。系统级**拖入**（Windows/
 // Linux 已接）复用的也是这一套：宿主每拍把外部事件喂进同一个会话，本文件的组件
 // 不用改；`accept` 除了松手时判收不收，还用于悬停期回答系统光标（见
-// `@core.Widget::set_drag_accept`）。系统级**拖出**（Windows/Linux 已接）走
+// `@widget.Widget::set_drag_accept`）。系统级**拖出**（Windows/Linux 已接）走
 // `drag_source(external=true)`：过阈值那一步先问后端能不能把这趟交给系统，能就
 // 交给系统、不能就回落到上面这条应用内会话。
 //
@@ -17,24 +17,24 @@
 ///|
 /// 拖源：包住 `content`，在其上按下并拖出 `threshold` 像素后调 `payload()` 取数据
 /// 开拖；`payload()` 返回 None（或不给）表示这一拖不成立（当作普通点击）。
-/// 拖拽期间只做「更新落点」，松手时投给落点（见 `@core.drag_drop`）。
+/// 拖拽期间只做「更新落点」，松手时投给落点（见 `@widget.drag_drop`）。
 ///
 /// `external=true` 时过阈值那一刻先试**系统级拖出**（拖给别的程序，Windows/Linux 已接）：
 /// 这趟走成了（成交或用户取消）就以 `on_external` 回报、不再开应用内会话；走不成
 /// （本机后端没这条能力、种类没有系统级形态、这趟起不来）就**自动回落到应用内
 /// 会话**，于是同一份代码三平台都能跑。这一支会**阻塞**到松手或取消，且必须在鼠标
-/// 键仍按下时发起（本组件正是在那一刻调），详见 `@core.drag_external_send`。
+/// 键仍按下时发起（本组件正是在那一刻调），详见 `@widget.drag_external_send`。
 pub fn drag_source(
-  content : @core.Node,
-  payload? : () -> @core.DragData? = fn() -> @core.DragData? { None },
+  content : @widget.Node,
+  payload? : () -> @widget.DragData? = fn() -> @widget.DragData? { None },
   threshold? : Double = 4.0,
   external? : Bool = false,
   on_external? : (
-    Result[@core.DragEffect, @core.DragError],
-  ) -> Unit = fn(_ : Result[@core.DragEffect, @core.DragError]) -> Unit { () },
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    Result[@widget.DragEffect, @widget.DragError],
+  ) -> Unit = fn(_ : Result[@widget.DragEffect, @widget.DragError]) -> Unit { () },
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let _ = content.mount_into(w)
     // 三态：armed = 按下且在等阈值；dragging = 已经开拖（会话在跑）
@@ -43,8 +43,8 @@ pub fn drag_source(
     let ox : Ref[Double] = Ref(0.0)
     let oy : Ref[Double] = Ref(0.0)
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       // 投给控件的是本地坐标，换回窗口坐标再交给会话（会话一律用窗口坐标）
       let wx = self.rect.x + ev.x
@@ -63,7 +63,7 @@ pub fn drag_source(
         }
         @widget.PointerKind::Move => {
           if dragging.val {
-            let _ = @core.drag_move(wx, wy)
+            let _ = @widget.drag_move(wx, wy)
             true
           } else if armed.val {
             let dx = wx - ox.val
@@ -79,14 +79,14 @@ pub fn drag_source(
                     // 用户已经松手/取消，此时再开应用内会话会凭空拖出一段）
                     armed.val = false
                     dragging.val = false
-                    match @core.drag_external_send(data) {
+                    match @widget.drag_external_send(data) {
                       Ok(e) => {
                         on_external(Ok(e))
                         true
                       }
                       Err(err) => {
                         on_external(Err(err))
-                        if @core.drag_begin(data, self.id, wx, wy) {
+                        if @widget.drag_begin(data, self.id, wx, wy) {
                           dragging.val = true
                           true
                         } else {
@@ -94,7 +94,7 @@ pub fn drag_source(
                         }
                       }
                     }
-                  } else if @core.drag_begin(data, self.id, wx, wy) {
+                  } else if @widget.drag_begin(data, self.id, wx, wy) {
                     dragging.val = true
                     armed.val = false
                     true
@@ -121,7 +121,7 @@ pub fn drag_source(
           dragging.val = false
           if was {
             // 松手：投给落点（没有落点或被拒绝都会结束会话）
-            let _ = @core.drag_drop(wx, wy)
+            let _ = @widget.drag_drop(wx, wy)
             true
           } else {
             false
@@ -146,21 +146,21 @@ pub fn drag_source(
 /// 投放目标：包住 `content`，被拖拽悬停时描一圈主题主色高亮，松手时若有数据则
 /// 调 `accept` 判收不收、收则调 `on_drop`。`accept` 默认全收。
 pub fn drop_target(
-  content : @core.Node,
-  on_drop? : (@core.DragData, Double, Double) -> Unit = fn(
-    _d : @core.DragData,
+  content : @widget.Node,
+  on_drop? : (@widget.DragData, Double, Double) -> Unit = fn(
+    _d : @widget.DragData,
     _x : Double,
     _y : Double,
   ) -> Unit {
     ()
   },
-  accept? : (@core.DragData) -> Bool = fn(_d : @core.DragData) -> Bool { true },
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  accept? : (@widget.DragData) -> Bool = fn(_d : @widget.DragData) -> Bool { true },
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let _ = content.mount_into(w)
-    w.set_on_drop(fn(data : @core.DragData, x : Double, y : Double) -> Bool {
+    w.set_on_drop(fn(data : @widget.DragData, x : Double, y : Double) -> Bool {
       if accept(data) {
         on_drop(data, x, y)
         true
@@ -173,11 +173,11 @@ pub fn drop_target(
     // 悬停高亮：会话把「当前最深命中的投放目标 id」记在 core 里，这里读它自判——
     // 于是不需要 enter/update/leave 三个回调，也就不会有「离开回调漏发」的态
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
-      if @core.drag_active() && @core.drag_hover() == self.id {
+      if @widget.drag_active() && @widget.drag_hover() == self.id {
         p.set_stroke_color(@theme.theme_primary())
         p.set_line_width(2.0)
         p.stroke_rect(1.0, 1.0, (r.w - 2.0).max(1.0), (r.h - 2.0).max(1.0))

@@ -2,8 +2,8 @@
 //
 // G7 迁移记档（与 master 旧页的差）：
 // ① 旧链路 `@declarative.view(on_draw=…, style=[("height",…)])` 换成
-//    `@core.node_of_new` 自挂 on_draw + yoga 尺寸参数（样式字符串在本栈不存在）；
-// ② 重绘从「容器 schedule_paint」换成进程级 `@core.invalidate()`（宿主装的
+//    `@widget.node_of_new` 自挂 on_draw + yoga 尺寸参数（样式字符串在本栈不存在）；
+// ② 重绘从「容器 schedule_paint」换成进程级 `@widget.invalidate()`（宿主装的
 //    是 host_repaint_all：所有在窗置脏 + 唤醒平台泵）；
 // ③ 「系统语义色」一行：旧链路 `@yue.system_color(Text/WindowBackground/Border)`
 //    在本栈没有对应物，换成真实存在的两个系统读数——深浅（sys_color_scheme，
@@ -18,11 +18,11 @@
 /// 字体演示的自绘块：左右两盒同一段文字，右盒把末尾「28」设成 28px 区间字体——
 /// 行盒必须按混排口径抬起来（盒高取 `AttributedText::line_height`），否则大字被裁；
 /// 下方一行演示族名回退（不存在的族退到 monospace）。
-fn font_mix_widget() -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+fn font_mix_widget() -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     w.node.set_width(@yoga.fixed(400.0))
     w.node.set_height(@yoga.fixed(96.0))
-    w.on_draw = Some(fn(_w : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
+    w.on_draw = Some(fn(_w : @widget.Widget, p : @render.Painter, r : @base.Rect) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
       let base = @text.AttributedText::new("基准 Base 28")
@@ -65,14 +65,14 @@ fn font_mix_widget() -> @core.Node {
   })
 }
 
-pub fn page_canvas(app : @shared.App) -> @core.Node {
+pub fn page_canvas(app : @shared.App) -> @widget.Node {
   let hue : Ref[Int] = Ref(0)
   let grad_on : Ref[Bool] = Ref(false)
   // 富文本两个格式开关
   let rt_wrap : Ref[Bool] = Ref(true)
   let rt_ellipsis : Ref[Bool] = Ref(false)
   // 自绘场景（命令式语义：Ref + invalidate，不做响应式包装）
-  let draw_scene = fn(p : @render.Painter, r : @core.Rect) -> Unit {
+  let draw_scene = fn(p : @render.Painter, r : @base.Rect) -> Unit {
     p.set_fill_color("#20242C")
     p.fill_rect(0.0, 0.0, r.w, r.h)
     let colors = ["#E8B34B", "#4B8BE8", "#4BE888"]
@@ -131,13 +131,13 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
       "Painter 自绘",
       "fill_rect / arc / fill / stroke_rect / draw_text 基础绘制 + 线性渐变填充。场景按控件实际尺寸画（缩放窗口不变形）；「旋转色相」循环三种主色，「渐变」给中间圆上线性渐变。",
       [
-        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+        @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
           w.node.set_width(@yoga.fixed(640.0))
           w.node.set_height(@yoga.fixed(300.0))
           w.on_draw = Some(fn(
-            _self : @core.Widget,
+            _self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             draw_scene(p, r)
           })
@@ -147,18 +147,18 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
           [
             @ui.button("旋转色相", on_click=fn() {
               hue.val = (hue.val + 1) % 3
-              @core.invalidate()
+              @widget.invalidate()
             }),
             @ui.button("渐变开关", variant=@ui.Soft, on_click=fn() {
               grad_on.val = !grad_on.val
-              @core.invalidate()
+              @widget.invalidate()
             }),
           ],
           column_gap=8.0,
         ),
       ],
       code=[
-        "let draw = fn(p : @render.Painter, r : @core.Rect) -> Unit {",
+        "let draw = fn(p : @render.Painter, r : @base.Rect) -> Unit {",
         "  p.set_fill_color(\"#20242C\")",
         "  p.fill_rect(0.0, 0.0, r.w, r.h)",
         "  p.arc(r.w * 0.25, r.h * 0.43, 60.0, 0.0, 6.28318)",
@@ -169,13 +169,13 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
         "  let _ = @text.draw_box_at(p, 24.0, r.h - 44.0, r.w - 48.0, 30.0,",
         "    \"自绘文本\", font, \"#F0F0F0\", align=@text.Center)",
         "}",
-        "@core.node_of_new(fn(w) {",
+        "@widget.node_of_new(fn(w) {",
         "  w.node.set_width(@yoga.fixed(640.0))",
         "  w.on_draw = Some(fn(_s, p, r) { draw(p, r) })",
         "  w",
         "})",
         "// 内容变了请求重画一帧（无宿主时是空操作）",
-        "@core.invalidate()",
+        "@widget.invalidate()",
       ],
     ),
     @shared.section(
@@ -183,13 +183,13 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
       "富文本 AttributedText",
       "范围字体/颜色（0-6 号 24px Black、8-11 号红色）+ 换行/省略号开关 + 文本改写（属性保留）。",
       [
-        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+        @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
           w.node.set_width(@yoga.fixed(640.0))
           w.node.set_height(@yoga.fixed(120.0))
           w.on_draw = Some(fn(
-            _self : @core.Widget,
+            _self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             p.set_fill_color(@theme.theme_bg_panel())
             p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -211,7 +211,7 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
                 wrap: rt_wrap.val,
                 ellipsis: rt_ellipsis.val,
               })
-              @core.invalidate()
+              @widget.invalidate()
             }),
             @ui.button("省略号开关", variant=@ui.Soft, on_click=fn() {
               rt_ellipsis.val = !rt_ellipsis.val
@@ -221,11 +221,11 @@ pub fn page_canvas(app : @shared.App) -> @core.Node {
                 wrap: true,
                 ellipsis: rt_ellipsis.val,
               })
-              @core.invalidate()
+              @widget.invalidate()
             }),
             @ui.button("改写文本", variant=@ui.Solid, on_click=fn() {
               rt.set_text("文本已替换 ✓（范围属性保留）")
-              @core.invalidate()
+              @widget.invalidate()
             }),
           ],
           column_gap=8.0,

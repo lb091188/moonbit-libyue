@@ -73,12 +73,12 @@ fn draw_disk_rows(
 }
 
 ///|
-fn page_disk(app : App) -> @core.Node {
-  let disk_n : @core.Store[Int] = @core.Store::new(app.disks.get().length())
+fn page_disk(app : App) -> @widget.Node {
+  let disk_n : @base.Store[Int] = @base.Store::new(app.disks.get().length())
   app.disks.subscribe(fn(d) { disk_n.set(d.length()) })
   // 根分区 IO 曲线（读 / 写两序列，120 点窗口）；速率来源不可用时
   // （macOS 无 IO 数据）不推点，曲线保持空态而不是画一条假的 0 线
-  let io : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
+  let io : @base.Store[Array[@charts.LineSeries]] = @base.Store::new([
     @charts.LineSeries::make("读", max_points=120),
     @charts.LineSeries::make("写", max_points=120),
   ])

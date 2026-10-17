@@ -50,10 +50,10 @@ test "style 工厂：简写四边同值、逐边覆写、gap 展开" {
 
 ///|
 test "style 工厂：颜色三形态进字段，未写的属性保持 None" {
-  let s = style(color="#fff", background_color="primary", cursor=@core.CURSOR_HAND)
+  let s = style(color="#fff", background_color="primary", cursor=@widget.CURSOR_HAND)
   assert_true(is_color(s.color, Hex("#fff")))
   assert_true(is_color(s.background_color, Var("primary")))
-  assert_true(s.cursor == Some(@core.CURSOR_HAND))
+  assert_true(s.cursor == Some(@widget.CURSOR_HAND))
   assert_true(s.font_size == None)
   assert_true(s.hover is None)
 }
@@ -145,7 +145,7 @@ test "基调表：块构造可用、简写与状态桶就位（token 不认识�
     Some(h) => assert_true(h.background_color is Some(Var("primary")))
     None => fail("soft 档应有 hover 桶（亮档翻主色）")
   }
-  assert_true(primary.cursor == Some(@core.CURSOR_HAND))
+  assert_true(primary.cursor == Some(@widget.CURSOR_HAND))
   assert_true(card.padding_left == Some(12.0))
   assert_true(table_row_base.hover is Some(_))
   // merge 拼出的 textarea 块继承 input 皮肤

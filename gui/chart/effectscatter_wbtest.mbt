@@ -225,13 +225,13 @@ test "eff_map_point：数据点 → 绘制区像素（等比映射/边缘/值域
 ///|
 test "相位 Store 订阅 + stop 开关：组件定时器接线镜像（无 GUI）" {
   // 镜像 eff_chart_t 的接线：相位 Store + 订阅重绘 + 句柄开关回调体
-  let phase : @core.Store[Double] = @core.Store::new(0.0)
+  let phase : @base.Store[Double] = @base.Store::new(0.0)
   let paints = Ref(0)
   phase.subscribe(fn(_p) { paints.val = paints.val + 1 })
   let anim = EffAnim::make()
   let tick = eff_tick_ms(3000)
   let step = tick.to_double() / 3000.0
-  fn timer_body(phase : @core.Store[Double], anim : EffAnim, step : Double) -> Bool {
+  fn timer_body(phase : @base.Store[Double], anim : EffAnim, step : Double) -> Bool {
     if !anim.is_running() {
       false
     } else {
@@ -266,7 +266,7 @@ test "相位 Store 订阅 + stop 开关：组件定时器接线镜像（无 GUI�
 
 ///|
 test "涟漪散点组件：出像素、相位推进画面变、eff_stop 后静止" {
-  let pts = @core.Store::new([
+  let pts = @base.Store::new([
     EffPoint::make(1.0, 2.0, size=8.0),
     EffPoint::make(3.0, 4.0, size=12.0),
   ])

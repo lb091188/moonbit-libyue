@@ -769,17 +769,17 @@ fn geo_draw_map(
 /// regions 经 Store 驱动（set 后只重绘画布不重建控件树），文本解析走
 /// [geojson_parse]；主题切换现取色自动跟随。
 pub fn geo_map_t(
-  regions : @core.Store[Array[GeoRegion]],
+  regions : @base.Store[Array[GeoRegion]],
   flights? : Array[GeoFlight] = [],
   show_labels? : Bool = true,
   width? : Double = 0.0,
   height? : Double = 360.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(regions)
   let fl = flights
   let labels = show_labels
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -789,9 +789,9 @@ pub fn geo_map_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

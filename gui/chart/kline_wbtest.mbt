@@ -121,7 +121,7 @@ test "kline_wick_span：影线过实体中心，high 上 low 下" {
 
 ///|
 test "K 线组件：出像素、涨红跌绿、换数据画面变" {
-  let cs = @core.Store::new([
+  let cs = @base.Store::new([
     Candle::make(10.0, 12.0, 9.0, 11.5),
     Candle::make(11.5, 13.0, 11.0, 12.5),
     Candle::make(12.5, 13.5, 11.5, 11.0),
@@ -137,7 +137,7 @@ test "K 线组件：出像素、涨红跌绿、换数据画面变" {
 
 ///|
 test "K 线组件：涨红跌绿两色都出像素" {
-  let cs = @core.Store::new([
+  let cs = @base.Store::new([
     Candle::make(10.0, 12.0, 9.0, 11.5), // 涨 → danger 红
     Candle::make(11.5, 13.0, 11.0, 11.0), // 平盘归涨
     Candle::make(12.0, 12.5, 10.0, 10.5), // 跌 → success 绿

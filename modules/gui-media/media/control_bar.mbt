@@ -138,14 +138,14 @@ fn media_error_board(
   msg : String,
   width : Double,
   height : Double,
-  handle : (@core.Widget) -> Unit,
-) -> @core.Node {
-  let w = @core.Widget::new()
+  handle : (@widget.Widget) -> Unit,
+) -> @widget.Node {
+  let w = @widget.Widget::new()
   w.set_size(width, height)
   w.on_draw = Some(fn(
-    _w : @core.Widget,
+    _w : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     p.set_fill_color(@theme.theme_bg_page())
     p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -160,7 +160,7 @@ fn media_error_board(
     )
   })
   handle(w)
-  @core.node_of(w)
+  @widget.node_of(w)
 }
 
 ///|
@@ -168,7 +168,7 @@ fn media_error_board(
 /// 的门面注释同条口径）；没有宿主（无头测试）返回 false，调用方据此不动
 /// 自己的档位状态。
 fn player_set_fullscreen(on : Bool) -> Bool {
-  match @core.host_active() {
+  match @widget.host_active() {
     Some(app) => {
       app.set_fullscreen(on)
       true
@@ -188,8 +188,8 @@ fn player_display(
   set_vol : (Double) -> Unit,
   seek_to : (Double) -> Unit,
   dragging : Ref[Bool],
-) -> @core.Widget {
-  let w = @core.Widget::new()
+) -> @widget.Widget {
+  let w = @widget.Widget::new()
   w.node.set_flex_grow(1.0)
   w.node.set_height(@yoga.fixed(BAR_H))
   // 窄到只剩时间文字时轨道就点不着了，给个下限让布局去挤按钮而不是挤轨道
@@ -198,9 +198,9 @@ fn player_display(
   let vol_drag : Ref[Bool] = Ref(false)
   let bar_w : Ref[Double] = Ref(0.0)
   w.on_draw = Some(fn(
-    _w : @core.Widget,
+    _w : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     bar_w.val = r.w
     p.set_fill_color(@theme.theme_bg_panel())
@@ -230,8 +230,8 @@ fn player_display(
     )
   })
   w.on_pointer = Some(fn(
-    _w : @core.Widget,
-    ev : @core.PointerEvent,
+    _w : @widget.Widget,
+    ev : @widget.PointerEvent,
   ) -> Bool {
     match ev.kind {
       @widget.PointerKind::Down => {
@@ -239,11 +239,11 @@ fn player_display(
         if hit.0 == "seek" {
           dragging.val = true
           drag_frac.val = hit.1
-          @core.invalidate()
+          @widget.invalidate()
         } else if hit.0 == "volume" {
           vol_drag.val = true
           set_vol(hit.1)
-          @core.invalidate()
+          @widget.invalidate()
         }
         true
       }
@@ -251,10 +251,10 @@ fn player_display(
         let hit = bar_hit(ev.x, bar_w.val)
         if dragging.val {
           drag_frac.val = hit.1
-          @core.invalidate()
+          @widget.invalidate()
         } else if vol_drag.val {
           set_vol(hit.1)
-          @core.invalidate()
+          @widget.invalidate()
         }
         dragging.val || vol_drag.val
       }
@@ -262,7 +262,7 @@ fn player_display(
         if dragging.val {
           dragging.val = false
           seek_to(drag_frac.val * dur())
-          @core.invalidate()
+          @widget.invalidate()
         }
         vol_drag.val = false
         true
@@ -281,7 +281,7 @@ fn player_display(
 /// 「还在被画吗」——换载摘掉的播放器不再吃键，同窗多台时注册序在前的先接；
 /// ③ 没有宿主（无头测试）时什么都不挂。
 fn player_bind_keys(
-  watch : @core.Widget,
+  watch : @widget.Widget,
   on_toggle : () -> Unit,
   on_back : () -> Unit,
   on_fwd : () -> Unit,
@@ -289,32 +289,32 @@ fn player_bind_keys(
   on_vol : (Double) -> Unit,
   is_full : () -> Bool,
 ) -> Unit {
-  match @core.host_active() {
+  match @widget.host_active() {
     None => ()
     Some(app) => app.add_key_fallthrough(fn(
-      ev : @core.KeyEvent,
+      ev : @widget.KeyEvent,
     ) -> Bool {
       if !watch.is_painted() {
         false
-      } else if ev.keysym == @core.KS_SPACE {
+      } else if ev.keysym == @base.KS_SPACE {
         on_toggle()
         true
-      } else if ev.keysym == @core.KS_RETURN {
+      } else if ev.keysym == @base.KS_RETURN {
         on_full()
         true
-      } else if ev.keysym == @core.KS_LEFT {
+      } else if ev.keysym == @base.KS_LEFT {
         on_back()
         true
-      } else if ev.keysym == @core.KS_RIGHT {
+      } else if ev.keysym == @base.KS_RIGHT {
         on_fwd()
         true
-      } else if ev.keysym == @core.KS_UP {
+      } else if ev.keysym == @base.KS_UP {
         on_vol(0.05)
         true
-      } else if ev.keysym == @core.KS_DOWN {
+      } else if ev.keysym == @base.KS_DOWN {
         on_vol(0.0 - 0.05)
         true
-      } else if ev.keysym == @core.KS_ESCAPE && is_full() {
+      } else if ev.keysym == @base.KS_ESCAPE && is_full() {
         // 只在真处于全屏时接管：窗口态的 Esc 还有别的用途
         on_full()
         true
@@ -328,10 +328,10 @@ fn player_bind_keys(
 ///|
 /// 整条控制条。`zoom` 给 `None` 时不画缩放键（音频没有画面可缩）。
 fn player_bar(
-  playing : @core.Store[Bool],
-  speed : @core.Store[Double],
-  full : @core.Store[Bool],
-  zoom : @core.Store[Int]?,
+  playing : @base.Store[Bool],
+  speed : @base.Store[Double],
+  full : @base.Store[Bool],
+  zoom : @base.Store[Int]?,
   back_icon : @icons.IconKind,
   fwd_icon : @icons.IconKind,
   on_toggle : () -> Unit,
@@ -340,10 +340,10 @@ fn player_bar(
   on_speed : () -> Unit,
   on_full : () -> Unit,
   on_zoom : () -> Unit,
-  display : @core.Widget,
-) -> @core.Node {
-  let kids : Array[@core.Node] = [
-    @core.bind_node(playing.signal(), fn(p : Bool) -> @core.Node {
+  display : @widget.Widget,
+) -> @widget.Node {
+  let kids : Array[@widget.Node] = [
+    @widget.bind_node(playing.signal(), fn(p : Bool) -> @widget.Node {
       @ui.icon_button(
         if p { @icons.VideoPause } else { @icons.VideoPlay },
         on_click=on_toggle,
@@ -363,7 +363,7 @@ fn player_bar(
       icon_size=16.0,
       box_size=28.0,
     ),
-    @core.bind_node(speed.signal(), fn(v : Double) -> @core.Node {
+    @widget.bind_node(speed.signal(), fn(v : Double) -> @widget.Node {
       @ui.button(
         vp_fmt_speed(v),
         on_click=on_speed,
@@ -374,7 +374,7 @@ fn player_bar(
   ]
   match zoom {
     Some(z) => kids.push(
-      @core.bind_node(z.signal(), fn(m : Int) -> @core.Node {
+      @widget.bind_node(z.signal(), fn(m : Int) -> @widget.Node {
         @ui.button(
           vp_zoom_label(m),
           on_click=on_zoom,
@@ -385,7 +385,7 @@ fn player_bar(
     )
     None => ()
   }
-  kids.push(@core.bind_node(full.signal(), fn(f : Bool) -> @core.Node {
+  kids.push(@widget.bind_node(full.signal(), fn(f : Bool) -> @widget.Node {
     @ui.icon_button(
       if f { @icons.FullscreenExit } else { @icons.Fullscreen },
       on_click=on_full,
@@ -393,7 +393,7 @@ fn player_bar(
       box_size=28.0,
     )
   }))
-  kids.push(@core.node_of(display))
+  kids.push(@widget.node_of(display))
   @ui.row(
     kids,
     column_gap=2.0,

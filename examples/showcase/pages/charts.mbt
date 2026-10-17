@@ -13,15 +13,15 @@
 // 两处排的首拍都进空通道（Windows 真机实证：探针 experiment/timer_probe，
 // 挂载回调里排的定时器 pending=0，宿主建好后再排的准点响）。on_mount 包的
 // mount 闭包在段正文惰性挂载、首次选中本段时才跑，那时宿主早已就绪。
-pub fn page_charts(_app : @shared.App) -> @core.Node {
+pub fn page_charts(_app : @shared.App) -> @widget.Node {
   // ---- 折线：3 序列定长窗口，500ms 推点（三角波模拟监控曲线），可暂停 ----
-  let line_series : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
+  let line_series : @base.Store[Array[@charts.LineSeries]] = @base.Store::new([
     @charts.LineSeries::make("CPU", max_points=120),
     @charts.LineSeries::make("内存", max_points=120),
     @charts.LineSeries::make("磁盘", max_points=120),
   ])
   // 复选框语义与标签同向：勾上 = 暂停（断数据流，定时器照跑）
-  let line_paused : @core.Store[Bool] = @core.Store::new(false)
+  let line_paused : @base.Store[Bool] = @base.Store::new(false)
   fn triangle(t : Int, period : Int, base : Double, amp : Double) -> Double {
     let phase = t % period
     let half = period / 2
@@ -42,11 +42,11 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       @charts.series_push(line_series, 1, triangle(t, 90, 45.0, 20.0))
       @charts.series_push(line_series, 2, triangle(t, 120, 20.0, 30.0))
     }
-    let _ = @core.set_timeout(500, line_pump)
+    let _ = @shell.set_timeout(500, line_pump)
   }
 
   // ---- 柱状：月度净值（含负值）+ Top 语言横向条 ----
-  let bar_data : @core.Store[Array[@charts.BarItem]] = @core.Store::new([
+  let bar_data : @base.Store[Array[@charts.BarItem]] = @base.Store::new([
     @charts.BarItem::make("1月", 12.0),
     @charts.BarItem::make("2月", -8.0),
     @charts.BarItem::make("3月", 25.0),
@@ -56,7 +56,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.BarItem::make("7月", 22.0),
     @charts.BarItem::make("8月", 9.0),
   ])
-  let bar_h_data : @core.Store[Array[@charts.BarItem]] = @core.Store::new([
+  let bar_h_data : @base.Store[Array[@charts.BarItem]] = @base.Store::new([
     @charts.BarItem::make("MoonBit", 92.0),
     @charts.BarItem::make("Rust", 78.0),
     @charts.BarItem::make("Go", 65.0),
@@ -64,7 +64,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.BarItem::make("Python", 41.0),
   ])
   // ---- 环形：流量来源占比 ----
-  let donut_data : @core.Store[Array[@charts.DonutSlice]] = @core.Store::new([
+  let donut_data : @base.Store[Array[@charts.DonutSlice]] = @base.Store::new([
     @charts.DonutSlice::make("直接访问", 335.0),
     @charts.DonutSlice::make("搜索引擎", 510.0),
     @charts.DonutSlice::make("社交媒体", 234.0),
@@ -72,16 +72,16 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.DonutSlice::make("邮件", 96.0),
   ])
   // ---- 仪表盘：自动（2Hz 三角波）+ 手动（滑杆）双演示 ----
-  let gauge_auto : @core.Store[Double] = @core.Store::new(0.0)
+  let gauge_auto : @base.Store[Double] = @base.Store::new(0.0)
   let gauge_tick : Ref[Int] = Ref(0)
   fn gauge_pump() -> Unit {
     let t = gauge_tick.val + 1
     gauge_tick.val = t
     gauge_auto.set(triangle(t, 100, 0.05, 0.9))
-    let _ = @core.set_timeout(500, gauge_pump)
+    let _ = @shell.set_timeout(500, gauge_pump)
   }
 
-  let gauge_manual : @core.Store[Double] = @core.Store::new(0.35)
+  let gauge_manual : @base.Store[Double] = @base.Store::new(0.35)
   // ---- 散点：2000 点确定性伪随机（LCG） ----
   let scatter_data : Array[(Double, Double)] = []
   let mut scatter_seed = 42
@@ -96,7 +96,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       (scatter_seed.to_double() / 2147483647.0 - 0.5) * 40.0
     scatter_data.push((x, y))
   }
-  let scatter_pts : @core.Store[Array[(Double, Double)]] = @core.Store::new(
+  let scatter_pts : @base.Store[Array[(Double, Double)]] = @base.Store::new(
     scatter_data,
   )
   let gauge_thresholds = [
@@ -105,7 +105,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     (1.0, @theme.theme_current().danger),
   ]
   // ---- 扩展段：雷达 / 热力 / K 线 / 漏斗 / 箱线 / 桑基（内置演示数据） ----
-  let radar_ind : @core.Store[Array[@charts.RadarIndicator]] = @core.Store::new([
+  let radar_ind : @base.Store[Array[@charts.RadarIndicator]] = @base.Store::new([
     @charts.RadarIndicator::make("渲染", 100.0),
     @charts.RadarIndicator::make("IO", 100.0),
     @charts.RadarIndicator::make("内存", 100.0),
@@ -113,11 +113,11 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.RadarIndicator::make("体积", 100.0),
     @charts.RadarIndicator::make("功耗", 100.0),
   ])
-  let radar_ser : @core.Store[Array[@charts.RadarSeries]] = @core.Store::new([
+  let radar_ser : @base.Store[Array[@charts.RadarSeries]] = @base.Store::new([
     @charts.RadarSeries::make("本方案", [88.0, 72.0, 80.0, 92.0, 85.0, 78.0]),
     @charts.RadarSeries::make("对照", [70.0, 90.0, 65.0, 75.0, 60.0, 82.0]),
   ])
-  let heat : @core.Store[@charts.HeatGrid] = @core.Store::new(
+  let heat : @base.Store[@charts.HeatGrid] = @base.Store::new(
     @charts.HeatGrid::make(
       ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
       ["上午", "下午", "晚间"],
@@ -128,7 +128,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       ],
     ),
   )
-  let candles : @core.Store[Array[@charts.Candle]] = @core.Store::new([
+  let candles : @base.Store[Array[@charts.Candle]] = @base.Store::new([
     @charts.Candle::make(100.0, 108.0, 98.0, 105.0),
     @charts.Candle::make(105.0, 107.0, 99.0, 101.0),
     @charts.Candle::make(101.0, 110.0, 100.0, 108.0),
@@ -137,19 +137,19 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.Candle::make(103.0, 105.0, 97.0, 99.0),
     @charts.Candle::make(99.0, 104.0, 96.0, 102.0),
   ])
-  let funnel : @core.Store[Array[@charts.BarItem]] = @core.Store::new([
+  let funnel : @base.Store[Array[@charts.BarItem]] = @base.Store::new([
     @charts.BarItem::make("浏览", 1000.0),
     @charts.BarItem::make("加购", 420.0),
     @charts.BarItem::make("下单", 260.0),
     @charts.BarItem::make("支付", 190.0),
     @charts.BarItem::make("复购", 80.0),
   ])
-  let boxp : @core.Store[Array[(String, Array[Double])]] = @core.Store::new([
+  let boxp : @base.Store[Array[(String, Array[Double])]] = @base.Store::new([
     ("渲染", [12.0, 14.0, 15.0, 16.0, 18.0, 21.0, 25.0, 30.0]),
     ("IO", [5.0, 6.0, 6.5, 7.0, 8.0, 9.0, 12.0]),
     ("启动", [70.0, 75.0, 78.0, 80.0, 82.0, 90.0, 110.0]),
   ])
-  let sankey : @core.Store[@charts.SankeyData] = @core.Store::new(
+  let sankey : @base.Store[@charts.SankeyData] = @base.Store::new(
     @charts.SankeyData::make(
       [
         @charts.SankeyNode::make("浏览"),
@@ -169,7 +169,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     ),
   )
   // ---- 新图表段：关系 / 平行坐标 / 象形柱 / 旭日 / 主题河流 / 树图 / 矩形树图 / 特效散点 ----
-  let graph : @core.Store[@charts.GraphData] = @core.Store::new(
+  let graph : @base.Store[@charts.GraphData] = @base.Store::new(
     @charts.GraphData::make(
       [
         @charts.GraphNode::make("网关"),
@@ -191,27 +191,27 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       ],
     ),
   )
-  let par_axes : @core.Store[Array[@charts.ParAxis]] = @core.Store::new([
+  let par_axes : @base.Store[Array[@charts.ParAxis]] = @base.Store::new([
     @charts.ParAxis::make("延迟(ms)"),
     @charts.ParAxis::make("吞吐(MB/s)"),
     @charts.ParAxis::make("错误率(%)"),
     @charts.ParAxis::make("饱和度(%)", min=Some(0.0), max=Some(100.0)),
   ])
-  let par_rows : @core.Store[Array[Array[Double]]] = @core.Store::new([
+  let par_rows : @base.Store[Array[Array[Double]]] = @base.Store::new([
     [12.0, 320.0, 0.5, 40.0],
     [18.0, 260.0, 1.2, 55.0],
     [9.0, 410.0, 0.2, 35.0],
     [25.0, 180.0, 2.0, 70.0],
     [15.0, 300.0, 0.8, 48.0],
   ])
-  let pb_data : @core.Store[Array[@charts.BarItem]] = @core.Store::new([
+  let pb_data : @base.Store[Array[@charts.BarItem]] = @base.Store::new([
     @charts.BarItem::make("北京", 92.0),
     @charts.BarItem::make("上海", 78.0),
     @charts.BarItem::make("广州", 64.0),
     @charts.BarItem::make("成都", 45.0),
     @charts.BarItem::make("西安", 36.0),
   ])
-  let sun_root : @core.Store[@charts.SunItem] = @core.Store::new(
+  let sun_root : @base.Store[@charts.SunItem] = @base.Store::new(
     @charts.SunItem::make(
       "访问来源",
       children=[
@@ -233,13 +233,13 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       ],
     ),
   )
-  let trv_names : @core.Store[Array[String]] = @core.Store::new(["移动端", "桌面端", "平板"])
-  let trv_values : @core.Store[Array[Array[Double]]] = @core.Store::new([
+  let trv_names : @base.Store[Array[String]] = @base.Store::new(["移动端", "桌面端", "平板"])
+  let trv_values : @base.Store[Array[Array[Double]]] = @base.Store::new([
     [12.0, 18.0, 25.0, 22.0, 30.0, 28.0, 20.0],
     [30.0, 32.0, 28.0, 35.0, 40.0, 38.0, 33.0],
     [8.0, 9.0, 11.0, 10.0, 14.0, 13.0, 9.0],
   ])
-  let tree_root : @core.Store[@charts.TreeItem] = @core.Store::new(
+  let tree_root : @base.Store[@charts.TreeItem] = @base.Store::new(
     {
       name: "产品线",
       value: None,
@@ -263,7 +263,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       ],
     },
   )
-  let tm_items : @core.Store[Array[@charts.TmItem]] = @core.Store::new([
+  let tm_items : @base.Store[Array[@charts.TmItem]] = @base.Store::new([
     @charts.TmItem::make(
       "研发",
       children=[
@@ -281,7 +281,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     ),
     @charts.TmItem::make("运营", value=25.0),
   ])
-  let eff_points : @core.Store[Array[@charts.EffPoint]] = @core.Store::new([
+  let eff_points : @base.Store[Array[@charts.EffPoint]] = @base.Store::new([
     @charts.EffPoint::make(18.0, 72.0, size=20.0),
     @charts.EffPoint::make(32.0, 58.0, size=14.0),
     @charts.EffPoint::make(47.0, 83.0, size=24.0),
@@ -291,7 +291,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.EffPoint::make(88.0, 70.0, size=13.0),
   ])
   // ---- 交互段：line / bar 缩放平移 + donut 交互版 ----
-  let it_line : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
+  let it_line : @base.Store[Array[@charts.LineSeries]] = @base.Store::new([
     {
       name: "CPU",
       max_points: 16,
@@ -303,7 +303,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
       points: [40.0, 42.0, 41.0, 44.0, 46.0, 45.0, 48.0, 50.0, 49.0, 52.0, 55.0, 54.0, 57.0, 60.0, 59.0, 62.0],
     },
   ])
-  let it_bar : @core.Store[Array[@charts.BarItem]] = @core.Store::new([
+  let it_bar : @base.Store[Array[@charts.BarItem]] = @base.Store::new([
     @charts.BarItem::make("一月", 120.0),
     @charts.BarItem::make("二月", 96.0),
     @charts.BarItem::make("三月", 145.0),
@@ -311,7 +311,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
     @charts.BarItem::make("五月", 168.0),
     @charts.BarItem::make("六月", 132.0),
   ])
-  let it_donut : @core.Store[Array[@charts.DonutSlice]] = @core.Store::new([
+  let it_donut : @base.Store[Array[@charts.DonutSlice]] = @base.Store::new([
     @charts.DonutSlice::make("研发", 42.0),
     @charts.DonutSlice::make("市场", 26.0),
     @charts.DonutSlice::make("运营", 18.0),
@@ -340,13 +340,13 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "let series = @core.Store::new([",
+        "let series = @base.Store::new([",
         "  @charts.LineSeries::make(\"CPU\", max_points=120),",
         "  @charts.LineSeries::make(\"内存\", max_points=120),",
         "])",
         "fn pump() -> Unit {",
         "  @charts.series_push(series, 0, v)",
-        "  let _ = @core.set_timeout(500, pump)  // 自重排循环",
+        "  let _ = @shell.set_timeout(500, pump)  // 自重排循环",
         "}",
         "// 第一拍挂在真·挂载时机：handle 构造期就跑、那时宿主还没建好",
         "@ui.row([chart]).on_mount(fn() { pump() })",
@@ -369,7 +369,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "let bars = @core.Store::new([@charts.BarItem::make(\"1月\", 12.0), @charts.BarItem::make(\"2月\", -8.0)])",
+        "let bars = @base.Store::new([@charts.BarItem::make(\"1月\", 12.0), @charts.BarItem::make(\"2月\", -8.0)])",
         "@charts.bar_chart_t(bars, width=320.0, height=240.0)",
         "@charts.bar_chart_t(top, horizontal=true, width=320.0, height=240.0)",
       ],
@@ -382,7 +382,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         @charts.donut_chart_t(donut_data, width=440.0, height=240.0),
       ],
       code=[
-        "let donut = @core.Store::new([@charts.DonutSlice::make(\"直接访问\", 335.0)])",
+        "let donut = @base.Store::new([@charts.DonutSlice::make(\"直接访问\", 335.0)])",
         "@charts.donut_chart_t(donut, width=440.0, height=240.0)",
       ],
     ),
@@ -409,7 +409,7 @@ pub fn page_charts(_app : @shared.App) -> @core.Node {
         ).on_mount(fn() -> Unit { gauge_pump() }),
       ],
       code=[
-        "let gauge = @core.Store::new(0.35)",
+        "let gauge = @base.Store::new(0.35)",
         "let thresholds = [",
         "  (0.6, @theme.theme_current().success),",
         "  (0.85, @theme.theme_current().warning),",

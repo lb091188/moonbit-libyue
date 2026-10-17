@@ -3,12 +3,12 @@
 // Store 外部同步。事件都按宿主的投递口径给**窗口坐标**。
 
 ///|
-fn key(root : @core.Widget, w : @core.Widget, keysym : Int, mods : Int) -> Unit {
+fn key(root : @widget.Widget, w : @widget.Widget, keysym : Int, mods : Int) -> Unit {
   let _ = root.dispatch_key(w.focus_id, { press: true, keysym, mods, })
 }
 
 ///|
-fn press(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
+fn press(root : @widget.Widget, w : @widget.Widget, x : Double) -> Unit {
   let _ = root.dispatch_pointer_to(w.id, {
     kind: @widget.PointerKind::Down,
     x,
@@ -19,7 +19,7 @@ fn press(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
 }
 
 ///|
-fn move_to(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
+fn move_to(root : @widget.Widget, w : @widget.Widget, x : Double) -> Unit {
   let _ = root.dispatch_pointer_to(w.id, {
     kind: @widget.PointerKind::Move,
     x,
@@ -30,7 +30,7 @@ fn move_to(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
 }
 
 ///|
-fn release(root : @core.Widget, w : @core.Widget, x : Double) -> Unit {
+fn release(root : @widget.Widget, w : @widget.Widget, x : Double) -> Unit {
   let _ = root.dispatch_pointer_to(w.id, {
     kind: @widget.PointerKind::Up,
     x,
@@ -48,8 +48,8 @@ fn mounted_entry(
   placeholder? : String = "",
   password? : Bool = false,
   read_only? : Bool = false,
-) -> (@core.Widget, @core.Widget, @core.Store[String]) {
-  let store = @core.Store::new(text)
+) -> (@widget.Widget, @widget.Widget, @base.Store[String]) {
+  let store = @base.Store::new(text)
   let e = input(
     store,
     placeholder=placeholder,
@@ -58,7 +58,7 @@ fn mounted_entry(
     width=width,
     focus_id=1,
   )
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(width + 20.0, 60.0)
   root.set_column()
   let w = e.mount_into(root)
@@ -68,7 +68,7 @@ fn mounted_entry(
 }
 
 ///|
-fn paint_of(root : @core.Widget) -> @render.Bitmap {
+fn paint_of(root : @widget.Widget) -> @render.Bitmap {
   let bm = @render.Bitmap::new(220, 60)
   let p = @render.Painter::new(bm)
   root.paint(p)
@@ -78,8 +78,8 @@ fn paint_of(root : @core.Widget) -> @render.Bitmap {
 
 ///|
 test "clearable：悬停出清空标记，点它整框清空并回写 Store" {
-  let store = @core.Store::new("abc")
-  let root = @core.Widget::new()
+  let store = @base.Store::new("abc")
+  let root = @widget.Widget::new()
   root.set_size(220.0, 60.0)
   root.set_column()
   let w = input(store, width=200.0, clearable=true).mount_into(root)
@@ -107,8 +107,8 @@ test "clearable：悬停出清空标记，点它整框清空并回写 Store" {
 
 ///|
 test "不给 focus_id 也自动可聚焦（输入框默认就该能点进能打）" {
-  let store = @core.Store::new("hi")
-  let root = @core.Widget::new()
+  let store = @base.Store::new("hi")
+  let root = @widget.Widget::new()
   root.set_size(220.0, 60.0)
   root.set_column()
   let w = input(store, width=200.0).mount_into(root)
@@ -120,15 +120,15 @@ test "不给 focus_id 也自动可聚焦（输入框默认就该能点进能打�
   }
   key(root, w, 'a'.to_int(), 0)
   assert_eq(store.get(), "hia")
-  let explicit = input(@core.Store::new(""), width=200.0, focus_id=77)
-  let root2 = @core.Widget::new()
+  let explicit = input(@base.Store::new(""), width=200.0, focus_id=77)
+  let root2 = @widget.Widget::new()
   root2.set_size(220.0, 60.0)
   root2.set_column()
   let fw = explicit.mount_into(root2)
   root2.relayout(220.0, 60.0)
   assert_eq(fw.focus_id, 77)
-  let other = input(@core.Store::new(""), width=200.0)
-  let root3 = @core.Widget::new()
+  let other = input(@base.Store::new(""), width=200.0)
+  let root3 = @widget.Widget::new()
   root3.set_size(220.0, 60.0)
   root3.set_column()
   let bw = other.mount_into(root3)
@@ -143,9 +143,9 @@ test "键入回写 Store，退格与 undo 照旧" {
   key(root, w, 'a'.to_int(), 0)
   key(root, w, 'b'.to_int(), 0)
   assert_eq(store.get(), "hiab")
-  key(root, w, @core.KS_BACKSPACE, 0)
+  key(root, w, @base.KS_BACKSPACE, 0)
   assert_eq(store.get(), "hia")
-  key(root, w, 'z'.to_int(), @core.MOD_CTRL)
+  key(root, w, 'z'.to_int(), @base.MOD_CTRL)
   assert_eq(store.get(), "hiab")
 }
 
@@ -212,7 +212,7 @@ test "拖动选区：按下为锚点，拖到最左端全选；松手后不再�
 }
 
 ///|
-fn caret_of(w : @core.Widget) -> Int {
+fn caret_of(w : @widget.Widget) -> Int {
   match w.im_context {
     Some(f) => f().unwrap().1
     None => -1
@@ -225,18 +225,18 @@ test "Shift+箭头扩选，Ctrl+A 全选，Ctrl+C/V 走内核内部剪贴板" {
   // caret 先到末尾
   press(root, w, w.rect.x + w.rect.w - 1.0)
   release(root, w, w.rect.x + w.rect.w - 1.0)
-  key(root, w, @core.KS_LEFT, @core.MOD_SHIFT)
-  key(root, w, @core.KS_LEFT, @core.MOD_SHIFT)
+  key(root, w, @base.KS_LEFT, @base.MOD_SHIFT)
+  key(root, w, @base.KS_LEFT, @base.MOD_SHIFT)
   let sel = match w.im_context {
     Some(f) => f().unwrap()
     None => ("", -1)
   }
   assert_eq(sel.1, 1)
-  key(root, w, 'a'.to_int(), @core.MOD_CTRL)
-  key(root, w, 'c'.to_int(), @core.MOD_CTRL)
-  key(root, w, 'x'.to_int(), @core.MOD_CTRL)
+  key(root, w, 'a'.to_int(), @base.MOD_CTRL)
+  key(root, w, 'c'.to_int(), @base.MOD_CTRL)
+  key(root, w, 'x'.to_int(), @base.MOD_CTRL)
   assert_eq(store.get(), "")
-  key(root, w, 'v'.to_int(), @core.MOD_CTRL)
+  key(root, w, 'v'.to_int(), @base.MOD_CTRL)
   assert_eq(store.get(), "abc")
 }
 
@@ -244,10 +244,10 @@ test "Shift+箭头扩选，Ctrl+A 全选，Ctrl+C/V 走内核内部剪贴板" {
 test "只读：编辑键不吃，导航与复制照旧" {
   let (root, w, store) = mounted_entry("锁住", 200.0, read_only=true)
   key(root, w, 'a'.to_int(), 0)
-  key(root, w, @core.KS_BACKSPACE, 0)
+  key(root, w, @base.KS_BACKSPACE, 0)
   assert_eq(store.get(), "锁住")
-  key(root, w, 'a'.to_int(), @core.MOD_CTRL)
-  key(root, w, 'c'.to_int(), @core.MOD_CTRL)
+  key(root, w, 'a'.to_int(), @base.MOD_CTRL)
+  key(root, w, 'c'.to_int(), @base.MOD_CTRL)
   assert_eq(store.get(), "锁住")
 }
 
@@ -290,9 +290,9 @@ test "placeholder：空文本画出占位，Store 仍是空" {
 
 ///|
 test "Store 被外部改动会回灌内核；焦点标志由宿主同步" {
-  let store = @core.Store::new("初值")
+  let store = @base.Store::new("初值")
   let e = input(store, width=160.0, focus_id=7)
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(200.0, 60.0)
   root.set_column()
   let w = e.mount_into(root)
@@ -318,7 +318,7 @@ test "输入框只读样式槽：class 覆盖底与描边，焦点框色来自 f
   if !ui_text_guard() {
     return
   }
-  let v = @core.Store::new("内容")
+  let v = @base.Store::new("内容")
   let root = mount_root(
     [input(
       v,
@@ -351,7 +351,7 @@ test "输入框只读样式槽：class 覆盖底与描边，焦点框色来自 f
   assert_true(cool > 40)
 
   // 焦点态：内置 focus 桶给主色描边，与未聚焦的描边灰不同
-  let v2 = @core.Store::new("甲")
+  let v2 = @base.Store::new("甲")
   let root2 = mount_root([input(v2, width=120.0)], 200.0, 60.0)
   let w2 = kid(root2, 0)
   let edge : () -> (Int, Int, Int, Int) = fn() -> (Int, Int, Int, Int) {

@@ -467,7 +467,7 @@ fn pb_draw_symbol(
 /// /|值|」换算并钳制在柱槽宽内；单位 <= 0 时每根柱一个符号）。数据经
 /// Store 驱动：set 后只重绘画布不重建控件树；主题切换现取色自动跟随。
 pub fn pb_chart_t(
-  data : @core.Store[Array[BarItem]],
+  data : @base.Store[Array[BarItem]],
   symbol? : PbSymbol = PbRect,
   mode? : PbMode = PbRepeat,
   unit? : Double = 10.0,
@@ -476,8 +476,8 @@ pub fn pb_chart_t(
   y_range? : (Double, Double)? = None,
   width? : Double = 0.0,
   height? : Double = 280.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let sym = symbol
   let md = mode
@@ -485,7 +485,7 @@ pub fn pb_chart_t(
   let horiz = horizontal
   let sv = show_values
   let yr = y_range
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -495,9 +495,9 @@ pub fn pb_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

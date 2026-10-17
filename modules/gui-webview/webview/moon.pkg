@@ -15,7 +15,9 @@ supported_targets = "native"
 import {
   "moonbitlang/core/encoding/utf8",
   "NoahLiu/yoga-mbt/src" @yoga,
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/base",
+  "NoahLiu/native-gui/shell",
+  "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/win",
   "NoahLiu/native-gui/render",
   "NoahLiu/native-gui/sys",

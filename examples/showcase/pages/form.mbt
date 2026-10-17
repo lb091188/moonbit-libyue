@@ -7,20 +7,20 @@
 // ③ `radio_group` 的值从「选项字符串」换成「索引 Store[Int]」；
 // ④ `checkbox` 从「on_change 写回信号」换成「Store 即状态源」，语义等价；
 // ⑤ `style=[("width",…)]` 一类 CSS 通道不存在，宽高/间距全走命名参数。
-pub fn page_form(_app : @shared.App) -> @core.Node {
-  let qty : @core.Store[Int] = @core.Store::new(3)
-  let qty2 : @core.Store[Int] = @core.Store::new(1)
-  let slider_val : @core.Store[Double] = @core.Store::new(30.0)
-  let rate_val : @core.Store[Int] = @core.Store::new(3)
-  let picked_color : @core.Store[String] = @core.Store::new("#2D68C4")
-  let dp_val : @core.Store[@ui.DateYMD?] = @core.Store::new(None)
-  let sync : @core.Store[Bool] = @core.Store::new(false)
-  let notify : @core.Store[Bool] = @core.Store::new(true)
-  let theme_idx : @core.Store[Int] = @core.Store::new(1)
-  let radio_idx : @core.Store[Int] = @core.Store::new(0)
-  let wifi_on : @core.Store[Bool] = @core.Store::new(true)
-  let locked : @core.Store[Bool] = @core.Store::new(false)
-  let dtr : @core.Store[@ui.DateTimeRange] = @core.Store::new({ start: None, end: None })
+pub fn page_form(_app : @shared.App) -> @widget.Node {
+  let qty : @base.Store[Int] = @base.Store::new(3)
+  let qty2 : @base.Store[Int] = @base.Store::new(1)
+  let slider_val : @base.Store[Double] = @base.Store::new(30.0)
+  let rate_val : @base.Store[Int] = @base.Store::new(3)
+  let picked_color : @base.Store[String] = @base.Store::new("#2D68C4")
+  let dp_val : @base.Store[@ui.DateYMD?] = @base.Store::new(None)
+  let sync : @base.Store[Bool] = @base.Store::new(false)
+  let notify : @base.Store[Bool] = @base.Store::new(true)
+  let theme_idx : @base.Store[Int] = @base.Store::new(1)
+  let radio_idx : @base.Store[Int] = @base.Store::new(0)
+  let wifi_on : @base.Store[Bool] = @base.Store::new(true)
+  let locked : @base.Store[Bool] = @base.Store::new(false)
+  let dtr : @base.Store[@ui.DateTimeRange] = @base.Store::new({ start: None, end: None })
   @shared.page([
     @shared.section(
       "输入",
@@ -30,19 +30,19 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         @ui.col(
           [
             @ui.input(
-              @core.Store::new(""),
+              @base.Store::new(""),
               placeholder="输入点什么…",
               width=300.0,
               clearable=true,
             ),
             @ui.input(
-              @core.Store::new(""),
+              @base.Store::new(""),
               placeholder="密码框",
               password=true,
               width=300.0,
             ),
             @ui.textarea(
-              @core.Store::new("多行文本输入演示。\n第二行内容。"),
+              @base.Store::new("多行文本输入演示。\n第二行内容。"),
               rows=3,
               width=300.0,
             ),
@@ -52,9 +52,9 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "@ui.input(@core.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0, clearable=true)",
-        "@ui.input(@core.Store::new(\"\"), placeholder=\"密码框\", password=true, width=300.0)",
-        "@ui.textarea(@core.Store::new(\"多行文本输入演示。\\n第二行内容。\"), rows=3, width=300.0)",
+        "@ui.input(@base.Store::new(\"\"), placeholder=\"输入点什么…\", width=300.0, clearable=true)",
+        "@ui.input(@base.Store::new(\"\"), placeholder=\"密码框\", password=true, width=300.0)",
+        "@ui.textarea(@base.Store::new(\"多行文本输入演示。\\n第二行内容。\"), rows=3, width=300.0)",
       ],
     ),
     @shared.section(
@@ -70,12 +70,12 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         @ui.bind_label(rate_val, fn(v) { "评分：\{v} 星" }),
       ],
       code=[
-        "let qty : @core.Store[Int] = @core.Store::new(3)",
+        "let qty : @base.Store[Int] = @base.Store::new(3)",
         "@ui.stepper(qty, min=0, max=10, step=1)",
         "@ui.bind_label(qty, fn(v) { \"当前数量：\\{v}\" })",
-        "let slider_val : @core.Store[Double] = @core.Store::new(30.0)",
+        "let slider_val : @base.Store[Double] = @base.Store::new(30.0)",
         "@ui.slider(slider_val, min=0.0, max=100.0, step=5.0, width=200.0)",
-        "let rate_val : @core.Store[Int] = @core.Store::new(3)",
+        "let rate_val : @base.Store[Int] = @base.Store::new(3)",
         "@ui.rate(rate_val)",
       ],
     ),
@@ -88,7 +88,7 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
           [
             @ui.select(
               ["杭州", "北京", "上海", "深圳", "广州"],
-              @core.Store::new(""),
+              @base.Store::new(""),
               clearable=true,
               width=170.0,
             ),
@@ -143,14 +143,14 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "let sync : @core.Store[Bool] = @core.Store::new(false)",
+        "let sync : @base.Store[Bool] = @base.Store::new(false)",
         "@ui.checkbox(\"启用自动同步\", sync)",
         "@ui.bind_label(sync, fn(v) { if v { \"同步：开\" } else { \"同步：关\" } })",
-        "let theme_idx : @core.Store[Int] = @core.Store::new(1)",
+        "let theme_idx : @base.Store[Int] = @base.Store::new(1)",
         "@ui.radio_group([\"浅色\", \"深色\", \"跟随系统\"], theme_idx)",
-        "let wifi_on : @core.Store[Bool] = @core.Store::new(true)",
+        "let wifi_on : @base.Store[Bool] = @base.Store::new(true)",
         "@ui.switch(wifi_on)",
-        "@ui.switch(@core.Store::new(false), disabled=true)",
+        "@ui.switch(@base.Store::new(false), disabled=true)",
       ],
     ),
     @shared.section(
@@ -190,11 +190,11 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         ]),
       ],
       code=[
-        "let dp : @core.Store[@ui.DateYMD?] = @core.Store::new(None)",
+        "let dp : @base.Store[@ui.DateYMD?] = @base.Store::new(None)",
         "@ui.date_picker(dp, clearable=true, width=170.0)",
         "@ui.bind(dp.signal(), fn(d) { match d { Some(v) => v.format()  None -> \"未选\" } })",
         "@ui.calendar()",
-        "let dtr : @core.Store[@ui.DateTimeRange] = @core.Store::new({ start: None, end: None })",
+        "let dtr : @base.Store[@ui.DateTimeRange] = @base.Store::new({ start: None, end: None })",
         "@ui.datetime_range_picker(dtr)",
       ],
     ),
@@ -206,16 +206,16 @@ pub fn page_form(_app : @shared.App) -> @core.Node {
         @ui.form("用户设置", [
           @ui.form_item(
             "用户名",
-            @ui.input(@core.Store::new("moonbit"), width=200.0, clearable=true),
+            @ui.input(@base.Store::new("moonbit"), width=200.0, clearable=true),
           ),
-          @ui.form_item("城市", @ui.input(@core.Store::new("杭州"), width=200.0)),
+          @ui.form_item("城市", @ui.input(@base.Store::new("杭州"), width=200.0)),
           @ui.form_item("数量", @ui.stepper(qty2, min=1, max=9)),
         ]),
       ],
       code=[
         "@ui.form(\"用户设置\", [",
         "  @ui.form_item(\"用户名\", @ui.input(",
-        "    @core.Store::new(\"moonbit\"), width=200.0, clearable=true,",
+        "    @base.Store::new(\"moonbit\"), width=200.0, clearable=true,",
         "  )),",
         "  @ui.form_item(\"数量\", @ui.stepper(qty2, min=1, max=9)),",
         "])",

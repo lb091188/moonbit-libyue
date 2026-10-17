@@ -120,6 +120,23 @@ fn app_window(
   }
 }
 
+///|
+/// 跨模块测试通道：给一扇（假）壳层窗挂上空的根控件与浮层宿主。
+pub fn test_app(s : @shell.Session) -> App {
+  let root = Widget::new()
+  {
+    session: s,
+    root,
+    focus: FocusStack::new(),
+    host: make_overlay_host(root),
+    closed: false,
+    canvas: None,
+    key_fallthrough: [],
+    dirty_rect: None,
+    dirty_full: false,
+  }
+}
+
 /// 首个宿主入口（主窗）。再要一扇窗用 `App::open_window`，或在本表已空时
 /// 再调一次本函数（那扇又成主窗）。
 pub fn App::new(width : Int, height : Int, title : String) -> App? {

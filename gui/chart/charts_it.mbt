@@ -102,7 +102,7 @@ fn ci_win_len(all : Array[LineSeries]) -> Int {
 /// 缺省组件自建。
 /// 布局 = vbox（图例 + 画布），总高比画布参数多图例行（24 + 6）。
 pub fn line_chart_it(
-  series : @core.Store[Array[LineSeries]],
+  series : @base.Store[Array[LineSeries]],
   area? : Bool = false,
   y_range? : (Double, Double)? = None,
   show_last? : Bool = true,
@@ -110,8 +110,8 @@ pub fn line_chart_it(
   zoom_state? : CiZoom? = None,
   width? : Double = 0.0,
   height? : Double = 260.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(series)
   let fill = area
   let yr = y_range
@@ -122,16 +122,16 @@ pub fn line_chart_it(
     None => ci_zoom_make()
   }
   let hover = Ref(-1)
-  let visible = @core.Store::new(ci_fit_len([], series.get().length()))
-  let items = @core.Store::new(ci_line_items(series.get()))
+  let visible = @base.Store::new(ci_fit_len([], series.get().length()))
+  let items = @base.Store::new(ci_line_items(series.get()))
   // 数据整体更换：同步图例项与显隐位（items/visible 各自的订阅触发图例
   // 重绘，invalidate 兜画布）；退订随本代回收袋
   let sid = series.subscribe_id(fn(_s : Array[LineSeries]) -> Unit {
     items.set(ci_line_items(series.get()))
     visible.update(fn(vs) { ci_fit_len(vs, series.get().length()) })
-    @core.invalidate()
+    @widget.invalidate()
   })
-  @core.sub_bag_register(fn() { series.remove(sid) })
+  @base.sub_bag_register(fn() { series.remove(sid) })
 
   fn draw(p : @render.Painter, w : Double, h : Double) -> Unit {
     let all = series.get()
@@ -258,7 +258,7 @@ pub fn line_chart_it(
         items~,
         color_at=fn(i) { series_color(i) },
         visible~,
-        on_toggle=fn(_i) { @core.invalidate() },
+        on_toggle=fn(_i) { @widget.invalidate() },
       ),
       ci_tooltip(
         draw,
@@ -290,15 +290,15 @@ pub fn line_chart_it(
 /// 缺省组件自建。
 /// 布局 = vbox（图例 + 画布），总高比画布参数多图例行（24 + 6）。
 pub fn bar_chart_it(
-  data : @core.Store[Array[BarItem]],
+  data : @base.Store[Array[BarItem]],
   horizontal? : Bool = false,
   y_range? : (Double, Double)? = None,
   zoom? : Bool = true,
   zoom_state? : CiZoom? = None,
   width? : Double = 0.0,
   height? : Double = 280.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let horiz = horizontal
   let yr = y_range
@@ -308,14 +308,14 @@ pub fn bar_chart_it(
     None => ci_zoom_make()
   }
   let hover = Ref(-1)
-  let visible = @core.Store::new(ci_fit_len([], data.get().length()))
-  let items = @core.Store::new(ci_bar_items(data.get()))
+  let visible = @base.Store::new(ci_fit_len([], data.get().length()))
+  let items = @base.Store::new(ci_bar_items(data.get()))
   let sid = data.subscribe_id(fn(_d : Array[BarItem]) -> Unit {
     items.set(ci_bar_items(data.get()))
     visible.update(fn(vs) { ci_fit_len(vs, data.get().length()) })
-    @core.invalidate()
+    @widget.invalidate()
   })
-  @core.sub_bag_register(fn() { data.remove(sid) })
+  @base.sub_bag_register(fn() { data.remove(sid) })
 
   fn draw(p : @render.Painter, w : Double, h : Double) -> Unit {
     let all = data.get()
@@ -394,7 +394,7 @@ pub fn bar_chart_it(
           }
         },
         visible~,
-        on_toggle=fn(_i) { @core.invalidate() },
+        on_toggle=fn(_i) { @widget.invalidate() },
       ),
       ci_tooltip(
         draw,
@@ -423,25 +423,25 @@ pub fn bar_chart_it(
 /// 环形图无 x 轴，不提供 DataZoom。
 /// 布局 = vbox（图例 + 画布），总高比画布参数多图例行（24 + 6）。
 pub fn donut_chart_it(
-  data : @core.Store[Array[DonutSlice]],
+  data : @base.Store[Array[DonutSlice]],
   thickness? : Double = 34.0,
   center? : String = "",
   width? : Double = 0.0,
   height? : Double = 240.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let thick = thickness
   let mid = center
   let hover = Ref(-1)
-  let visible = @core.Store::new(ci_fit_len([], data.get().length()))
-  let items = @core.Store::new(ci_donut_items(data.get()))
+  let visible = @base.Store::new(ci_fit_len([], data.get().length()))
+  let items = @base.Store::new(ci_donut_items(data.get()))
   let sid = data.subscribe_id(fn(_d : Array[DonutSlice]) -> Unit {
     items.set(ci_donut_items(data.get()))
     visible.update(fn(vs) { ci_fit_len(vs, data.get().length()) })
-    @core.invalidate()
+    @widget.invalidate()
   })
-  @core.sub_bag_register(fn() { data.remove(sid) })
+  @base.sub_bag_register(fn() { data.remove(sid) })
 
   fn draw(p : @render.Painter, w : Double, h : Double) -> Unit {
     let all = data.get()
@@ -523,7 +523,7 @@ pub fn donut_chart_it(
         items~,
         color_at=fn(i) { donut_color(i) },
         visible~,
-        on_toggle=fn(_i) { @core.invalidate() },
+        on_toggle=fn(_i) { @widget.invalidate() },
       ),
       ci_tooltip(draw, hit, on_leave=fn() { hover.val = -1 }, width~, height~),
     ],

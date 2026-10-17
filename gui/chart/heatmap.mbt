@@ -270,21 +270,21 @@ fn heat_draw(
 /// 过密自动抽稀截断；show_values=true 时格内居中标注数值（格子足够大
 /// 才画）。数据经 Store 驱动，set 后只重绘画布。
 pub fn heatmap_t(
-  data : @core.Store[HeatGrid],
+  data : @base.Store[HeatGrid],
   low_color? : String = "",
   high_color? : String = "",
   gap? : Double = 2.0,
   show_values? : Bool = false,
   width? : Double = 0.0,
   height? : Double = 300.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let lc = low_color
   let hc = high_color
   let g = gap
   let sv = show_values
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -294,9 +294,9 @@ pub fn heatmap_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

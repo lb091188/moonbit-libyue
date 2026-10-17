@@ -1,6 +1,6 @@
 // 表单控件首批：复选 / 单选组 / 开关 / 滑块 / 进度 / 步进器。
 //
-// 值一律走 `@core.Store[T]`（与 master 同：组件不持有状态，状态归调用方）。
+// 值一律走 `@base.Store[T]`（与 master 同：组件不持有状态，状态归调用方）。
 // 组件订阅 Store 只为**请求重绘**——颜色与位置都在 `on_draw` 里现取，订阅退订
 // 随本代回收袋，重挂不留死订阅。
 //
@@ -10,20 +10,20 @@
 
 ///|
 /// 订阅一个 Store，只为请求重绘；退订随本代回收袋。
-pub fn[T] follow_store(s : @core.Store[T]) -> Unit {
+pub fn[T] follow_store(s : @base.Store[T]) -> Unit {
   let sig = s.signal()
-  let sid = sig.subscribe(fn(_v : T) -> Unit { @core.invalidate() })
-  @core.sub_bag_register(fn() { sig.remove(sid) })
+  let sid = sig.subscribe(fn(_v : T) -> Unit { @widget.invalidate() })
+  @base.sub_bag_register(fn() { sig.remove(sid) })
 }
 
 ///|
 /// 一行开关型控件的点击：按下消费，抬起且落在自己范围内才写回值。
 fn attach_toggle(
-  w : @core.Widget,
+  w : @widget.Widget,
   toggle : () -> Unit,
   off : Enabled,
 ) -> Unit {
-  w.on_pointer = Some(fn(self : @core.Widget, ev : @core.PointerEvent) -> Bool {
+  w.on_pointer = Some(fn(self : @widget.Widget, ev : @widget.PointerEvent) -> Bool {
     match ev.kind {
       @widget.PointerKind::Down => !off.off
       @widget.PointerKind::Up => {
@@ -43,19 +43,19 @@ fn attach_toggle(
 /// 键盘口径：空格/回车切换；未给 `focus_id` 时自动领号进 Tab 链，聚焦时框线转主题色。
 pub fn checkbox(
   content : String,
-  state : @core.Store[Bool],
+  state : @base.Store[Bool],
   disabled? : Bool = false,
   enabled? : Enabled? = None,
   focus_id? : Int = 0,
   font_size? : Double = 13.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(state)
-  @core.node_of_new(fn(row : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(row : @widget.Widget) -> @widget.Widget {
     let off = enabled_cell(enabled, disabled)
     row.focus_id = auto_focus_id(focus_id)
-    let box = @core.Widget::new()
+    let box = @widget.Widget::new()
     box.node.set_width(@yoga.fixed(14.0))
     box.node.set_height(@yoga.fixed(14.0))
     // 标记的内置基调存 token 名（随主题现取）：强调色=primary，未选框色=border
@@ -64,9 +64,9 @@ pub fn checkbox(
       @style.merge_all([@style.style(color="primary", border_color="border"), paint_subset(class)]),
     )
     box.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let accent = @style.color_of(s.color, "")
@@ -109,13 +109,13 @@ pub fn checkbox(
     row.node.set_min_height(@yoga.fixed(20.0))
     row.append_child(box)
     let _ = (text(content, font_size=font_size)).mount_into(row)
-    row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
+    row.cursor_fn = Some(enabled_cursor(off, @widget.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
-    row.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    row.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || off.off {
         return false
       }
-      if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+      if ev.keysym == @base.KS_SPACE || ev.keysym == @base.KS_RETURN {
         state.set(!state.get())
         true
       } else {
@@ -134,21 +134,21 @@ pub fn checkbox(
 /// 每项各自进 Tab 链（自动领号），聚焦时环转主题色。
 pub fn radio_group(
   options : Array[String],
-  state : @core.Store[Int],
+  state : @base.Store[Int],
   disabled? : Bool = false,
   direction? : @yoga.FlexDirection = @yoga.Row,
   gap? : Double = 12.0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   follow_store(state)
   let is_row = match direction {
     @yoga.Row | @yoga.RowReverse => true
     _ => false
   }
-  let items : Array[@core.Node] = []
+  let items : Array[@widget.Node] = []
   for i = 0; i < options.length(); i = i + 1 {
     let idx = i
-    let dot = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    let dot = @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
       w.node.set_width(@yoga.fixed(14.0))
       w.node.set_height(@yoga.fixed(14.0))
       // 内置基调存 token 名：选中=primary，未选环=border
@@ -157,9 +157,9 @@ pub fn radio_group(
         @style.merge_all([@style.style(color="primary", border_color="border"), paint_subset(class)]),
       )
       w.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        _r : @core.Rect,
+        _r : @base.Rect,
       ) -> Unit {
         let s = @style.style_for(self)
         let accent = @style.color_of(s.color, "")
@@ -189,7 +189,7 @@ pub fn radio_group(
         column_gap=6.0,
         align_items=@yoga.AlignItems::Center,
         class=class,
-        handle=fn(w : @core.Widget) -> Unit {
+        handle=fn(w : @widget.Widget) -> Unit {
           // 行高不随字体度量塌陷：文本行盒比 14px 标记还矮的字体上（真机
           // XFCE 的默认字体实测如此），标记会把行撑破、圆圈顶被上一行盖住
           w.node.set_min_height(@yoga.fixed(20.0))
@@ -200,9 +200,9 @@ pub fn radio_group(
             let dot_w = w.kids[0]
             let prev = dot_w.on_draw
             dot_w.on_draw = Some(fn(
-              self : @core.Widget,
+              self : @widget.Widget,
               p : @render.Painter,
-              r : @core.Rect,
+              r : @base.Rect,
             ) -> Unit {
               match prev {
                 Some(f) => f(self, p, r)
@@ -216,18 +216,18 @@ pub fn radio_group(
             })
           }
           let n = options.length()
-          w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+          w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
             if !ev.press || disabled {
               return false
             }
             let ks = ev.keysym
-            if ks == @core.KS_SPACE || ks == @core.KS_RETURN {
+            if ks == @base.KS_SPACE || ks == @base.KS_RETURN {
               state.set(idx)
               true
-            } else if ks == @core.KS_LEFT || ks == @core.KS_UP {
+            } else if ks == @base.KS_LEFT || ks == @base.KS_UP {
               state.set((idx + n - 1) % n)
               true
-            } else if ks == @core.KS_RIGHT || ks == @core.KS_DOWN {
+            } else if ks == @base.KS_RIGHT || ks == @base.KS_DOWN {
               state.set((idx + 1) % n)
               true
             } else {
@@ -250,18 +250,18 @@ pub fn radio_group(
 /// 开关：40×20 胶囊（圆角半径=半高）+ 16 圆滑珠，可带开/关文案。
 /// 键盘口径：空格/回车切换，自动进 Tab 链，聚焦时胶囊描边转主题色。
 pub fn switch(
-  state : @core.Store[Bool],
+  state : @base.Store[Bool],
   on_text? : String = "",
   off_text? : String = "",
   disabled? : Bool = false,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   follow_store(state)
-  @core.node_of_new(fn(row : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(row : @widget.Widget) -> @widget.Widget {
     let off = enabled_cell(None, disabled)
     row.focus_id = auto_focus_id(focus_id)
-    let pill = @core.Widget::new()
+    let pill = @widget.Widget::new()
     pill.node.set_width(@yoga.fixed(40.0))
     pill.node.set_height(@yoga.fixed(20.0))
     // 标记控件的基调存 token 名：开态底色=primary，关态=border，滑珠=白
@@ -273,9 +273,9 @@ pub fn switch(
       ]),
     )
     pill.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let on = state.get()
@@ -307,13 +307,13 @@ pub fn switch(
     if txt.length() > 0 {
       let _ = (text(txt)).mount_into(row)
     }
-    row.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
+    row.cursor_fn = Some(enabled_cursor(off, @widget.CURSOR_HAND))
     attach_toggle(row, fn() { state.set(!state.get()) }, off)
-    row.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    row.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || off.off {
         return false
       }
-      if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+      if ev.keysym == @base.KS_SPACE || ev.keysym == @base.KS_RETURN {
         state.set(!state.get())
         true
       } else {
@@ -330,7 +330,7 @@ pub fn switch(
 /// 键盘口径：←/↓ 减、→/↑ 加（无 step 时按百分之一量程）、Home/End 到两端；
 /// 自动进 Tab 链，聚焦时拇指外围一圈主题色。
 pub fn slider(
-  state : @core.Store[Double],
+  state : @base.Store[Double],
   min? : Double = 0.0,
   max? : Double = 100.0,
   step? : Double = 0.0,
@@ -338,13 +338,13 @@ pub fn slider(
   disabled? : Bool = false,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(state)
   let lo = min
   let hi = if max > min { max } else { min + 1.0 }
   let st = if step > 0.0 { step } else { 0.0 }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let off = enabled_cell(None, disabled)
     // 拖动状态自己持有：宿主维护的 `pressed` 只在真实事件流里置位，组件要在
@@ -353,8 +353,8 @@ pub fn slider(
     w.focus_id = auto_focus_id(focus_id)
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(@theme.control_height))
-    w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
-    let set_from_x = fn(self : @core.Widget, x : Double) -> Unit {
+    w.cursor_fn = Some(enabled_cursor(off, @widget.CURSOR_HAND))
+    let set_from_x = fn(self : @widget.Widget, x : Double) -> Unit {
       let track = (self.rect.w - 12.0).max(1.0)
       let ratio = ((x - 6.0) / track).clamp(min=0.0, max=1.0)
       let raw = lo + ratio * (hi - lo)
@@ -362,9 +362,9 @@ pub fn slider(
       state.set(v.clamp(min=lo, max=hi))
     }
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 强调色（已填充段与拇指）=样式 color，轨道底=border_color
       let s = @style.style_for(self)
@@ -395,8 +395,8 @@ pub fn slider(
       }
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       if off.off {
         return false
@@ -418,22 +418,22 @@ pub fn slider(
         @widget.PointerKind::Leave => false
       }
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || off.off {
         return false
       }
       let dv = if st > 0.0 { st } else { (hi - lo) / 100.0 }
       let ks = ev.keysym
-      if ks == @core.KS_LEFT || ks == @core.KS_DOWN {
+      if ks == @base.KS_LEFT || ks == @base.KS_DOWN {
         state.set((state.get() - dv).clamp(min=lo, max=hi))
         true
-      } else if ks == @core.KS_RIGHT || ks == @core.KS_UP {
+      } else if ks == @base.KS_RIGHT || ks == @base.KS_UP {
         state.set((state.get() + dv).clamp(min=lo, max=hi))
         true
-      } else if ks == @core.KS_HOME {
+      } else if ks == @base.KS_HOME {
         state.set(lo)
         true
-      } else if ks == @core.KS_END {
+      } else if ks == @base.KS_END {
         state.set(hi)
         true
       } else {
@@ -449,14 +449,14 @@ pub fn slider(
 ///|
 /// 进度条：`state` 取 0..max 的实数值（纯展示，不响应点击）。
 pub fn progress(
-  state : @core.Store[Double],
+  state : @base.Store[Double],
   max? : Double = 1.0,
   width? : Double = 200.0,
   height? : Double = 6.0,
   color? : String = "",
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(state)
   let hi = if max > 0.0 { max } else { 1.0 }
   let blocks : Array[@style.Style] = [
@@ -467,15 +467,15 @@ pub fn progress(
     },
   ]
   let anon = @style.merge_all(blocks)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(height))
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 槽底=background_color，进度段=color（散参数 color 折块，class 覆盖同一条路）
       let s = @style.style_for(self)
@@ -499,12 +499,12 @@ fn step_cell(
   sep_right : Bool,
   on_click : () -> Unit,
   subset : @style.Style,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(32.0))
     w.node.set_height(@yoga.fixed(@theme.control_height))
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     fold_style(
       w,
       @style.empty_style().hover(background_color="fill_hover").active(
@@ -513,9 +513,9 @@ fn step_cell(
       [subset],
     )
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let bg = @style.color_of(st.background_color, "")
@@ -550,8 +550,8 @@ fn step_cell(
       )
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => !off.off
@@ -578,13 +578,13 @@ fn step_cell(
 /// 键盘口径：←/↓ 减、→/↑ 加（触界侧吃掉键但不改值），自动进 Tab 链，
 /// 聚焦时外框描边转主题色。
 pub fn stepper(
-  state : @core.Store[Int],
+  state : @base.Store[Int],
   min? : Int = 0,
   max? : Int = 999,
   step? : Int = 1,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let lo = min
   let hi = if max > min { max } else { min }
   let inc = if step > 0 { step } else { 1 }
@@ -595,13 +595,13 @@ pub fn stepper(
     minus_off.off = v <= lo
     plus_off.off = v >= hi
   }
-  let value = @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  let value = @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     w.node.set_width(@yoga.fixed(44.0))
     w.node.set_height(@yoga.fixed(@theme.control_height))
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let _ = @text.draw_box_at(
@@ -657,14 +657,14 @@ pub fn stepper(
         border_radius=4.0,
       ),
     ] + class,
-    handle=fn(w : @core.Widget) -> Unit {
+    handle=fn(w : @widget.Widget) -> Unit {
       w.focus_id = auto_focus_id(focus_id)
       // 外框底/描边是 view 的内置绘制：包一层，聚焦时末尾补一圈主题色
       let prev = w.on_draw
       w.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         match prev {
           Some(f) => f(self, p, r)
@@ -676,18 +676,18 @@ pub fn stepper(
           p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
         }
       })
-      w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+      w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
         if !ev.press {
           return false
         }
         let ks = ev.keysym
-        if ks == @core.KS_LEFT || ks == @core.KS_DOWN {
+        if ks == @base.KS_LEFT || ks == @base.KS_DOWN {
           if !minus_off.off {
             state.set((state.get() - inc).clamp(min=lo, max=hi))
             sync()
           }
           true
-        } else if ks == @core.KS_RIGHT || ks == @core.KS_UP {
+        } else if ks == @base.KS_RIGHT || ks == @base.KS_UP {
           if !plus_off.off {
             state.set((state.get() + inc).clamp(min=lo, max=hi))
             sync()
@@ -772,8 +772,8 @@ pub fn button(
   disabled? : Bool = false,
   enabled? : Enabled? = None,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let src = text_source(text, font_size=font_size, align=@text.Center)
   // 变体皮肤折进样式槽：基块=常态，`hover`/`active` 桶=点亮态（旧口径
   // `lit = hovered || pressed`，两桶同值）；散参数显式覆盖会让两态取到同一色，
@@ -815,7 +815,7 @@ pub fn button(
   let lit = @style.merge_all(lit_blocks)
   skin.hover = Some(lit)
   skin.active = Some(lit)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let off = enabled_cell(enabled, disabled)
     w.focus_id = auto_focus_id(focus_id)
@@ -826,13 +826,13 @@ pub fn button(
     w.node.set_padding_left(@yoga.fixed(12.0))
     w.node.set_padding_right(@yoga.fixed(12.0))
     w.node.set_flex_shrink(0.0)
-    w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
+    w.cursor_fn = Some(enabled_cursor(off, @widget.CURSOR_HAND))
     attach_text_measure(w, src)
     fold_style(w, skin, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       // 禁用态是组件语义，不走样式：文字转次要色、底色统一浅灰
@@ -883,8 +883,8 @@ pub fn button(
       }
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => !off.off
@@ -898,11 +898,11 @@ pub fn button(
         @widget.PointerKind::Leave => false
       }
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || off.off {
         return false
       }
-      if ev.keysym == @core.KS_SPACE || ev.keysym == @core.KS_RETURN {
+      if ev.keysym == @base.KS_SPACE || ev.keysym == @base.KS_RETURN {
         on_click()
         true
       } else {
@@ -921,20 +921,20 @@ pub fn link(
   on_click : () -> Unit,
   font_size? : Double = 13.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let font = @text.Font::new("", font_size)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let tw = text_width(text, font)
     w.node.set_width(@yoga.fixed(tw))
     w.node.set_height(@yoga.fixed(@text.line_height_font(font).unwrap_or(18).to_double()))
     w.node.set_flex_shrink(0.0)
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let hue = @style.color_of(s.color, @theme.theme_primary())
@@ -945,8 +945,8 @@ pub fn link(
       }
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -970,11 +970,11 @@ pub fn link(
 /// 时显示 danger 红字）。行高固定预留，错误出现/消失不引起布局跳动。
 pub fn form_item(
   label_text : String,
-  control : @core.Node,
+  control : @widget.Node,
   label_width? : Double = 90.0,
-  error? : @core.Store[String] = @core.Store::new(""),
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  error? : @base.Store[String] = @base.Store::new(""),
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let err_store = error
   view(
     [
@@ -1004,7 +1004,7 @@ pub fn form_item(
         [text_dyn(err_store.signal(), font_size=12.0, color="danger", wrap=false)],
         direction=@yoga.Row,
         height=18.0,
-        handle=fn(w : @core.Widget) -> Unit { w.set_margin(left=label_width + 12.0) },
+        handle=fn(w : @widget.Widget) -> Unit { w.set_margin(left=label_width + 12.0) },
       ),
     ],
     direction=@yoga.Column,
@@ -1017,11 +1017,11 @@ pub fn form_item(
 /// 表单：分组标题 + 一组表单项（纵向排布）。
 pub fn form(
   title : String,
-  items : Array[@core.Node],
+  items : Array[@widget.Node],
   row_gap? : Double = 8.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  let nodes : Array[@core.Node] = [text(title, role=Section)]
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  let nodes : Array[@widget.Node] = [text(title, role=Section)]
   for it in items {
     nodes.push(it)
   }
@@ -1063,27 +1063,27 @@ fn star_path(p : @render.Painter, cx : Double, cy : Double, r_out : Double) -> U
 /// 组件同口径）。键盘口径：→/↑ 加一星、←/↓ 减一星、Home/End 到两端，
 /// 写值同点击（回调 on_change）；自动进 Tab 链，聚焦时整圈主题色描边。
 pub fn rate(
-  value : @core.Store[Int],
+  value : @base.Store[Int],
   max? : Int = 5,
   on_change? : (Int) -> Unit = fn(_v : Int) -> Unit { () },
   size? : Double = 22.0,
   gap? : Double = 4.0,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(value)
   let n = if max > 0 { max } else { 1 }
   let hover_n : Ref[Int] = Ref(0)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.focus_id = auto_focus_id(focus_id)
     w.node.set_width(@yoga.fixed(size * n.to_double() + gap * (n - 1).to_double()))
     w.node.set_height(@yoga.fixed(size))
     w.node.set_flex_shrink(0.0)
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     // 第几颗星（1 起，越界夹住）：星星间距的一半算在星内，边缘不空
-    w.on_pointer = Some(fn(_self : @core.Widget, ev : @core.PointerEvent) -> Bool {
+    w.on_pointer = Some(fn(_self : @widget.Widget, ev : @widget.PointerEvent) -> Bool {
       let star_at = fn(x : Double) -> Int {
         let idx = ((x + gap / 2.0) / (size + gap)).to_int() + 1
         idx.clamp(min=1, max=n)
@@ -1099,22 +1099,22 @@ pub fn rate(
           let h = star_at(ev.x)
           if h != hover_n.val {
             hover_n.val = h
-            @core.invalidate()
+            @widget.invalidate()
           }
           true
         }
         @widget.PointerKind::Leave => {
           hover_n.val = 0
-          @core.invalidate()
+          @widget.invalidate()
           false
         }
         @widget.PointerKind::Up => false
       }
     })
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let lit_c = @style.color_of(st.color, @theme.theme_primary())
@@ -1142,7 +1142,7 @@ pub fn rate(
         p.stroke_rect(0.5, 0.5, r.w - 1.0, r.h - 1.0)
       }
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press {
         return false
       }
@@ -1153,13 +1153,13 @@ pub fn rate(
         true
       }
       let ks = ev.keysym
-      if ks == @core.KS_RIGHT || ks == @core.KS_UP {
+      if ks == @base.KS_RIGHT || ks == @base.KS_UP {
         setv((cur + 1).clamp(min=1, max=n))
-      } else if ks == @core.KS_LEFT || ks == @core.KS_DOWN {
+      } else if ks == @base.KS_LEFT || ks == @base.KS_DOWN {
         setv((cur - 1).clamp(min=1, max=n))
-      } else if ks == @core.KS_HOME {
+      } else if ks == @base.KS_HOME {
         setv(1)
-      } else if ks == @core.KS_END {
+      } else if ks == @base.KS_END {
         setv(n)
       } else {
         false
@@ -1174,23 +1174,23 @@ pub fn rate(
 ///|
 /// 下拉候选行（EP 样式）：当前选中浅蓝底 + 主色字 + 右侧 ✓，悬停灰底。
 /// 选中在**抬起**时触发（与浮层其它项同：按下被图层消费，抬起才派发）。
-fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @core.Node {
+fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @widget.Node {
   let font = @text.Font::new("", 13.0)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.fixed(28.0))
     w.node.set_flex_shrink(0.0)
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     // 内置基调：常态文字 text_regular，悬停底 fill_hover（选中态见下方注释）
     @style.apply(
       w,
       @style.style(color="text_regular").hover(background_color="fill_hover"),
     )
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let act = selected()
@@ -1226,8 +1226,8 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
       }
     })
     w.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -1245,7 +1245,7 @@ fn select_row(opt : String, selected : () -> Bool, on_pick : () -> Unit) -> @cor
 ///|
 /// 候选浮层：`n` 行 × 28 高 + 4×2 内边距，超过 300 高就套一层垂直滚动
 /// （选项再多也不会顶出窗口）。`select_t` 与 `combo` 共用。
-fn list_popup(rows : Array[@core.Node], n : Int, width : Double) -> @core.Node {
+fn list_popup(rows : Array[@widget.Node], n : Int, width : Double) -> @widget.Node {
   let want = n.to_double() * 28.0 + 8.0
   let list_h = if want > 300.0 { 300.0 } else { want }
   let st = ScrollState::new()
@@ -1265,7 +1265,7 @@ fn list_popup(rows : Array[@core.Node], n : Int, width : Double) -> @core.Node {
 /// 主题色，见 `setup_picker_field`）。
 pub fn select(
   options : Array[String],
-  value : @core.Store[String],
+  value : @base.Store[String],
   on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
   clearable? : Bool = false,
   placeholder? : String = "",
@@ -1273,8 +1273,8 @@ pub fn select(
   focus_id? : Int = 0,
   editable? : Bool = false,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   if editable {
     // §2 合并:`combo`(可输入)就是 select 的 editable 档,原实现整体复用
     // (labelled 参数没有透传通道,combo_impl 收显式 Option 形参)
@@ -1291,7 +1291,7 @@ pub fn select(
   follow_store(value)
   let opts = options
   let ph = placeholder
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let open_id : Ref[Int] = Ref(0)
     let hi : Ref[Int] = Ref(0)
@@ -1299,7 +1299,7 @@ pub fn select(
     w.focus_id = auto_focus_id(focus_id)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
@@ -1313,7 +1313,7 @@ pub fn select(
         }
       }
       shown.val = opts
-      let rows : Array[@core.Node] = []
+      let rows : Array[@widget.Node] = []
       for i = 0; i < opts.length(); i = i + 1 {
         let opt = opts[i]
         rows.push(
@@ -1332,7 +1332,7 @@ pub fn select(
           ),
         )
       }
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         list_popup(rows, opts.length(), width),
         w.rect.x,
         w.rect.y + w.rect.h + 2.0,
@@ -1369,33 +1369,33 @@ pub fn select(
         }
       },
     )
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press {
         return false
       }
       let ks = ev.keysym
       if overlay_alive(open_id.val) {
         let n = shown.val.length()
-        if ks == @core.KS_RETURN || ks == @core.KS_SPACE {
+        if ks == @base.KS_RETURN || ks == @base.KS_SPACE {
           pick_hi()
           true
-        } else if ks == @core.KS_ESCAPE {
+        } else if ks == @base.KS_ESCAPE {
           close_pop()
           true
-        } else if n > 0 && ks == @core.KS_DOWN {
+        } else if n > 0 && ks == @base.KS_DOWN {
           hi.val = (hi.val + 1) % n
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if n > 0 && ks == @core.KS_UP {
+        } else if n > 0 && ks == @base.KS_UP {
           hi.val = (hi.val + n - 1) % n
-          @core.invalidate()
+          @widget.invalidate()
           true
         } else {
           false
         }
-      } else if ks == @core.KS_RETURN ||
-        ks == @core.KS_SPACE ||
-        ks == @core.KS_DOWN {
+      } else if ks == @base.KS_RETURN ||
+        ks == @base.KS_SPACE ||
+        ks == @base.KS_DOWN {
         open_pop()
         true
       } else {
@@ -1415,7 +1415,7 @@ pub fn select(
 /// 键盘口径：空格/回车/↓ 开层，←/→ 移一格、↑/↓ 移一行（夹在色板范围内），
 /// 回车/空格取色、Esc 收层。
 pub fn color_picker(
-  value : @core.Store[String],
+  value : @base.Store[String],
   colors? : Array[String] = [
     "#2D68C4", "#2E9E5B", "#D9822B", "#D64550", "#6B7480", "#1E4FA3", "#3F6E9E",
     "#7A9E4E", "#B86E2B", "#9AA0A6", "#E8EAED", "#BDC1C6", "#4E5560", "#2A2F36",
@@ -1425,21 +1425,21 @@ pub fn color_picker(
   width? : Double = 200.0,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(value)
   let cs = colors
   let swatch = 26.0
   let cell_gap = 6.0
   let per_row = 5
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let open_id : Ref[Int] = Ref(0)
     let hi : Ref[Int] = Ref(0)
     w.focus_id = auto_focus_id(focus_id)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
@@ -1452,8 +1452,8 @@ pub fn color_picker(
           hi.val = i
         }
       }
-      let rows : Array[@core.Node] = []
-      let mut line : Array[@core.Node] = []
+      let rows : Array[@widget.Node] = []
+      let mut line : Array[@widget.Node] = []
       for i = 0; i < cs.length(); i = i + 1 {
         let c = cs[i]
         line.push(
@@ -1484,7 +1484,7 @@ pub fn color_picker(
         }
       }
       let rows_n = ((cs.length() + per_row - 1) / per_row).to_double()
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         overlay_pane(
           [view(rows, direction=@yoga.Column, row_gap=0.0, padding=8.0)],
           per_row.to_double() * (swatch + cell_gap) + 16.0,
@@ -1517,41 +1517,41 @@ pub fn color_picker(
         }
       },
     )
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press {
         return false
       }
       let ks = ev.keysym
       if overlay_alive(open_id.val) {
         let n = cs.length()
-        if ks == @core.KS_RETURN || ks == @core.KS_SPACE {
+        if ks == @base.KS_RETURN || ks == @base.KS_SPACE {
           pick_hi()
           true
-        } else if ks == @core.KS_ESCAPE {
+        } else if ks == @base.KS_ESCAPE {
           close_pop()
           true
-        } else if n > 0 && ks == @core.KS_LEFT {
+        } else if n > 0 && ks == @base.KS_LEFT {
           hi.val = (hi.val - 1).clamp(min=0, max=n - 1)
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if n > 0 && ks == @core.KS_RIGHT {
+        } else if n > 0 && ks == @base.KS_RIGHT {
           hi.val = (hi.val + 1).clamp(min=0, max=n - 1)
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if n > 0 && ks == @core.KS_UP {
+        } else if n > 0 && ks == @base.KS_UP {
           hi.val = (hi.val - per_row).clamp(min=0, max=n - 1)
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if n > 0 && ks == @core.KS_DOWN {
+        } else if n > 0 && ks == @base.KS_DOWN {
           hi.val = (hi.val + per_row).clamp(min=0, max=n - 1)
-          @core.invalidate()
+          @widget.invalidate()
           true
         } else {
           false
         }
-      } else if ks == @core.KS_RETURN ||
-        ks == @core.KS_SPACE ||
-        ks == @core.KS_DOWN {
+      } else if ks == @base.KS_RETURN ||
+        ks == @base.KS_SPACE ||
+        ks == @base.KS_DOWN {
         open_pop()
         true
       } else {
@@ -1572,20 +1572,20 @@ fn color_swatch(
   gap : Double,
   selected : () -> Bool,
   on_pick : () -> Unit,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(size))
     w.node.set_height(@yoga.fixed(size))
     w.node.set_flex_shrink(0.0)
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.set_margin(right=gap)
     // 格子的色是数据不是样式，但仍走同一条槽：折成 background_color 供绘制期读
     @style.apply(w, @style.style(background_color=c))
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, c))
@@ -1606,8 +1606,8 @@ fn color_swatch(
       }
     })
     w.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -1631,13 +1631,13 @@ fn color_swatch(
 /// `ComboBoxEntry`），本栈全自绘——浮层开在浮层图层上，收层同样由图层负责。
 fn combo_impl(
   options : Array[String],
-  value : @core.Store[String],
+  value : @base.Store[String],
   on_change~ : Option[(String) -> Unit],
   placeholder~ : Option[String],
   width~ : Option[Double],
   focus_id~ : Option[Int],
-  handle~ : Option[(@core.Widget) -> Unit],
-) -> @core.Node {
+  handle~ : Option[(@widget.Widget) -> Unit],
+) -> @widget.Node {
   let on_change = on_change.unwrap_or(fn(_s : String) -> Unit { () })
   let placeholder = placeholder.unwrap_or("")
   let width = width.unwrap_or(200.0)
@@ -1645,14 +1645,14 @@ fn combo_impl(
   let handle = handle.unwrap_or(default_handle)
   follow_store(value)
   let opts = options
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let open_id : Ref[Int] = Ref(0)
     let hi : Ref[Int] = Ref(0)
     let shown : Ref[Array[String]] = Ref([])
     let close = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
@@ -1687,7 +1687,7 @@ fn combo_impl(
       if hi.val >= cand.length() {
         hi.val = 0
       }
-      let rows : Array[@core.Node] = []
+      let rows : Array[@widget.Node] = []
       for i = 0; i < cand.length(); i = i + 1 {
         let idx = i
         let text = cand[i]
@@ -1697,7 +1697,7 @@ fn combo_impl(
       }
       shown.val = cand
       close()
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         list_popup(rows, cand.length(), width),
         w.rect.x,
         w.rect.y + w.rect.h + 2.0,
@@ -1720,8 +1720,8 @@ fn combo_impl(
     )
     let _ = box.mount_into(w)
     w.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         // 字段里的抬起（选完词、点完插入点）顺手把候选开出来：
@@ -1733,21 +1733,21 @@ fn combo_impl(
         _ => false
       }
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || !overlay_alive(open_id.val) {
         return false
       }
       let n = shown.val.length()
-      if ev.keysym == @core.KS_ESCAPE {
+      if ev.keysym == @base.KS_ESCAPE {
         close()
         true
-      } else if n > 0 && ev.keysym == @core.KS_DOWN {
+      } else if n > 0 && ev.keysym == @base.KS_DOWN {
         hi.val = (hi.val + 1) % n
-        @core.invalidate()
+        @widget.invalidate()
         true
-      } else if n > 0 && ev.keysym == @core.KS_UP {
+      } else if n > 0 && ev.keysym == @base.KS_UP {
         hi.val = (hi.val + n - 1) % n
-        @core.invalidate()
+        @widget.invalidate()
         true
       } else {
         false

@@ -10,12 +10,12 @@
 // ③ `input_t` → `input`（Store 驱动）。
 
 ///|
-pub fn page_feedback(app : @shared.App) -> @core.Node {
-  let msg_open : @core.Store[Bool] = @core.Store::new(false)
-  let msg_kind : @core.Store[Int] = @core.Store::new(0)
-  let msg_text : @core.Store[String] = @core.Store::new("")
-  let msg_btns : @core.Store[Array[(String, Int)]] = @core.Store::new([("知道了", 1)])
-  let msg_resp : @core.Store[String] = @core.Store::new("（还没弹过自绘消息框）")
+pub fn page_feedback(app : @shared.App) -> @widget.Node {
+  let msg_open : @base.Store[Bool] = @base.Store::new(false)
+  let msg_kind : @base.Store[Int] = @base.Store::new(0)
+  let msg_text : @base.Store[String] = @base.Store::new("")
+  let msg_btns : @base.Store[Array[(String, Int)]] = @base.Store::new([("知道了", 1)])
+  let msg_resp : @base.Store[String] = @base.Store::new("（还没弹过自绘消息框）")
   @shared.page([
     @shared.section(
       "横幅",
@@ -151,8 +151,8 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "let visible : @core.Store[Bool] = @core.Store::new(false)",
-        "let name : @core.Store[String] = @core.Store::new(\"\")",
+        "let visible : @base.Store[Bool] = @base.Store::new(false)",
+        "let name : @base.Store[String] = @base.Store::new(\"\")",
         "@ui.dialog(",
         "  visible,",
         "  \"新建连接\",",
@@ -194,11 +194,11 @@ pub fn page_feedback(app : @shared.App) -> @core.Node {
           column_gap=8.0,
         ),
         @ui.bind_label(msg_resp, fn(s) { s }),
-        @core.bind_node(
-          @core.Signal::computed(fn() {
+        @widget.bind_node(
+          @base.Signal::computed(fn() {
             (msg_kind.get(), msg_text.get(), msg_btns.get())
           }),
-          fn(t : (Int, String, Array[(String, Int)])) -> @core.Node {
+          fn(t : (Int, String, Array[(String, Int)])) -> @widget.Node {
             @ui.message_box(
               msg_open,
               "自绘消息框",

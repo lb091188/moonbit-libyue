@@ -4,10 +4,10 @@
 
 ///|
 /// 取控件的按键回调（没有就返回恒 false 的桩，省得每处写 match）。
-fn msgbox_key_of(w : @core.Widget) -> (@core.KeyEvent) -> Bool {
+fn msgbox_key_of(w : @widget.Widget) -> (@widget.KeyEvent) -> Bool {
   match w.on_key {
     Some(f) => f
-    None => fn(_e : @core.KeyEvent) -> Bool { false }
+    None => fn(_e : @widget.KeyEvent) -> Bool { false }
   }
 }
 
@@ -48,7 +48,7 @@ test "消息框：Store 驱动弹收，按钮回调响应编号并收起" {
   if !ui_text_guard() {
     return
   }
-  let vis = @core.Store::new(false)
+  let vis = @base.Store::new(false)
   let got : Array[Int] = []
   let dismissed = Ref(0)
   let (root, _anchor) = mounted_with_overlay(
@@ -65,13 +65,13 @@ test "消息框：Store 驱动弹收，按钮回调响应编号并收起" {
     400.0,
     300.0,
   )
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   vis.set(true)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let scrim = match @core.overlay_root_of(@core.overlay_top_id()) {
+  let scrim = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   // 遮罩铺满整窗（宽度是显式 100% 而不是内容撑），面板居中
   assert_eq(scrim.rect.w, 400.0)
@@ -98,15 +98,15 @@ test "消息框：Store 驱动弹收，按钮回调响应编号并收起" {
   // 点「取消」（第二个钮，非主色）：回调 20 + 收起 + Store 归假
   click_at(root, footer.children()[1], 20.0, 15.0)
   assert_eq(got, [20])
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   assert_eq(vis.get(), false)
   assert_eq(dismissed.val, 0)
   // 再开一次，点「删除」（第一个钮）
   vis.set(true)
   root.relayout(400.0, 300.0)
-  let scrim2 = match @core.overlay_root_of(@core.overlay_top_id()) {
+  let scrim2 = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   click_at(root, scrim2.children()[0].children()[3].children()[0], 20.0, 15.0)
   assert_eq(got, [20, 10])
@@ -118,7 +118,7 @@ test "消息框：✕ 与 Esc 走 dismiss（不给响应编号），Enter 走默
   if !ui_text_guard() {
     return
   }
-  let vis = @core.Store::new(true)
+  let vis = @base.Store::new(true)
   let got : Array[Int] = []
   let dismissed = Ref(0)
   let (_root, _a) = mounted_with_overlay(
@@ -133,31 +133,31 @@ test "消息框：✕ 与 Esc 走 dismiss（不给响应编号），Enter 走默
     400.0,
     300.0,
   )
-  assert_eq(@core.overlay_count(), 1)
-  let panel = match @core.overlay_root_of(@core.overlay_top_id()) {
+  assert_eq(@widget.overlay_count(), 1)
+  let panel = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0].children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   let key = msgbox_key_of(panel)
   // Esc：收起 + dismiss，不给编号；抬起不处理
-  assert_eq(key({ press: false, keysym: @core.KS_ESCAPE, mods: 0 }), false)
-  assert_eq(key({ press: true, keysym: @core.KS_ESCAPE, mods: 0 }), true)
+  assert_eq(key({ press: false, keysym: @base.KS_ESCAPE, mods: 0 }), false)
+  assert_eq(key({ press: true, keysym: @base.KS_ESCAPE, mods: 0 }), true)
   assert_eq(dismissed.val, 1)
   assert_eq(got.length(), 0)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   assert_eq(vis.get(), false)
   // 再开一次：Enter → 第一个按钮的编号 1
   vis.set(true)
-  assert_eq(@core.overlay_count(), 1)
-  let panel2 = match @core.overlay_root_of(@core.overlay_top_id()) {
+  assert_eq(@widget.overlay_count(), 1)
+  let panel2 = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0].children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   let key2 = msgbox_key_of(panel2)
-  assert_eq(key2({ press: true, keysym: @core.KS_RETURN, mods: 0 }), true)
+  assert_eq(key2({ press: true, keysym: @base.KS_RETURN, mods: 0 }), true)
   assert_eq(got, [1])
   assert_eq(dismissed.val, 1)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
 }
 
 ///|
@@ -165,7 +165,7 @@ test "消息框：close_on_mask=false 时点遮罩不收，但 ✕ 收（走 dis
   if !ui_text_guard() {
     return
   }
-  let vis = @core.Store::new(true)
+  let vis = @base.Store::new(true)
   let got : Array[Int] = []
   let dismissed = Ref(0)
   let (root, _a) = mounted_with_overlay(
@@ -181,22 +181,22 @@ test "消息框：close_on_mask=false 时点遮罩不收，但 ✕ 收（走 dis
     400.0,
     300.0,
   )
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let scrim = match @core.overlay_root_of(@core.overlay_top_id()) {
+  let scrim = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   // 点遮罩角落（面板外）：close_on_mask=false 收不了
   click_at(root, scrim, 5.0, 5.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   assert_eq(vis.get(), true)
   assert_eq(dismissed.val, 0)
   // ✕ 在标题栏右上角（面板子项第 2 个）：收起 + dismiss，不给响应编号
   click_at(root, scrim.children()[0].children()[1], 12.0, 12.0)
   assert_eq(dismissed.val, 1)
   assert_eq(got.length(), 0)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   assert_eq(vis.get(), false)
 }
 
@@ -205,7 +205,7 @@ test "消息框：close_on_mask=true 时点遮罩收起且走 dismiss" {
   if !ui_text_guard() {
     return
   }
-  let vis = @core.Store::new(true)
+  let vis = @base.Store::new(true)
   let dismissed = Ref(0)
   let (root, _a) = mounted_with_overlay(
     message_box(
@@ -218,19 +218,19 @@ test "消息框：close_on_mask=true 时点遮罩收起且走 dismiss" {
     400.0,
     300.0,
   )
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(400.0, 300.0)
-  let scrim = match @core.overlay_root_of(@core.overlay_top_id()) {
+  let scrim = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   // 点遮罩角落（面板外）：收起 + dismiss
   click_at(root, scrim, 5.0, 5.0)
   assert_eq(dismissed.val, 1)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   assert_eq(vis.get(), false)
   // 点 ✕ 也走 dismiss（换一个实例，遮罩不参与）
-  let vis2 = @core.Store::new(true)
+  let vis2 = @base.Store::new(true)
   let dismissed2 = Ref(0)
   let (root2, _b) = mounted_with_overlay(
     message_box(
@@ -244,14 +244,14 @@ test "消息框：close_on_mask=true 时点遮罩收起且走 dismiss" {
     300.0,
   )
   root2.relayout(400.0, 300.0)
-  let scrim2 = match @core.overlay_root_of(@core.overlay_top_id()) {
+  let scrim2 = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   // ✕ 在标题栏右上角（面板子项第 2 个）
   click_at(root2, scrim2.children()[0].children()[1], 12.0, 12.0)
   assert_eq(dismissed2.val, 1)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   assert_eq(vis2.get(), false)
 }
 
@@ -260,7 +260,7 @@ test "消息框：informative 为空时不占副行；空文案按钮跳过" {
   if !ui_text_guard() {
     return
   }
-  let vis = @core.Store::new(true)
+  let vis = @base.Store::new(true)
   let (_root, _a) = mounted_with_overlay(
     message_box(
       vis,
@@ -271,9 +271,9 @@ test "消息框：informative 为空时不占副行；空文案按钮跳过" {
     400.0,
     300.0,
   )
-  let panel = match @core.overlay_root_of(@core.overlay_top_id()) {
+  let panel = match @widget.overlay_root_of(@widget.overlay_top_id()) {
     Some(w) => w.children()[0].children()[0]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
   // 文本列只有正文一行
   assert_eq(panel.children()[2].children()[1].children().length(), 1)

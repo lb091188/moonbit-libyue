@@ -40,8 +40,8 @@ fn mark_in(bm : @render.Bitmap, x0 : Int, y0 : Int, x1 : Int, y1 : Int) -> Int {
 }
 
 ///|
-fn mounted(node : @core.Node, w : Double, h : Double) -> (@core.Widget, @core.Widget) {
-  let root = @core.Widget::new()
+fn mounted(node : @widget.Node, w : Double, h : Double) -> (@widget.Widget, @widget.Widget) {
+  let root = @widget.Widget::new()
   root.set_size(w, h)
   root.set_column()
   root.node.set_align_items(@yoga.AlignItems::FlexStart)
@@ -128,7 +128,7 @@ test "头像取首字符、统计块按内容定宽" {
 
 ///|
 test "带文字分隔线：整宽、文字两侧都有线" {
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(200.0, 60.0)
   root.set_column()
   let d = divider(text="或").mount_into(root)
@@ -241,8 +241,8 @@ test "空状态与结果页都真画出像素" {
 
 ///|
 test "折线进度：条与百分比两列，填充随 Store 变化" {
-  let v = @core.Store::new(0.25)
-  let root = @core.Widget::new()
+  let v = @base.Store::new(0.25)
+  let root = @widget.Widget::new()
   root.set_size(260.0, 60.0)
   root.set_column()
   let row = progress_line(v, max=1.0, width=240.0).mount_into(root)
@@ -267,7 +267,7 @@ test "折线进度：条与百分比两列，填充随 Store 变化" {
 }
 
 ///|
-fn click_at(root : @core.Widget, w : @core.Widget, fx : Double, fy : Double) -> Unit {
+fn click_at(root : @widget.Widget, w : @widget.Widget, fx : Double, fy : Double) -> Unit {
   let x = w.rect.x + fx
   let y = w.rect.y + fy
   let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x, y, button: 1, mods: 0 })
@@ -310,7 +310,7 @@ test "时间线：逐行等高、首末行的贯通线只到点心" {
 ///|
 test "轮播：面板预建只显示当前页，箭头与指示点切页、越界回绕" {
   let h = CarouselHandle::make()
-  let pages : Array[@core.Node] = [
+  let pages : Array[@widget.Node] = [
     text("第一页", font_size=14.0),
     text("第二页", font_size=14.0),
     text("第三页", font_size=14.0),
@@ -350,7 +350,7 @@ test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消
   let queue : Ref[Array[() -> Unit]] = Ref([])
   let delays : Ref[Array[Int]] = Ref([])
   let cancelled : Ref[Array[Int]] = Ref([])
-  @core.set_timer_hooks(
+  @shell.set_timer_hooks(
     fn(ms : Int, f : () -> Unit) -> Int {
       delays.val.push(ms)
       queue.val.push(f)
@@ -359,7 +359,7 @@ test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消
     fn(id : Int) -> Unit { cancelled.val.push(id) },
   )
   let h = CarouselHandle::make()
-  let host = @core.Widget::new()
+  let host = @widget.Widget::new()
   host.set_size(160.0, 100.0)
   host.set_column()
   let c = carousel(
@@ -404,7 +404,7 @@ test "轮播自转走宿主延时通道：暂停不前进、stop 断链并取消
   assert_eq(h.index(), 2)
   assert_eq(delays.val.length(), 4)
   // 恢复成「无宿主」通道，别影响同包其余用例
-  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+  @shell.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
 
 ///|
@@ -426,14 +426,14 @@ test "展示族 *_dyn：值变就地改字、按内容重算宽度" {
     return
   }
   // 徽标：5 → 150（显示成「99+」），宽度跟着长
-  let unread = @core.Store::new(5)
+  let unread = @base.Store::new(5)
   let (root_b, bd) = mounted(badge_count_dyn(unread.signal(), max=99), 120.0, 40.0)
   let w_small = bd.rect.w
   unread.set(150)
   root_b.relayout(120.0, 40.0)
   assert_true(bd.rect.w > w_small)
   // 标签：文本变长就变宽（tag / tag_of_type 两条入口共用内核）
-  let label = @core.Signal::new("新")
+  let label = @base.Signal::new("新")
   let (root_t, tg) = mounted(tag_dyn(label, "#337ecc"), 200.0, 60.0)
   let w_short = tg.rect.w
   label.set("很长的一段标签文字")
@@ -445,7 +445,7 @@ test "展示族 *_dyn：值变就地改字、按内容重算宽度" {
   root_t2.relayout(200.0, 60.0)
   assert_true(tg2.rect.w > w_t2)
   // 统计块：数值行走信号，标题与前缀建树时定死
-  let hits = @core.Store::new("1,234")
+  let hits = @base.Store::new("1,234")
   let (root_s, st) = mounted(statistic_dyn("访问量", hits.signal()), 240.0, 80.0)
   let w_num = st.rect.w
   hits.set("12,345,678")
@@ -453,7 +453,7 @@ test "展示族 *_dyn：值变就地改字、按内容重算宽度" {
   assert_true(st.rect.w > w_num)
   assert_eq(st.rect.h, 56.0)
   // 头像：尺寸不随文本变，换名后仍画得出像素
-  let name = @core.Signal::new("刘斌")
+  let name = @base.Signal::new("刘斌")
   let (root_a, av) = mounted(avatar_dyn(name), 60.0, 60.0)
   assert_eq((av.rect.w, av.rect.h), (32.0, 32.0))
   name.set("李雷")
@@ -556,14 +556,14 @@ test "展示族只读样式槽：token 落色等于主题取色、class 覆盖�
 /// 遍历经过谁就记谁）。被祖先藏起来的轮播不得再切页、不得再置脏。
 test "轮播自转只在本帧被画到时推进：整块隐藏就不驱动重绘，复现后继续" {
   let queue : Ref[Array[() -> Unit]] = Ref([])
-  @core.set_timer_hooks(fn(_ms : Int, f : () -> Unit) -> Int {
+  @shell.set_timer_hooks(fn(_ms : Int, f : () -> Unit) -> Int {
     queue.val.push(f)
     queue.val.length()
   }, fn(_id : Int) -> Unit { () })
   let repaints : Ref[Int] = Ref(0)
-  @core.set_repaint_hook(fn() -> Unit { repaints.val = repaints.val + 1 })
+  @widget.set_repaint_hook(fn() -> Unit { repaints.val = repaints.val + 1 })
   let h = CarouselHandle::make()
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(220.0, 140.0)
   root.set_column()
   let _ = carousel(
@@ -582,7 +582,7 @@ test "轮播自转只在本帧被画到时推进：整块隐藏就不驱动重�
   }
   let bm = @render.Bitmap::new(220, 140)
   let paint_once = fn() -> Unit {
-    let _ = @core.bump_paint_epoch()
+    let _ = @widget.bump_paint_epoch()
     let p = @render.Painter::new(bm)
     root.paint(p)
     p.end()
@@ -610,6 +610,6 @@ test "轮播自转只在本帧被画到时推进：整块隐藏就不驱动重�
   assert_true(repaints.val > after_show)
 
   carousel_stop(h)
-  @core.set_repaint_hook(fn() -> Unit { () })
-  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+  @widget.set_repaint_hook(fn() -> Unit { () })
+  @shell.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }

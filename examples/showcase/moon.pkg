@@ -3,7 +3,9 @@
 // 各页内容在 `pages/`。
 import {
   "NoahLiu/yoga-mbt/src" @yoga,
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/base",
+  "NoahLiu/native-gui/widget" @widget,
+
   "NoahLiu/native-gui/shell" @shell,
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/theme",

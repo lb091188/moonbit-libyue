@@ -4,7 +4,7 @@
 
 > **On origins**: this library began as a MoonBit binding of [Cheng Zhao (zcbenz)](https://github.com/zcbenz)'s [Yue / libyue](https://github.com/yue/yue), with [Yoga](https://github.com/facebook/yoga)'s flexbox for layout. Neither is a runtime dependency now — both stay as references for behavior and sources of material. Thanks also to [MoonBit](https://github.com/moonbitlang).
 
-A lightweight cross-platform desktop GUI framework for [MoonBit](https://github.com/moonbitlang) — native window hosts, a self-drawn rendering pipeline, a complete widget set, and full system integration. One codebase runs native windows on Windows ✅ / Linux ✅, with the macOS backend landing on the `mac` branch. Zero config after `moon add`.
+A cross-platform desktop GUI framework for [MoonBit](https://github.com/moonbitlang) — one MoonBit codebase produces native windows on Windows ✅ / Linux ✅, with tray, notifications, global shortcuts, file dialogs and more ready to use. Zero config after `moon add`. The macOS backend is landing on the `mac` branch.
 
 English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/master/README_ZH.md)
 
@@ -16,9 +16,9 @@ English | [简体中文](https://github.com/lb091188/moonbit-native-gui/blob/mas
 
 ## Core highlights
 
-**🖥 Full system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart and idle detection, plus system queries for volume, power, wallpaper, monitors, printers, browser history and installed apps, all behind `@sys` / `@core`. The tray splits into three backends by platform: SNI, Shell_NotifyIcon and NSStatusItem. On Linux, D-Bus adds MPRIS media control. Capabilities are probed and degrade in a structured way — never silently.
+**🖥 Full system integration** — tray, notifications, global shortcuts, clipboard, native menus, file dialogs, drag & drop, autostart and more desktop essentials work out of the box, plus system queries for volume, power, wallpaper, monitors, printers and beyond. Capabilities are probed and degrade in a structured way — never silently. See the [system capabilities overview](docs/system-capabilities.md) for the full list.
 
-**🎨 Self-drawn rendering pipeline** — rendering runs on the library's own pure-MoonBit software rasterizer, with an optional Cairo backend and no Skia-class engine. Measured on Linux: the minimal `hello` window ships as a **1.1 MB** release binary and shows a window in about 0.1 s; the 15-page `showcase` board is 5.5 MB and about 1 s. Widgets look the same on every platform, light/dark mode and the system accent colour are followed by default, and a theme is a plain value you can override.
+**🎨 Self-drawn rendering pipeline** — no Skia-class engine dependency; widgets look the same on every platform, light/dark mode and the system accent colour are followed by default, and the theme is fully customizable.
 
 **📊 A complete widget set** — five general chart types (line / bar / pie / gauge / scatter), plus specialised charts such as radar, heatmap, candlestick, funnel, boxplot, sankey, tree, treemap, sunburst and map, with a cross-cutting interaction layer. The Markdown view, the embedded WebView and the self-drawn widgets share one rasterizer and one layout tree.
 
@@ -46,7 +46,7 @@ fn main {
 
 ## Ecosystem position
 
-GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github.com/wzzc-dev/MoUI) targets shared logic across platforms, and [Sun](https://github.com/wzzc-dev/sun) provides the low level for graphics and text rendering. native-gui depends on neither and takes a third lane — **one-stop delivery for desktop apps**: system integration done deep, everyday desktop widgets made ready to use.
+GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github.com/wzzc-dev/MoUI) targets shared logic across platforms, and [Sun](https://github.com/wzzc-dev/sun) provides the low level for graphics and text rendering. native-gui depends on neither and takes a third lane — **one-stop delivery for desktop apps**: everyday desktop capabilities work out of the box, common widgets are ready-to-use components.
 
 ## Package layout
 
@@ -57,7 +57,6 @@ GUI efforts in the MoonBit ecosystem each have their lane: [MoUI](https://github
 | `NoahLiu/native-gui/base` | `@base` | Platform-free primitives: the `Store` / `Signal` / `ListStore` reactive core, the focus stack, key-code constants, end-of-frame batching and the frame ledger |
 | `NoahLiu/native-gui/shell` | `@shell` | System-capability shell: menu bars / context menus, the global-hotkey facade, tray, notifications, open-externally, plus the loop scheduler and read-only platform probes |
 | `NoahLiu/native-gui/widget` | `@widget` | Self-drawn widget host: layout-tree mapping, hit-testing and event routing, paint walk, declarative `Node`, overlays (layer and native tiers), drag & drop, input mapping, the `App` pump |
-| `NoahLiu/native-gui/core` | `@core` | G9 Batch 2 migration facade: `@base`/`@shell`/`@widget` names stay reachable through `@core` |
 | `.../native-gui/ui` | `@ui` | Self-drawn controls and the component library: window mounting, labels / buttons, forms, display, navigation, date, tables and virtual lists, entries, scrolling, overlays, code view, declarative layer |
 | `.../native-gui/render` | `@render` | Rasterizer: pure-MoonBit software raster plus a Cairo backend; bitmaps, canvas, images, PNG |
 | `.../native-gui/text` | `@text` | Text layer: font families, fonts, rich text and range attributes (Pango / DirectWrite) |

@@ -347,14 +347,14 @@ test "GraphData 构造与 gph_chart_t 组件可编译（不 mount，真机验证
   assert_eq(lay.points.length(), 3)
   // 组件构造只建未挂载片段（无平台副作用）；绘制路径走 on_draw，
   // 由用户真机验证
-  let store : @core.Store[GraphData] = @core.Store::new(data)
+  let store : @base.Store[GraphData] = @base.Store::new(data)
   let node = gph_chart_t(store)
   ignore(node.mount)
 }
 
 ///|
 test "关系图组件：出像素、换数据画面变（布局缓存失效）" {
-  let d = @core.Store::new(
+  let d = @base.Store::new(
     GraphData::make(
       [GraphNode::make("甲", value=30.0), GraphNode::make("乙", value=20.0), GraphNode::make("丙", value=10.0)],
       [GraphEdge::make(0, 1, weight=5.0), GraphEdge::make(1, 2, weight=3.0)],

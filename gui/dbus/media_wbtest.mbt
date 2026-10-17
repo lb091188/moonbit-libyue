@@ -235,7 +235,7 @@ test "media 真机冒烟：监视启动后立停不崩（无播放器环境跳�
   // 有播放器机器上首轮建基线也不触发。启动后立即停止验证句柄与
   // 定时器注销路径不抛异常。
   let mut fired = 0
-  // 排期通道由调用方注入（GUI 层给 @core.set_timeout）：这里给假通道，
+  // 排期通道由调用方注入（GUI 层给 @shell.set_timeout）：这里给假通道，
   // 只验证句柄与停止路径，不真起轮询
   let pending : Array[() -> Unit] = []
   let w = media_watch_status(

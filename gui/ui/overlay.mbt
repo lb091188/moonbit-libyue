@@ -12,12 +12,12 @@
 ///|
 /// 浮层面板：面板底 + 描边 + 可选固定尺寸（0 = 按内容）。
 fn overlay_pane(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   width : Double,
   height : Double,
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Column)
     if width > 0.0 {
@@ -34,9 +34,9 @@ fn overlay_pane(
       ]),
     )
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -45,7 +45,7 @@ fn overlay_pane(
       p.set_line_width(@style.number_of(st.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
     })
-    @core.mount_children(w, children)
+    @widget.mount_children(w, children)
     w
   })
 }
@@ -54,7 +54,7 @@ fn overlay_pane(
 /// 浮层是否还开着（句柄有效即开着：点外部会被图层收起，句柄随之失效——
 /// 组件因此不必自己跟踪「外面关掉了」这件事）。
 fn overlay_alive(id : Int) -> Bool {
-  match @core.overlay_rect_of(id) {
+  match @widget.overlay_rect_of(id) {
     Some(_) => true
     None => false
   }
@@ -64,31 +64,31 @@ fn overlay_alive(id : Int) -> Bool {
 /// 气泡弹层（EP Popover）：点 trigger 在它下方弹出任意内容，再点一次收起；
 /// 点浮层外由图层收起。width/height 传 0 表示按内容定尺寸。
 pub fn popover(
-  trigger : @core.Node,
-  content : @core.Node,
+  trigger : @widget.Node,
+  content : @widget.Node,
   width? : Double = 0.0,
   height? : Double = 0.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let open_id : Ref[Int] = Ref(0)
     // trigger 自己仍在最前：它内部控件的事件先跑，抬起冒泡到这里才切换开合
     let _ = trigger.mount_into(w)
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Up => {
           // 开着时再点触发件通常到不了这里：那一击被图层消费掉（点浮层外收起）；
           // 这个分支兜底（程序化投递、或图层被撤掉的形态），免得句柄失效后打不开
           if overlay_alive(open_id.val) {
-            @core.overlay_hide(open_id.val)
+            @widget.overlay_hide(open_id.val)
             open_id.val = 0
           } else {
-            open_id.val = @core.overlay_show_at(
+            open_id.val = @widget.overlay_show_at(
               overlay_pane([content], width, height, skin=paint_subset(class)),
               self.rect.x,
               self.rect.y + self.rect.h + 2.0,
@@ -113,16 +113,16 @@ fn menu_row(
   on_pick : () -> Unit,
   selected? : () -> Bool = fn() -> Bool { false },
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Node {
+) -> @widget.Node {
   if text == "-" {
     return divider()
   }
   let font = @text.Font::new("", 13.0)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.fixed(28.0))
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     @style.apply(
       w,
       @style.merge_all([
@@ -131,9 +131,9 @@ fn menu_row(
       ]),
     )
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let act = selected()
@@ -166,8 +166,8 @@ fn menu_row(
       )
     })
     w.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -193,15 +193,15 @@ pub fn dropdown(
   width? : Double = 150.0,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let font = @text.Font::new("", 13.0)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let tw = text_width(trigger, font)
     w.node.set_width(@yoga.fixed(tw + 40.0))
     w.node.set_height(@yoga.fixed(30.0))
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.focus_id = auto_focus_id(focus_id)
     let open_id : Ref[Int] = Ref(0)
     let hi : Ref[Int] = Ref(0)
@@ -209,13 +209,13 @@ pub fn dropdown(
     let picks : Ref[Array[Int]] = Ref([])
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
     let open_pop = fn() -> Unit {
       hi.val = 0
-      let rows : Array[@core.Node] = []
+      let rows : Array[@widget.Node] = []
       let pick_rows : Array[Int] = []
       for i = 0; i < items.length(); i = i + 1 {
         if items[i] == "-" {
@@ -240,7 +240,7 @@ pub fn dropdown(
         )
       }
       picks.val = pick_rows
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         overlay_pane(rows, width, 0.0, skin=paint_subset(class)),
         w.rect.x,
         w.rect.y + w.rect.h + 2.0,
@@ -261,9 +261,9 @@ pub fn dropdown(
       ]),
     )
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -298,8 +298,8 @@ pub fn dropdown(
       )
     })
     w.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -314,35 +314,35 @@ pub fn dropdown(
         _ => false
       }
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press {
         return false
       }
       let ks = ev.keysym
       if overlay_alive(open_id.val) {
         let n = picks.val.length()
-        if ks == @core.KS_ESCAPE {
+        if ks == @base.KS_ESCAPE {
           close_pop()
           true
-        } else if n > 0 && (ks == @core.KS_RETURN || ks == @core.KS_SPACE) {
+        } else if n > 0 && (ks == @base.KS_RETURN || ks == @base.KS_SPACE) {
           let idx = picks.val[hi.val.clamp(min=0, max=n - 1)]
           close_pop()
           on_select(idx)
           true
-        } else if n > 0 && ks == @core.KS_DOWN {
+        } else if n > 0 && ks == @base.KS_DOWN {
           hi.val = (hi.val + 1) % n
-          @core.invalidate()
+          @widget.invalidate()
           true
-        } else if n > 0 && ks == @core.KS_UP {
+        } else if n > 0 && ks == @base.KS_UP {
           hi.val = (hi.val + n - 1) % n
-          @core.invalidate()
+          @widget.invalidate()
           true
         } else {
           false
         }
-      } else if ks == @core.KS_RETURN ||
-        ks == @core.KS_SPACE ||
-        ks == @core.KS_DOWN {
+      } else if ks == @base.KS_RETURN ||
+        ks == @base.KS_SPACE ||
+        ks == @base.KS_DOWN {
         open_pop()
         true
       } else {
@@ -361,9 +361,9 @@ fn tooltip_pane(
   tip : String,
   font : @text.Font,
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Node {
+) -> @widget.Node {
   let text_w = text_width(tip, font)
-  @core.node_of_new(fn(pane_w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(pane_w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     pane_w.node.set_height(@yoga.fixed(24.0))
     pane_w.node.set_width(@yoga.fixed(text_w + 16.0))
@@ -375,9 +375,9 @@ fn tooltip_pane(
       ]),
     )
     pane_w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_text_primary()))
@@ -407,20 +407,20 @@ fn tooltip_pane(
 /// 可能自己消费移动（按钮就是这样，`Move => !is_off()`），包在外面的组件就再也
 /// 收不到通知；宿主维护的悬停态带父链语义（与 CSS `:hover` 同义），包住谁都成立。
 pub fn tooltip(
-  content : @core.Node,
+  content : @widget.Node,
   tip : String,
   delay_ms? : Int = 500,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let font = @text.Font::new("", 12.0)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let tip_id : Ref[Int] = Ref(0)
     let timer : Ref[Int] = Ref(0)
     let _ = content.mount_into(w)
     w.on_hover_change = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       on : Bool,
     ) -> Unit {
       if on {
@@ -428,9 +428,9 @@ pub fn tooltip(
           // 锚点先算好再排延时：定时回调不捕获本控件（自捕获是引用环）
           let ax = self.rect.x
           let ay = self.rect.y + self.rect.h + 4.0
-          timer.val = @core.set_timeout(delay_ms, fn() {
+          timer.val = @shell.set_timeout(delay_ms, fn() {
             timer.val = 0
-            tip_id.val = @core.overlay_show_at(
+            tip_id.val = @widget.overlay_show_at(
               tooltip_pane(tip, font, skin=paint_subset(class)),
               ax,
               ay,
@@ -439,11 +439,11 @@ pub fn tooltip(
         }
       } else {
         if timer.val != 0 {
-          @core.clear_timeout(timer.val)
+          @shell.clear_timeout(timer.val)
           timer.val = 0
         }
         if tip_id.val != 0 {
-          @core.overlay_hide(tip_id.val)
+          @widget.overlay_hide(tip_id.val)
           tip_id.val = 0
         }
       }
@@ -463,9 +463,9 @@ pub fn tooltip(
 /// `Node` 常驻页面树、靠 `set_visible` 弹收）；本栈改开在浮层图层上——对话框
 /// 天然要压过所有内容与其它浮层，图层正是这个语义，而且不需要常驻一棵隐藏树。
 pub fn dialog(
-  visible : @core.Store[Bool],
+  visible : @base.Store[Bool],
   title : String,
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   confirm_text? : String = "确定",
   cancel_text? : String = "取消",
   on_confirm? : () -> Unit = fn() -> Unit { () },
@@ -473,14 +473,14 @@ pub fn dialog(
   close_on_mask? : Bool = false,
   width? : Double = 420.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   // 用显式 mount 而不是 `node_of_new`：后者的 finish 在**构造期**就跑
   // （`node_of_new` = `node_of(finish(Widget::new()))`），而「按 Store 立刻开层」
   // 需要浮层宿主已经就位——宿主是 App 建窗时装的，挂载期调用才稳。
   {
-    mount: fn(parent : @core.Widget) -> @core.Widget {
-    let anchor = @core.Widget::new()
+    mount: fn(parent : @widget.Widget) -> @widget.Widget {
+    let anchor = @widget.Widget::new()
     watch_theme()
     // 锚点自己是个 0 尺寸占位：对话框的可见性只由 Store 驱动
     anchor.node.set_height(@yoga.fixed(0.0))
@@ -494,9 +494,9 @@ pub fn dialog(
       }
       let panel_w = width
       // 面板：主题面板底 + 描边 + 标题栏/内容/按钮三区
-      let panel : @core.Widget = @core.Widget::new()
-      let panel_node = @core.node_of(panel)
-      let scrim = @core.node_of_new(fn(s : @core.Widget) -> @core.Widget {
+      let panel : @widget.Widget = @widget.Widget::new()
+      let panel_node = @widget.node_of(panel)
+      let scrim = @widget.node_of_new(fn(s : @widget.Widget) -> @widget.Widget {
         watch_theme()
         // 铺满「铺满窗口的包裹层」：宽度靠内部对齐撑不可靠（内容可能更宽），
         // 显式 100% 才保证遮罩确实盖住整窗
@@ -506,8 +506,8 @@ pub fn dialog(
         s.node.set_align_items(@yoga.AlignItems::Center)
         // 遮罩自己吃下按下：视觉模态（点击不穿透到内容）
         s.on_pointer = Some(fn(
-          self : @core.Widget,
-          ev : @core.PointerEvent,
+          self : @widget.Widget,
+          ev : @widget.PointerEvent,
         ) -> Bool {
           match ev.kind {
             @widget.PointerKind::Down => true
@@ -523,9 +523,9 @@ pub fn dialog(
           }
         })
         s.on_draw = Some(fn(
-          _s : @core.Widget,
+          _s : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           // 半透明黑罩（EP 同款 rgba(0,0,0,.5)）：内容面板之外先压一层暗底
           p.set_fill_color("#000000")
@@ -537,7 +537,7 @@ pub fn dialog(
         s
       })
       // 面板内容
-      let title_bar = @core.Widget::new()
+      let title_bar = @widget.Widget::new()
       title_bar.node.set_flex_direction(@yoga.Row)
       title_bar.node.set_height(@yoga.fixed(40.0))
       title_bar.node.set_align_items(@yoga.AlignItems::Center)
@@ -547,9 +547,9 @@ pub fn dialog(
         @style.merge_all([@style.style(color="text_primary"), paint_subset(class)]),
       )
       title_bar.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         let _ = @text.draw_box_at(
@@ -565,13 +565,13 @@ pub fn dialog(
           valign=@text.Center,
         )
       })
-      let close_btn = @core.Widget::new()
+      let close_btn = @widget.Widget::new()
       close_btn.node.set_position(@yoga.Absolute)
       close_btn.node.set_top(@yoga.fixed(8.0))
       close_btn.node.set_right(@yoga.fixed(8.0))
       close_btn.node.set_width(@yoga.fixed(24.0))
       close_btn.node.set_height(@yoga.fixed(24.0))
-      close_btn.cursor = @core.CURSOR_HAND
+      close_btn.cursor = @widget.CURSOR_HAND
       @style.apply(
         close_btn,
         @style.merge_all([
@@ -581,9 +581,9 @@ pub fn dialog(
         ]),
       )
       close_btn.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         let bg = @style.color_of(st.background_color, "")
@@ -601,8 +601,8 @@ pub fn dialog(
         p.stroke()
       })
       close_btn.on_pointer = Some(fn(
-        _s : @core.Widget,
-        ev : @core.PointerEvent,
+        _s : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           @widget.PointerKind::Down => true
@@ -613,14 +613,14 @@ pub fn dialog(
           _ => false
         }
       })
-      let body = @core.Widget::new()
+      let body = @widget.Widget::new()
       body.node.set_flex_direction(@yoga.Column)
       body.node.set_width(@yoga.percent(100.0))
       // 四边留空 + 相邻内容间一档呼吸位：正文不顶标题栏/底栏，输入类内容不贴缘
       body.node.set_gap(0.0, 10.0)
       body.set_padding(left=16.0, right=16.0, top=8.0, bottom=8.0)
-      @core.mount_children(body, children)
-      let footer = @core.Widget::new()
+      @widget.mount_children(body, children)
+      let footer = @widget.Widget::new()
       footer.node.set_flex_direction(@yoga.Row)
       footer.node.set_height(@yoga.fixed(44.0))
       footer.node.set_justify_content(@yoga.JustifyContent::FlexEnd)
@@ -631,10 +631,10 @@ pub fn dialog(
         if text.length() == 0 {
           return
         }
-        let b = @core.Widget::new()
+        let b = @widget.Widget::new()
         b.node.set_width(@yoga.fixed(text_width(text, btn_font) + 28.0))
         b.node.set_height(@yoga.fixed(28.0))
-        b.cursor = @core.CURSOR_HAND
+        b.cursor = @widget.CURSOR_HAND
         // 两档皮肤都折进槽：主档 常态 primary / 悬停 primary_hover，
         // 次档 常态 bg_panel / 悬停 fill_hover（悬停分支由 hover 桶承担）
         let skin = if primary {
@@ -648,9 +648,9 @@ pub fn dialog(
         }
         @style.apply(b, @style.merge_all([skin, paint_subset(class)]))
         b.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           p.set_fill_color(
@@ -690,8 +690,8 @@ pub fn dialog(
           )
         })
         b.on_pointer = Some(fn(
-          _s : @core.Widget,
-          ev : @core.PointerEvent,
+          _s : @widget.Widget,
+          ev : @widget.PointerEvent,
         ) -> Bool {
           match ev.kind {
             @widget.PointerKind::Down => true
@@ -724,9 +724,9 @@ pub fn dialog(
         ]),
       )
       panel.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -745,7 +745,7 @@ pub fn dialog(
       panel.append_child(close_btn)
       panel.append_child(body)
       panel.append_child(footer)
-      open_id.val = @core.overlay_show_full(scrim)
+      open_id.val = @widget.overlay_show_full(scrim)
       handle(anchor)
     }
 
@@ -756,12 +756,12 @@ pub fn dialog(
         open()
       } else {
         if open_id.val != 0 {
-          @core.overlay_hide(open_id.val)
+          @widget.overlay_hide(open_id.val)
           open_id.val = 0
         }
       }
     })
-    @core.sub_bag_register(fn() { sig.remove(sid) })
+    @base.sub_bag_register(fn() { sig.remove(sid) })
     if visible.get() {
       open()
     }
@@ -794,20 +794,20 @@ fn toast_left(win_w : Double, group_w : Double) -> Double {
 pub fn toast_layer(
   duration_ms? : Int = 2600,
 ) -> (String, SemanticType) -> Unit {
-  let strip : Ref[@core.Widget?] = Ref(None)
+  let strip : Ref[@widget.Widget?] = Ref(None)
   let open_id : Ref[Int] = Ref(0)
   let alive : Ref[Int] = Ref(0)
   let widest : Ref[Double] = Ref(0.0)
   let font = @text.Font::new("", 13.0)
   // 列 + 交叉轴居中：宽度自然等于最宽那一条，浮层也就只开那么大
-  let strip_w = @core.Widget::new()
+  let strip_w = @widget.Widget::new()
   strip_w.node.set_flex_direction(@yoga.Column)
   strip_w.node.set_align_items(@yoga.AlignItems::Center)
   strip_w.set_padding(top=8.0)
   strip.val = Some(strip_w)
   // 窗口内容区宽（居中摆位用）；取不到宿主给 0（摆位退回左上）
   let win_w = fn() -> Double {
-    match @core.host_active() {
+    match @widget.host_active() {
       Some(a) => {
         let (w, _h) = a.window().size()
         w.to_double()
@@ -825,8 +825,8 @@ pub fn toast_layer(
           // dismiss_on_outside=false：轻提示没有「点外收起」语义——图层的默认
           // 行为（点浮层外吞掉这一击并收起最上层）会把在屏那两秒的点击全吃掉，
           // 提示还被这一击误收（2026-10-15 真机反馈）；放行后点击穿到页面控件
-          open_id.val = @core.overlay_show_at(
-            @core.node_of(c),
+          open_id.val = @widget.overlay_show_at(
+            @widget.node_of(c),
             toast_left(win_w(), bw),
             0.0,
             dismiss_on_outside=false,
@@ -834,20 +834,20 @@ pub fn toast_layer(
         } else if bw > widest.val {
           // 新条更宽：整组还是居中，按新宽重摆包裹层
           widest.val = bw
-          let _ = @core.overlay_set_pos(
+          let _ = @widget.overlay_set_pos(
             open_id.val,
             toast_left(win_w(), bw),
             0.0,
           )
         }
-        let bar = @core.Widget::new()
+        let bar = @widget.Widget::new()
         bar.node.set_width(@yoga.fixed(bw))
         bar.node.set_height(@yoga.fixed(34.0))
         bar.set_margin(bottom=8.0)
         bar.on_draw = Some(fn(
-          _s : @core.Widget,
+          _s : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           p.set_fill_color(@theme.theme_bg_panel())
           fill_round_rect(p, 0.0, 0.0, r.w, r.h, 4.0)
@@ -876,15 +876,15 @@ pub fn toast_layer(
         })
         c.append_child(bar)
         alive.val = alive.val + 1
-        @core.invalidate()
-        let _ = @core.set_timeout(duration_ms, fn() {
+        @widget.invalidate()
+        let _ = @shell.set_timeout(duration_ms, fn() {
           let _ = c.remove_child(bar)
           alive.val = alive.val - 1
           if alive.val <= 0 && open_id.val != 0 {
-            @core.overlay_hide(open_id.val)
+            @widget.overlay_hide(open_id.val)
             open_id.val = 0
           }
-          @core.invalidate()
+          @widget.invalidate()
         })
       }
     }
@@ -904,34 +904,34 @@ pub fn toast_layer(
 /// 自绘栈没有原生菜单，改成开在浮层图层上的自绘面板，位置按事件里的窗口坐标
 /// （本栈指针事件本来就带窗口坐标，不必绕屏幕坐标）。
 pub fn context_menu_for(
-  content : @core.Node,
+  content : @widget.Node,
   items : Array[(String, () -> Unit)],
   width? : Double = 150.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let _ = content.mount_into(w)
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => {
           if ev.button != 3 {
             false
           } else {
-            let rows : Array[@core.Node] = []
+            let rows : Array[@widget.Node] = []
             for i = 0; i < items.length(); i = i + 1 {
               let input = items[i]
               rows.push(
                 menu_row(input.0, fn() -> Unit {
-                  @core.overlay_hide_top()
+                  @widget.overlay_hide_top()
                   (input.1)()
                 }),
               )
             }
-            let _ = @core.overlay_show_at(
+            let _ = @widget.overlay_show_at(
               overlay_pane(rows, width, 0.0),
               self.rect.x + ev.x,
               self.rect.y + ev.y,

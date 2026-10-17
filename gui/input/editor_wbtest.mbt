@@ -82,27 +82,27 @@ test "handle_key：打字、退格、方向、Tab 归属" {
   assert_eq(ed.handle_key('a'.to_int(), 0), true)
   assert_eq(ed.handle_key('b'.to_int(), 0), true)
   assert_eq(ed.get_text(), "ab")
-  assert_eq(ed.handle_key(@core.KS_LEFT, 0), true)
+  assert_eq(ed.handle_key(@base.KS_LEFT, 0), true)
   assert_eq(ed.caret_pos(), 1)
-  assert_eq(ed.handle_key(@core.KS_BACKSPACE, 0), true)
+  assert_eq(ed.handle_key(@base.KS_BACKSPACE, 0), true)
   assert_eq(ed.get_text(), "b")
   // Tab 属焦点导航，内核不消费
-  assert_eq(ed.handle_key(@core.KS_TAB, 0), false)
-  assert_eq(ed.handle_key(@core.KS_ESCAPE, 0), false)
+  assert_eq(ed.handle_key(@base.KS_TAB, 0), false)
+  assert_eq(ed.handle_key(@base.KS_ESCAPE, 0), false)
 }
 
 test "handle_key：Ctrl+A 全选、Ctrl+Z 撤销、Ctrl+箭头按词" {
   let ed = Editor::new()
   ed.set_text("aa bb")
-  assert_eq(ed.handle_key('a'.to_int(), @core.MOD_CTRL), true)
+  assert_eq(ed.handle_key('a'.to_int(), @base.MOD_CTRL), true)
   assert_eq(ed.selection(), Some((0, 5)))
   // 全选状态下再打字符即替换
   assert_eq(ed.handle_key('x'.to_int(), 0), true)
   assert_eq(ed.get_text(), "x")
-  assert_eq(ed.handle_key('z'.to_int(), @core.MOD_CTRL), true)
+  assert_eq(ed.handle_key('z'.to_int(), @base.MOD_CTRL), true)
   assert_eq(ed.get_text(), "aa bb")
   ed.move_caret(1, 2, false) // 先跳到文末（5）
-  assert_eq(ed.handle_key(@core.KS_LEFT, @core.MOD_CTRL), true)
+  assert_eq(ed.handle_key(@base.KS_LEFT, @base.MOD_CTRL), true)
   assert_eq(ed.caret_pos(), 3) // 按词回退到 "bb" 词首
 }
 

@@ -83,7 +83,7 @@ fn demo_md_code(width : Double) -> Array[String] {
 }
 
 ///|
-pub fn page_code(_app : @shared.App) -> @core.Node {
+pub fn page_code(_app : @shared.App) -> @widget.Node {
   let md_w = 480.0
   let demo = demo_md_lines().join("\n")
   @shared.page([

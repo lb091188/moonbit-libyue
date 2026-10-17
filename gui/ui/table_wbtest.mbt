@@ -28,8 +28,8 @@ test "列宽：固定列按声明、弹性列均分剩余，总宽不够时弹�
 ///|
 test "表格：表头列数、斑马纹、行点选与取消、行回调带源下标" {
   let data = table_rows([["甲", "1"], ["乙", "2"], ["丙", "3"]])
-  let rows = @core.Store::new(data)
-  let sel : @core.Store[Array[Int]] = @core.Store::new([])
+  let rows = @base.Store::new(data)
+  let sel : @base.Store[Array[Int]] = @base.Store::new([])
   let clicks : Array[Int] = []
   let (root, tb) = mounted(
     table(
@@ -78,8 +78,8 @@ test "表格：表头列数、斑马纹、行点选与取消、行回调带源�
 
 ///|
 test "表格：表头排序状态机（新列升序 / 同列翻转 / 同列第三次取消）" {
-  let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
-  let sort = @core.Store::new({ column: -1, asc: true })
+  let rows = @base.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
+  let sort = @base.Store::new({ column: -1, asc: true })
   let (root, tb) = mounted(
     table(
       [
@@ -111,9 +111,9 @@ test "表格：表头排序状态机（新列升序 / 同列翻转 / 同列第�
 
 ///|
 test "表格：多选表头全选框（点击全选/清空、部分态出墨、标题区照旧排序）" {
-  let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"], ["丙", "3"]]))
-  let sel : @core.Store[Array[Int]] = @core.Store::new([])
-  let sort = @core.Store::new({ column: -1, asc: true })
+  let rows = @base.Store::new(table_rows([["甲", "1"], ["乙", "2"], ["丙", "3"]]))
+  let sel : @base.Store[Array[Int]] = @base.Store::new([])
+  let sort = @base.Store::new({ column: -1, asc: true })
   let (root, tb) = mounted(
     table(
       [TableColumn::make("名", 120.0), TableColumn::make("值", 100.0)],
@@ -156,7 +156,7 @@ test "表格：多选表头全选框（点击全选/清空、部分态出墨、�
 
 ///|
 test "表格：单元格类型（标签 / 色块 / 多行）都出像素，数据变更整表重建" {
-  let rows = @core.Store::new([
+  let rows = @base.Store::new([
     { cells: [CellText("行一"), CellTag("成功", Success), CellColorBox("#ff8800", "橙"), CellLines(["第一行", "第二行"])] },
   ])
   let (root, tb) = mounted(
@@ -205,7 +205,7 @@ test "表格：单元格类型（标签 / 色块 / 多行）都出像素，数�
 
 ///|
 test "表格：表头边界拖动改列宽，相邻两列此消彼长且有最小列宽" {
-  let rows = @core.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
+  let rows = @base.Store::new(table_rows([["甲", "1"], ["乙", "2"]]))
   let (root, tb) = mounted(
     table(
       [
@@ -332,8 +332,8 @@ test "表格只读样式槽：class 覆盖表头底/行底线/单元格文字色
     return
   }
   let cols = [TableColumn::make("名称", 120.0), TableColumn::make("说明", 120.0)]
-  let rows = @core.Store::new(table_rows([["甲", "一"], ["乙", "二"], ["丙", "三"]]))
-  let count = fn(node : @core.Node) -> Int {
+  let rows = @base.Store::new(table_rows([["甲", "一"], ["乙", "二"], ["丙", "三"]]))
+  let count = fn(node : @widget.Node) -> Int {
     let (root, _t) = mounted(node, 260.0, 200.0)
     let bm = @render.Bitmap::new(260, 200)
     let p = @render.Painter::new(bm)

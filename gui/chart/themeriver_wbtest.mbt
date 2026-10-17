@@ -264,8 +264,8 @@ test "trv_series_name：越界兜底占位" {
 
 ///|
 test "Store 驱动：names / values 各自订阅、set 各通知一次" {
-  let names : @core.Store[Array[String]] = @core.Store::new(["A", "B"])
-  let values : @core.Store[Array[Array[Double]]] = @core.Store::new([[1.0, 1.0], [2.0, 2.0]])
+  let names : @base.Store[Array[String]] = @base.Store::new(["A", "B"])
+  let values : @base.Store[Array[Array[Double]]] = @base.Store::new([[1.0, 1.0], [2.0, 2.0]])
   let nhits = Ref(0)
   let vhits = Ref(0)
   names.subscribe(fn(_n) { nhits.val = nhits.val + 1 })
@@ -284,8 +284,8 @@ test "Store 驱动：names / values 各自订阅、set 各通知一次" {
 
 ///|
 test "主题河流组件：出像素、换序列画面变" {
-  let names = @core.Store::new(["甲", "乙"])
-  let values = @core.Store::new([
+  let names = @base.Store::new(["甲", "乙"])
+  let values = @base.Store::new([
     [1.0, 3.0, 2.0, 5.0, 4.0],
     [2.0, 1.0, 4.0, 2.0, 3.0],
   ])

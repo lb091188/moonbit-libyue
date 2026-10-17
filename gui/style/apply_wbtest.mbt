@@ -2,14 +2,14 @@
 // 交互态选桶、z_index 同步绘制层序键。
 
 ///|
-fn laid_out(root : @core.Widget) -> Unit {
+fn laid_out(root : @widget.Widget) -> Unit {
   @yoga.calculate_layout(root.node, None, None)
 }
 
 ///|
 test "apply：尺寸与定位走 Yoga（逻辑像素落位）" {
-  let root = @core.Widget::new()
-  let box_w = @core.Widget::new()
+  let root = @widget.Widget::new()
+  let box_w = @widget.Widget::new()
   root.append_child(box_w)
   apply(box_w, style(width=100.0, height=50.0))
   laid_out(root)
@@ -19,10 +19,10 @@ test "apply：尺寸与定位走 Yoga（逻辑像素落位）" {
 
 ///|
 test "apply：absolute + 四向 inset 落位（定位组）" {
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.node.set_width(@yoga.fixed(300.0))
   root.node.set_height(@yoga.fixed(200.0))
-  let kid = @core.Widget::new()
+  let kid = @widget.Widget::new()
   root.append_child(kid)
   apply(kid, style(width=40.0, height=20.0, position=@yoga.Absolute, top=10.0, left=20.0))
   laid_out(root)
@@ -32,9 +32,9 @@ test "apply：absolute + 四向 inset 落位（定位组）" {
 
 ///|
 test "apply：width_percent 与 width 共用一条 Yoga 入口（后写者赢）" {
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.node.set_width(@yoga.fixed(200.0))
-  let kid = @core.Widget::new()
+  let kid = @widget.Widget::new()
   root.append_child(kid)
   apply(kid, style(width_percent=50.0))
   root.node.set_flex_direction(@yoga.Column)
@@ -43,12 +43,12 @@ test "apply：width_percent 与 width 共用一条 Yoga 入口（后写者赢）
 }
 ///|
 test "apply：padding 逐边、margin、flex_direction 全走 Yoga 落位" {
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   apply(root, style(width=300.0, height=200.0, flex_direction=@yoga.Column))
-  let kid = @core.Widget::new()
+  let kid = @widget.Widget::new()
   root.append_child(kid)
   apply(kid, style(padding=14.0, padding_top=4.0, margin=8.0, width=50.0, height=30.0))
-  let inner = @core.Widget::new()
+  let inner = @widget.Widget::new()
   kid.append_child(inner)
   apply(inner, style(width=20.0, height=10.0))
   @yoga.calculate_layout(root.node, None, None)
@@ -60,19 +60,19 @@ test "apply：padding 逐边、margin、flex_direction 全走 Yoga 落位" {
 }
 
 test "apply：visibility/cursor 落宿主，z_index 落绘制层序键" {
-  let w = @core.Widget::new()
-  apply(w, style(visibility=Hidden, cursor=@core.CURSOR_HAND, z_index=3))
+  let w = @widget.Widget::new()
+  apply(w, style(visibility=Hidden, cursor=@widget.CURSOR_HAND, z_index=3))
   assert_true(!w.visible)
-  assert_eq(w.cursor, @core.CURSOR_HAND)
+  assert_eq(w.cursor, @widget.CURSOR_HAND)
   assert_eq(w.z_index_paint, 3.0)
-  let w2 = @core.Widget::new()
+  let w2 = @widget.Widget::new()
   apply(w2, style(visibility=Visible))
   assert_true(w2.visible)
 }
 
 ///|
 test "resolved/style_for：基块与状态桶按控件交互态选桶" {
-  let w = @core.Widget::new()
+  let w = @widget.Widget::new()
   let block =
     style(background_color="bg_panel")
     .hover(background_color="fill_hover")
@@ -116,7 +116,7 @@ test "resolved/style_for：基块与状态桶按控件交互态选桶" {
 
 ///|
 test "apply 多次调用逐属性叠加，样式常量本体不被改动" {
-  let w = @core.Widget::new()
+  let w = @widget.Widget::new()
   let base = style(padding=14.0, background_color="bg_panel")
   apply(w, base)
   apply(w, style(padding=4.0))
@@ -136,10 +136,10 @@ test "apply 多次调用逐属性叠加，样式常量本体不被改动" {
 /// 本包首次 `apply` 时自己装上。
 test "样式侧表随控件丢弃清账（remove_child 连子树、clear_children 整批）" {
   let base = resolved_count()
-  let parent = @core.Widget::new()
-  let a = @core.Widget::new()
-  let b = @core.Widget::new()
-  let leaf = @core.Widget::new()
+  let parent = @widget.Widget::new()
+  let a = @widget.Widget::new()
+  let b = @widget.Widget::new()
+  let leaf = @widget.Widget::new()
   parent.append_child(a)
   parent.append_child(b)
   a.append_child(leaf)
@@ -157,11 +157,11 @@ test "样式侧表随控件丢弃清账（remove_child 连子树、clear_childre
 
 ///|
 test "apply：flex_wrap=Wrap 让子项换到第二行" {
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.node.set_width(@yoga.fixed(100.0))
   apply(root, style(flex_direction=@yoga.Row))
-  let a = @core.Widget::new()
-  let b = @core.Widget::new()
+  let a = @widget.Widget::new()
+  let b = @widget.Widget::new()
   root.append_child(a)
   root.append_child(b)
   apply(a, style(width=60.0, height=20.0))

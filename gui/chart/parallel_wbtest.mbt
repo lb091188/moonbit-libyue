@@ -191,12 +191,12 @@ test "ParAxis 构造 / 量程省略与显式 / Store 驱动" {
   assert_eq(rows.length(), 2)
   debug_inspect(rows[0], content="[1, 2, 3]")
   // Store 驱动：axes / rows 各自 set 触发订阅
-  let axes : @core.Store[Array[ParAxis]] = @core.Store::new([
+  let axes : @base.Store[Array[ParAxis]] = @base.Store::new([
     ParAxis::make("a"),
     ParAxis::make("b"),
     ParAxis::make("c"),
   ])
-  let data : @core.Store[Array[Array[Double]]] = @core.Store::new([[1.0, 2.0, 3.0]])
+  let data : @base.Store[Array[Array[Double]]] = @base.Store::new([[1.0, 2.0, 3.0]])
   let hits = Ref(0)
   axes.subscribe(fn(_a) { hits.val = hits.val + 1 })
   data.subscribe(fn(_r) { hits.val = hits.val + 1 })
@@ -209,12 +209,12 @@ test "ParAxis 构造 / 量程省略与显式 / Store 驱动" {
 
 ///|
 test "平行坐标组件：出像素、换行数据画面变" {
-  let axes = @core.Store::new([
+  let axes = @base.Store::new([
     ParAxis::make("吞吐"),
     ParAxis::make("延迟"),
     ParAxis::make("内存"),
   ])
-  let rows = @core.Store::new([
+  let rows = @base.Store::new([
     [10.0, 5.0, 40.0],
     [20.0, 3.0, 55.0],
     [15.0, 8.0, 35.0],

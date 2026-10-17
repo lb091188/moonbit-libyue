@@ -1,7 +1,7 @@
 // 组件层公共地基：文本测量接入布局引擎、主题跟随重绘、绘制小工具。
 //
 // 三条统一口径：
-// ① 组件一律返回 `@core.Node`——构造只建树，mount 才建控件；命令式使用者经
+// ① 组件一律返回 `@widget.Node`——构造只建树，mount 才建控件；命令式使用者经
 //    `handle?` 拿控件句柄（与 master 同名同义）。
 // ② 随内容定尺寸的控件把尺寸交给布局引擎的 measure/baseline 回调，测量走
 //    `text`（Pango）；文本状态的唯一权威在组件自己的 `TextSource`。
@@ -10,7 +10,7 @@
 
 ///|
 /// `handle?` 的默认值：不需要句柄时不必写空闭包。
-pub fn default_handle(_w : @core.Widget) -> Unit { () }
+pub fn default_handle(_w : @widget.Widget) -> Unit { () }
 
 
 ///|
@@ -170,7 +170,7 @@ fn text_eff(
 /// 把文本状态接到布局引擎的测量面：内容尺寸来自 Pango，基线同源。
 /// 近似口径（记档）：min-content 探询（请求轴 `Some(0.0)`）按「不受约束」处理
 /// ——本层还没有按 min-content 定宽的弹性场景，接进省略号自适应时再细化。
-fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
+fn attach_text_measure(w : @widget.Widget, src : TextSource) -> Unit {
   // 只记 id，不记句柄：回调挂在布局节点上，捕获控件就成了引用环
   let id = w.id
   w.node.set_measure(fn(avail_w : Double?, _avail_h : Double?) -> (
@@ -217,7 +217,7 @@ fn attach_text_measure(w : @core.Widget, src : TextSource) -> Unit {
 
 ///|
 /// 按文本状态在控件盒内绘制（对齐/换行/省略都按 `src`，垂直居中）。
-fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool {
+fn draw_text_in(w : @widget.Widget, p : @render.Painter, src : TextSource) -> Bool {
   let r = w.rect
   // 盒宽取「控件宽与声明的 max_width 的较小者」：draw_box_at 的宽度约束就是盒宽
   let box_w = if src.max_width > 0.0 { src.max_width.min(r.w) } else { r.w }
@@ -255,7 +255,7 @@ fn draw_text_in(w : @core.Widget, p : @render.Painter, src : TextSource) -> Bool
 /// 单行下划线：基线下方 1.5px 起一条 1px 线，宽度与左右位置按对齐算。
 fn draw_underline(
   p : @render.Painter,
-  w : @core.Widget,
+  w : @widget.Widget,
   src : TextSource,
   font : @text.Font,
   box_w : Double,
@@ -297,17 +297,17 @@ let theme_watch : Ref[Bool] = Ref(false)
 pub fn watch_theme() -> Unit {
   if !theme_watch.val {
     theme_watch.val = true
-    let _ = @theme.on_theme_change(fn() { @core.invalidate() })
+    let _ = @theme.on_theme_change(fn() { @widget.invalidate() })
   }
 }
 
 ///|
 /// 换文本后让布局重新测量：重设一次测量回调即 `mark_changed`，下一帧只重算
 /// 这一条链（脏区增量重排）。
-pub fn relabel(w : @core.Widget, src : TextSource, text : String) -> Unit {
+pub fn relabel(w : @widget.Widget, src : TextSource, text : String) -> Unit {
   src.text = text
   attach_text_measure(w, src)
-  @core.invalidate()
+  @widget.invalidate()
 }
 
 ///|
@@ -361,7 +361,7 @@ pub fn border_block(hex : String) -> @style.Style? {
 /// `class` 在后（数组尾赢 ⇒ `class` > 散参数，不需要第二条优先级规则），
 /// 一次 `merge_all` + `apply` 落到控件样式槽与 Yoga。
 pub fn fold_style(
-  w : @core.Widget,
+  w : @widget.Widget,
   anon : @style.Style,
   class : Array[@style.Style],
 ) -> Unit {

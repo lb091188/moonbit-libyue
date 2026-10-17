@@ -12,7 +12,7 @@ const H = 900
 
 ///|
 /// 递归数「每帧真的会被画的控件」（有 on_draw 的），顺带数总控件数
-fn count_widgets(w : @core.Widget) -> (Int, Int) {
+fn count_widgets(w : @widget.Widget) -> (Int, Int) {
   let mut total = 1
   let mut drawn = if w.on_draw is Some(_) { 1 } else { 0 }
   let kids = w.children()
@@ -26,14 +26,14 @@ fn count_widgets(w : @core.Widget) -> (Int, Int) {
 
 ///|
 /// 一段典型内容：标题 + 一行控件 + 一叠文本行 + 统计块 + 提示条
-fn page_of(idx : Int, label : (Int) -> String) -> @core.Node {
-  let parts : Array[@core.Node] = [
+fn page_of(idx : Int, label : (Int) -> String) -> @widget.Node {
+  let parts : Array[@widget.Node] = [
     @ui.text("第 " + idx.to_string() + " 页", role=@ui.Title),
     @ui.row(
       [
         @ui.button("保存", variant=@ui.Solid),
         @ui.button("取消", variant=@ui.Border),
-        @ui.input(@core.Store::new("输入框内容")),
+        @ui.input(@base.Store::new("输入框内容")),
         @ui.tag("标签", "#337ecc"),
         @ui.badge_count(idx),
       ],
@@ -49,22 +49,22 @@ fn page_of(idx : Int, label : (Int) -> String) -> @core.Node {
   @ui.col(parts, row_gap=4.0, padding=10.0, width=1360.0, background_color="bg_panel")
 }
 
-fn build_page(cold~ : Bool) -> @core.Node {
+fn build_page(cold~ : Bool) -> @widget.Node {
   // warm：12 条字符串轮转；cold：每条都带唯一编号（数量远超缓存上限）
   let label : (Int) -> String = if cold {
     fn(i : Int) -> String { "唯一文本 " + i.to_string() + "-" + (i * 7919).to_string() }
   } else {
     fn(i : Int) -> String { "复用文本 " + (i % 12).to_string() }
   }
-  let pages : Array[@core.Node] = []
+  let pages : Array[@widget.Node] = []
   for p = 0; p < PAGES; p = p + 1 {
     let _ = pages.push(page_of(p, label))
   }
   @ui.col(pages, row_gap=8.0, width=W.to_double(), height=H.to_double())
 }
 
-fn mount_and_layout(node : @core.Node) -> (@core.Widget, Int, Int, Int64) {
-  let root = @core.Widget::new()
+fn mount_and_layout(node : @widget.Node) -> (@widget.Widget, Int, Int, Int64) {
+  let root = @widget.Widget::new()
   root.set_size(W.to_double(), H.to_double())
   root.set_column()
   let t0 = @win.now_ms()
@@ -75,7 +75,7 @@ fn mount_and_layout(node : @core.Node) -> (@core.Widget, Int, Int, Int64) {
   (page, total, drawn, t1 - t0)
 }
 
-fn paint_frames(page : @core.Widget, n : Int) -> Int64 {
+fn paint_frames(page : @widget.Widget, n : Int) -> Int64 {
   let bm = @render.Bitmap::new(W, H)
   let p = @render.Painter::new(bm)
   let t0 = @win.now_ms()

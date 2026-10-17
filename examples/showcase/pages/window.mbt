@@ -29,16 +29,16 @@ fn hotkey_err_text(e : @shell.HotkeyError) -> String {
 
 ///|
 /// 拖出回报 → 可读串：成交档给效果，没走成时给原因（后端未接会自动回落应用内）。
-fn drag_send_text(r : Result[@core.DragEffect, @core.DragError]) -> String {
+fn drag_send_text(r : Result[@widget.DragEffect, @widget.DragError]) -> String {
   match r {
     Ok(e) => match e {
-      @core.DragEffect::Copy => "已复制出去"
-      @core.DragEffect::Move => "已移动出去"
-      @core.DragEffect::Link => "已建立链接"
-      @core.DragEffect::Rejected => "取消或落点不收"
+      @widget.DragEffect::Copy => "已复制出去"
+      @widget.DragEffect::Move => "已移动出去"
+      @widget.DragEffect::Link => "已建立链接"
+      @widget.DragEffect::Rejected => "取消或落点不收"
     }
-    Err(@core.DragError::Unsupported) => "本机没有系统级拖出后端（已回落应用内拖放）"
-    Err(@core.DragError::Failed(why)) => "这趟没走成：\{why}（已回落应用内拖放）"
+    Err(@widget.DragError::Unsupported) => "本机没有系统级拖出后端（已回落应用内拖放）"
+    Err(@widget.DragError::Failed(why)) => "这趟没走成：\{why}（已回落应用内拖放）"
   }
 }
 
@@ -47,7 +47,7 @@ fn drag_send_text(r : Result[@core.DragEffect, @core.DragError]) -> String {
 /// 命中即累计 + toast——加速串由门面回查表给，调用方不持第二张表。
 /// 页内容惰性挂载，故本表由段内一个零尺寸挂载钩子启动（页函数体跑完时宿主
 /// 还没就绪，`app.host` 那时还是 None）。
-fn hotkey_poll_loop(app : @shared.App, hits : @core.Store[Int]) -> Unit {
+fn hotkey_poll_loop(app : @shared.App, hits : @base.Store[Int]) -> Unit {
   let tick : Ref[() -> Unit] = Ref(fn() { () })
   tick.val = fn() -> Unit {
     match @shell.hotkey_poll() {
@@ -70,11 +70,11 @@ fn hotkey_poll_loop(app : @shared.App, hits : @core.Store[Int]) -> Unit {
 /// 宿主未就绪时（理论上是点不到的）静默跳过。
 fn win_button(
   app : @shared.App,
-  last_op : @core.Store[String],
+  last_op : @base.Store[String],
   text : String,
   act : (@win.Window) -> Unit,
   variant? : @ui.ButtonVariant = @ui.Soft,
-) -> @core.Node {
+) -> @widget.Node {
   @ui.button(text, variant=variant, on_click=fn() {
     match app.host.val {
       Some(a) => {
@@ -88,8 +88,8 @@ fn win_button(
 
 ///|
 /// 窗口页。页内私有状态（回显/热键句柄/两个切换态）不进共享 App。
-pub fn page_window(app : @shared.App) -> @core.Node {
-  let taskbar_out : @core.Store[String] = @core.Store::new("（还没写过任务栏进度）")
+pub fn page_window(app : @shared.App) -> @widget.Node {
+  let taskbar_out : @base.Store[String] = @base.Store::new("（还没写过任务栏进度）")
   fn taskbar_pct(v : Int64, t : Int64, tag : String) -> Unit {
     match app.host.val {
       Some(a) =>
@@ -108,7 +108,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
       None => ()
     }
   }
-  let last_op : @core.Store[String] = @core.Store::new("（尚无操作）")
+  let last_op : @base.Store[String] = @base.Store::new("（尚无操作）")
   // 两个切换态由按钮自己翻（窗口层没有 is_fullscreen/is_borderless 之外的
   // 读回通道，态以按钮点击为准）
   let fs : Ref[Bool] = Ref(false)
@@ -116,12 +116,12 @@ pub fn page_window(app : @shared.App) -> @core.Node {
   let sz : Ref[Int] = Ref(1280)
   // 快捷键：门面回查表在 core 里，页内只记自己注册过的句柄（注销用）
   let hotkeys : Ref[Array[@shell.Hotkey]] = Ref([])
-  let hk_status : @core.Store[String] = @core.Store::new("（未注册）")
-  let hk_hits : @core.Store[Int] = @core.Store::new(0)
+  let hk_status : @base.Store[String] = @base.Store::new("（未注册）")
+  let hk_hits : @base.Store[Int] = @base.Store::new(0)
   // 拖放回显
-  let dnd : @core.Store[String] = @core.Store::new("（还没投过）")
-  let ext : @core.Store[String] = @core.Store::new("（外部还没投过）")
-  let out : @core.Store[String] = @core.Store::new("（还没往外拖过）")
+  let dnd : @base.Store[String] = @base.Store::new("（还没投过）")
+  let ext : @base.Store[String] = @base.Store::new("（外部还没投过）")
+  let out : @base.Store[String] = @base.Store::new("（还没往外拖过）")
   @shared.page([
     @shared.section(
       "窗口",
@@ -181,7 +181,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         // 首拍必须挂真·挂载时机（Node::on_mount）——node_of_new 的 finish 是
         // 构造期执行、那时宿主还没建好，timer 是空通道，表会当场死掉不再重排
         // （与图表页推点同一条坑，见 charts.mbt 头注释）。
-        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget { w }).on_mount(
+        @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget { w }).on_mount(
           fn() -> Unit { hotkey_poll_loop(app, hk_hits) },
         ),
         @ui.row(
@@ -244,7 +244,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
                 height=64.0,
                 padding=8.0,
               ),
-              payload=fn() { Some(@core.DragData::Text("窗口页的拖放演示")) },
+              payload=fn() { Some(@widget.DragData::Text("窗口页的拖放演示")) },
             ),
             @ui.text("拖到右边 →", role=@ui.Secondary),
             @ui.drop_target(
@@ -256,10 +256,10 @@ pub fn page_window(app : @shared.App) -> @core.Node {
                 height=64.0,
                 padding=8.0,
               ),
-              on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+              on_drop=fn(d : @widget.DragData, _x : Double, _y : Double) -> Unit {
                 match d {
-                  @core.DragData::Text(t) => dnd.set("收到文本：\{t}")
-                  @core.DragData::Paths(ps) => {
+                  @widget.DragData::Text(t) => dnd.set("收到文本：\{t}")
+                  @widget.DragData::Paths(ps) => {
                     let joined = ps.join(" ; ")
                     dnd.set("应用内投进 \{ps.length()} 个路径：\{joined}")
                   }
@@ -282,12 +282,12 @@ pub fn page_window(app : @shared.App) -> @core.Node {
                 height=64.0,
                 padding=8.0,
               ),
-              accept=fn(d : @core.DragData) -> Bool {
+              accept=fn(d : @widget.DragData) -> Bool {
                 d.kind() == @widget.DataKind::FilePaths
               },
-              on_drop=fn(d : @core.DragData, _x : Double, _y : Double) -> Unit {
+              on_drop=fn(d : @widget.DragData, _x : Double, _y : Double) -> Unit {
                 match d {
-                  @core.DragData::Paths(ps) => {
+                  @widget.DragData::Paths(ps) => {
                     let joined = ps.join(" ; ")
                     ext.set("外部投进 \{ps.length()} 个：\{joined}")
                   }
@@ -296,7 +296,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
               },
             ),
             @ui.text(
-              if @core.drag_external_supported() {
+              if @widget.drag_external_supported() {
                 "系统级拖入：本机可用（试试从资源管理器拖文件）"
               } else {
                 "系统级拖入：本机后端未接（拖放仍限应用内）"
@@ -318,7 +318,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
                 height=64.0,
                 padding=8.0,
               ),
-              payload=fn() { Some(@core.DragData::Text("窗口页的拖放演示")) },
+              payload=fn() { Some(@widget.DragData::Text("窗口页的拖放演示")) },
               external=true,
               on_external=fn(r) { out.set("文本拖出：\{drag_send_text(r)}") },
             ),
@@ -333,13 +333,13 @@ pub fn page_window(app : @shared.App) -> @core.Node {
               ),
               // 相对路径由后端绝对化（对方程序拿到的是完整位置）
               payload=fn() {
-                Some(@core.DragData::Paths([ "README.md", "docs/zh/adaptation.md" ]))
+                Some(@widget.DragData::Paths([ "README.md", "docs/zh/adaptation.md" ]))
               },
               external=true,
               on_external=fn(r) { out.set("文件拖出：\{drag_send_text(r)}") },
             ),
             @ui.text(
-              if @core.drag_external_send_supported() {
+              if @widget.drag_external_send_supported() {
                 "系统级拖出：本机可用（Ctrl 复制 / Shift 移动 / Alt 链接）"
               } else {
                 "系统级拖出：本机后端未接（自动回落应用内拖放）"
@@ -370,7 +370,7 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "// 拖源：过 4px 阈值才开拖，payload 取数（None 当普通点击）",
         "@ui.drag_source(",
         "  tile,",
-        "  payload=fn() { Some(@core.DragData::Text(\"窗口页的拖放演示\")) },",
+        "  payload=fn() { Some(@widget.DragData::Text(\"窗口页的拖放演示\")) },",
         ")",
         "// 投放目标：悬停描主色边（读 drag_hover 自判，无 enter/leave 三回调）",
         "@ui.drop_target(",
@@ -378,19 +378,19 @@ pub fn page_window(app : @shared.App) -> @core.Node {
         "  accept=fn(d) { d.kind() == @widget.DataKind::FilePaths }, // 不收时系统光标显示禁止",
         "  on_drop=fn(d, _x, _y) {",
         "    match d {",
-        "      @core.DragData::Paths(ps) => ...",
+        "      @widget.DragData::Paths(ps) => ...",
         "      _ => ...",
         "    }",
         "  },",
         ")",
         "// 系统级拖入（Windows/Linux）：建窗自动挂投放目标，宿主每拍抽事件喂进同一条",
         "// 会话；运行时探测决定这台机器能不能用（非 Windows 给 false）",
-        "if @core.drag_external_supported() { ... }",
+        "if @widget.drag_external_supported() { ... }",
         "// 系统级拖出（Windows/Linux）：过阈值那一刻把这趟交给系统，阻塞到松手/取消；",
         "// 本机后端没接或这趟起不来时自动回落到应用内会话",
         "@ui.drag_source(",
         "  tile,",
-        "  payload=fn() { Some(@core.DragData::Paths([ \"README.md\" ])) }, // 相对路径会被绝对化",
+        "  payload=fn() { Some(@widget.DragData::Paths([ \"README.md\" ])) }, // 相对路径会被绝对化",
         "  external=true,",
         "  on_external=fn(r) { ... }, // Ok(效果)=成交/取消，Err=没走成（已回落）",
         ")",

@@ -44,10 +44,10 @@ pub fn is_disabled(cell : Enabled) -> Bool {
 /// 按禁用单元下发光标请求：可用时请求 `on`，禁用时不请求（查询继续往祖先走，
 /// 最终回默认箭头）。光标是按命中路径现查的，所以禁用态必须**查询时现算**——
 /// 建树时定死会与「禁用态是单元」的口径冲突（同 `enabled_cell` 的注释）。
-fn enabled_cursor(cell : Enabled, on : Int) -> (@core.Widget) -> Int {
-  fn(_w : @core.Widget) -> Int {
+fn enabled_cursor(cell : Enabled, on : Int) -> (@widget.Widget) -> Int {
+  fn(_w : @widget.Widget) -> Int {
     if cell.off {
-      @core.CURSOR_DEFAULT
+      @widget.CURSOR_DEFAULT
     } else {
       on
     }

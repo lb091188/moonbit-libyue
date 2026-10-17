@@ -15,7 +15,7 @@ const SPLITTER_HANDLE : Double = 8.0
 /// 把手绘制：常显点纹（不靠悬停也能找到），悬停浅灰底，拖动中主题色 + 白点。
 fn splitter_handle_draw(
   p : @render.Painter,
-  r : @core.Rect,
+  r : @base.Rect,
   horizontal : Bool,
   hovered : Bool,
   dragging : Bool,
@@ -50,15 +50,15 @@ fn splitter_handle_draw(
 fn splitter_impl(
   class : Array[@style.Style],
   horizontal : Bool,
-  first : @core.Node,
-  second : @core.Node,
+  first : @widget.Node,
+  second : @widget.Node,
   ratio : Double,
   min_first : Double,
   min_second : Double,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let r0 = ratio.clamp(min=0.05, max=0.95)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(if horizontal {
       @yoga.Row
@@ -68,7 +68,7 @@ fn splitter_impl(
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.percent(100.0))
     // 首栏：初始按比例（百分比），拖动后切成固定值
-    let first_wrap = @core.Widget::new()
+    let first_wrap = @widget.Widget::new()
     first_wrap.node.set_flex_direction(if horizontal {
       @yoga.Column
     } else {
@@ -81,7 +81,7 @@ fn splitter_impl(
     }
     first_wrap.node.set_flex_shrink(0.0)
     let _ = first.mount_into(first_wrap)
-    let second_wrap = @core.Widget::new()
+    let second_wrap = @widget.Widget::new()
     second_wrap.node.set_flex_direction(if horizontal {
       @yoga.Column
     } else {
@@ -92,7 +92,7 @@ fn splitter_impl(
     second_wrap.node.set_min_height(@yoga.fixed(0.0))
     let _ = second.mount_into(second_wrap)
     // 把手
-    let bar = @core.Widget::new()
+    let bar = @widget.Widget::new()
     if horizontal {
       bar.node.set_width(@yoga.fixed(SPLITTER_HANDLE))
       bar.node.set_align_self(Some(@yoga.AlignItems::Stretch))
@@ -102,20 +102,20 @@ fn splitter_impl(
     }
     bar.node.set_flex_shrink(0.0)
     // 横向分隔用左右箭头、纵向用上下箭头（宿主按命中路径下发）
-    bar.cursor = if horizontal { @core.CURSOR_RESIZE_H } else { @core.CURSOR_RESIZE_V }
+    bar.cursor = if horizontal { @widget.CURSOR_RESIZE_H } else { @widget.CURSOR_RESIZE_V }
     let dragging = Ref(false)
     let drag_start : Ref[Double] = Ref(0.0)
     let drag_first0 : Ref[Double] = Ref(0.0)
     bar.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       splitter_handle_draw(p, r, horizontal, self.hovered, dragging.val)
     })
     bar.on_pointer = Some(fn(
-      s : @core.Widget,
-      ev : @core.PointerEvent,
+      s : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       // 拖动量一律用**窗口坐标**（把手自己的局部坐标 + 把手的绝对位置）：
       // 把手本身会随首栏变宽而平移，用局部坐标做增量会把上一帧的位移从这一帧
@@ -153,7 +153,7 @@ fn splitter_impl(
             } else {
               first_wrap.node.set_height(@yoga.fixed(nw))
             }
-            @core.invalidate()
+            @widget.invalidate()
             true
           } else {
             false
@@ -187,16 +187,16 @@ pub(all) enum SplitDirection {
 
 ///|
 pub fn split(
-  first : @core.Node,
-  second : @core.Node,
+  first : @widget.Node,
+  second : @widget.Node,
   direction? : SplitDirection = Horizontal,
   ratio? : Double = 0.5,
   // 缺省下限按方向分档（同现状 hsplit 80 / vsplit 60）；None=未给,现场折算
   min_first? : Double = 0.0,
   min_second? : Double = 0.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let horiz = match direction {
     Horizontal => true
     Vertical => false

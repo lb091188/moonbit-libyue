@@ -2,5 +2,5 @@ supported_targets = "native"
 
 import {
   "moonbitlang/core/encoding/utf8",
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/base",
 }

@@ -599,7 +599,7 @@ pub let pagination_base : Style = style(
   height=28.0,
   font_size=13.0,
   color="text_regular",
-  cursor=@core.CURSOR_HAND,
+  cursor=@widget.CURSOR_HAND,
 )
 .hover(background_color="primary_light")
 
@@ -724,6 +724,6 @@ pub let primary : Style = style(
   background_color="primary",
   color="#fff",
   border_radius=4.0,
-  cursor=@core.CURSOR_HAND,
+  cursor=@widget.CURSOR_HAND,
 )
 .hover(background_color="primary_hover")

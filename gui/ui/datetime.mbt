@@ -1,7 +1,7 @@
 // 日期族首批：日期/时间值模型 + 自绘日历面板 + `calendar`。
 //
 // 两条与 master 的差（记档）：① CSS `style` 通道同样未接，只留类型化参数；
-// ② 「今天」不由组件直接问平台，而是 `@core.local_ymd()` 转派，并且可以显式
+// ② 「今天」不由组件直接问平台，而是 `@shell.local_ymd()` 转派，并且可以显式
 //    传入（`today?`）——无头测试要拿确定日期才测得动网格。
 //
 // 一条结构差：42 格的排布规则外置成纯函数 `month_grid`（面板只负责画与点），
@@ -92,7 +92,7 @@ pub fn month_shift(y : Int, m : Int, delta : Int) -> (Int, Int) {
 ///|
 /// 本地时区的今天；平台给不出时退回 1970-01-01（本层不猜日期）。
 pub fn today_date() -> DateYMD {
-  let (y, m, d) = @core.local_ymd()
+  let (y, m, d) = @shell.local_ymd()
   if y > 0 && m >= 1 && m <= 12 && d >= 1 && d <= 31 {
     { y, m, d }
   } else {
@@ -292,7 +292,7 @@ pub fn range_state_of(range : DateRange, d : DateYMD) -> CalCell {
 /// 42 格一次建好、永不增删：切月只改每格的数据（日期与是否本月）再请求重绘，
 /// 网格结构稳定，命中矩形也不会因为增删子控件而错位。
 fn build_calendar(
-  panel : @core.Widget,
+  panel : @widget.Widget,
   today : DateYMD,
   state_of : (DateYMD) -> CalCell,
   on_cell : (DateYMD) -> Unit,
@@ -318,9 +318,9 @@ fn build_calendar(
     ]),
   )
   panel.on_draw = Some(fn(
-    self : @core.Widget,
+    self : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     let st = @style.style_for(self)
     p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -335,13 +335,13 @@ fn build_calendar(
   let head_font = @text.Font::new("", 14.0, weight=@text.SemiBold)
   let cell_font = @text.Font::new("", 13.0)
 
-  let head = @core.Widget::new()
+  let head = @widget.Widget::new()
   head.node.set_flex_direction(@yoga.Row)
   head.node.set_height(@yoga.fixed(head_h))
   head.set_margin(bottom=4.0)
 
-  fn chevron(right : Bool) -> @core.Widget {
-    let b = @core.Widget::new()
+  fn chevron(right : Bool) -> @widget.Widget {
+    let b = @widget.Widget::new()
     b.node.set_width(@yoga.fixed(28.0))
     b.node.set_height(@yoga.fixed(head_h))
     @style.apply(
@@ -352,9 +352,9 @@ fn build_calendar(
       ]),
     )
     b.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       let bg = @style.color_of(st.background_color, "")
@@ -373,8 +373,8 @@ fn build_calendar(
     })
     let delta = if right { 1 } else { -1 }
     b.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => {
@@ -390,14 +390,14 @@ fn build_calendar(
     b
   }
 
-  let title = @core.Widget::new()
+  let title = @widget.Widget::new()
   title.node.set_flex_grow(1.0)
   title.node.set_height(@yoga.fixed(head_h))
   @style.apply(title, @style.merge_all([@style.style(color="text_primary"), skin]))
   title.on_draw = Some(fn(
-    self : @core.Widget,
+    self : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     let tst = @style.style_for(self)
     let _ = @text.draw_box_at(
@@ -417,19 +417,19 @@ fn build_calendar(
   head.append_child(title)
   head.append_child(chevron(true))
 
-  let week = @core.Widget::new()
+  let week = @widget.Widget::new()
   week.node.set_flex_direction(@yoga.Row)
   week.node.set_height(@yoga.fixed(week_h))
   for name in ["日", "一", "二", "三", "四", "五", "六"] {
-    let c = @core.Widget::new()
+    let c = @widget.Widget::new()
     c.node.set_width(@yoga.fixed(cell_w))
     c.node.set_height(@yoga.fixed(week_h))
     let label = name
     @style.apply(c, @style.merge_all([@style.style(color="text_secondary"), skin]))
     c.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let wst = @style.style_for(self)
       let _ = @text.draw_box_at(
@@ -448,17 +448,17 @@ fn build_calendar(
     week.append_child(c)
   }
 
-  let grid = @core.Widget::new()
+  let grid = @widget.Widget::new()
   grid.node.set_flex_direction(@yoga.Column)
   let cell_date : Array[Ref[DateYMD]] = []
   let cell_inm : Array[Ref[Bool]] = []
   for _row = 0; _row < 6; _row = _row + 1 {
-    let row = @core.Widget::new()
+    let row = @widget.Widget::new()
     row.node.set_flex_direction(@yoga.Row)
     for _col = 0; _col < 7; _col = _col + 1 {
       let dref : Ref[DateYMD] = Ref({ y: 1970, m: 1, d: 1 })
       let inm : Ref[Bool] = Ref(false)
-      let c = @core.Widget::new()
+      let c = @widget.Widget::new()
       c.node.set_width(@yoga.fixed(cell_w))
       c.node.set_height(@yoga.fixed(cell_h))
       @style.apply(
@@ -466,9 +466,9 @@ fn build_calendar(
         @style.merge_all([@style.style().hover(background_color="fill_hover"), skin]),
       )
       c.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let sty = @style.style_for(self)
         let d = dref.val
@@ -530,8 +530,8 @@ fn build_calendar(
         }
       })
       c.on_pointer = Some(fn(
-        self : @core.Widget,
-        ev : @core.PointerEvent,
+        self : @widget.Widget,
+        ev : @widget.PointerEvent,
       ) -> Bool {
         match ev.kind {
           // 松开才算选中（与弹层内点项同一口径），跨月格不可选
@@ -540,7 +540,7 @@ fn build_calendar(
             let inside = ev.x >= 0.0 && ev.x <= self.rect.w && ev.y >= 0.0 && ev.y <= self.rect.h
             if inm.val && inside {
               on_cell(dref.val)
-              @core.invalidate()
+              @widget.invalidate()
             }
             false
           }
@@ -560,7 +560,7 @@ fn build_calendar(
       cell_date[i].val = cells[i].0
       cell_inm[i].val = cells[i].1
     }
-    @core.invalidate()
+    @widget.invalidate()
   }
 
   rebuild.val = rebuild_grid
@@ -577,13 +577,13 @@ fn build_calendar(
 /// 松开当月日期即写入 `value`（若有）并回调 `on_pick`。
 pub fn calendar(
   on_pick? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
-  value? : @core.Store[DateYMD?],
+  value? : @base.Store[DateYMD?],
   today? : DateYMD = today_date(),
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let t = today
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     // 有 Store 就以 Store 为唯一权威（外部 set 立刻反映到画法），没有才自持
     let sel : Ref[DateYMD?] = Ref(
       match value {

@@ -87,7 +87,7 @@ fn draw_sensor_rows(
 ///|
 /// 页面状态：温度行 + 行历史。
 struct SensorPage {
-  rows : @core.Store[Array[SensorRow]]
+  rows : @base.Store[Array[SensorRow]]
   hist : Map[String, Array[Double]]
 }
 
@@ -105,11 +105,11 @@ fn SensorPage::rebuild(self : SensorPage, sensors : Array[TempSensor]) -> Unit {
 }
 
 ///|
-fn page_sensors(app : App) -> @core.Node {
-  let page : SensorPage = { rows: @core.Store::new([]), hist: Map([]), }
+fn page_sensors(app : App) -> @widget.Node {
+  let page : SensorPage = { rows: @base.Store::new([]), hist: Map([]), }
   page.rebuild(app.sensors.get())
   app.sensors.subscribe(fn(sensors) { page.rebuild(sensors) })
-  let sensor_n : @core.Store[Int] = @core.Store::new(page.rows.get().length())
+  let sensor_n : @base.Store[Int] = @base.Store::new(page.rows.get().length())
   page.rows.subscribe(fn(r) { sensor_n.set(r.length()) })
 
   // 每块物理卡两张图：使用率（0-100 固定轴）+ 显存（GB，自适应轴，
@@ -124,7 +124,7 @@ fn page_sensors(app : App) -> @core.Node {
     }
     "显卡 \{i + 1}\{model} \{what}"
   }
-  let nodes : Array[@core.Node] = []
+  let nodes : Array[@widget.Node] = []
   if app.gpu_busy_hists.length() == 0 {
     nodes.push(
       @ui.text("未检测到显卡", color="text_secondary", role=Body),
@@ -156,7 +156,7 @@ fn page_sensors(app : App) -> @core.Node {
         l.set_visible(page.rows.get().length() == 0)
         page.rows.subscribe(fn(r) {
           l.set_visible(r.length() == 0)
-          @core.invalidate()
+          @widget.invalidate()
         })
       },
     ),

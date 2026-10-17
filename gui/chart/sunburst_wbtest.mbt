@@ -392,7 +392,7 @@ test "sun_text_on：按填充亮度挑深字 / 白字 / 解析失败兜底" {
 
 ///|
 test "SunItem Store 驱动：set 换树根 / 订阅通知一次" {
-  let s : @core.Store[SunItem] = @core.Store::new(SunItem::make("空"))
+  let s : @base.Store[SunItem] = @base.Store::new(SunItem::make("空"))
   assert_eq(s.get().name, "空")
   let hits = Ref(0)
   s.subscribe(fn(_v) { hits.val = hits.val + 1 })
@@ -423,7 +423,7 @@ test "旭日图组件：出像素、换数据画面变" {
   root_item.children.push(mk("甲", 10.0))
   root_item.children.push(mk("乙", 5.0))
   root_item.children.push(branch)
-  let d = @core.Store::new(root_item)
+  let d = @base.Store::new(root_item)
   let (root, w) = mounted(sun_chart_t(d, width=280.0, height=220.0), 320.0, 240.0)
   let plain = bm_of(w)
   assert_true(ink_of(plain) > 1500)

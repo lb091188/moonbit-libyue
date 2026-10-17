@@ -20,13 +20,13 @@ fn ink(bm : @render.Bitmap) -> Int {
 }
 
 // 一屏典型内容：30 行「按钮 + 输入框 + 文本」（native-app/showcase 的密度量级）
-fn build_page() -> @core.Node {
-  let rows : Array[@core.Node] = []
+fn build_page() -> @widget.Node {
+  let rows : Array[@widget.Node] = []
   for _ in 0..<30 {
     let _ = rows.push(@ui.row(
       [
         @ui.button("保存", variant=@ui.Solid),
-        @ui.input(@core.Store::new("输入框内容")),
+        @ui.input(@base.Store::new("输入框内容")),
         @ui.text("一行说明文字，用来占住交叉轴", role=@ui.Secondary),
       ],
       column_gap=8.0,
@@ -39,7 +39,7 @@ fn main {
   let w = 1400
   let h = 900
   let bm = @render.Bitmap::new(w, h)
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(w.to_double(), h.to_double())
   root.set_column()
   let _ = (build_page().mount)(root)

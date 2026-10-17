@@ -48,7 +48,7 @@ let a = @media.audio("music.mp3", lyric=lrc_text, width=560.0, auto_play=true, o
 let v = @media.video("demo.mp4", width=640.0, height=360.0, auto_play=true)
 ```
 
-两个组件都返回 `@core.Node`，直接挂进声明式树即可；观测口 `on_tick`/`on_speed`/`on_subtitle`/`on_lyric` 给位置、档位、字幕来源与歌词行数，调用方不必读引擎内部状态。打不开时不抛异常——画说明板并把原因经 `on_error` 交出去。
+两个组件都返回 `@widget.Node`，直接挂进声明式树即可；观测口 `on_tick`/`on_speed`/`on_subtitle`/`on_lyric` 给位置、档位、字幕来源与歌词行数，调用方不必读引擎内部状态。打不开时不抛异常——画说明板并把原因经 `on_error` 交出去。
 
 控制条（两个组件同一份实现，`media/control_bar.mbt`）：左边一排真按钮——播放/暂停与全屏是图标按钮（悬停浅底、进 Tab 链、有焦点环），倍速与缩放是文字按钮（图标说不清「1.25x」和「铺满」），右边是自绘的进度轨 + 音量条 + 时间文字。进度**抬手才 seek**（真 seek 要回退关键帧），音量**每步生效**。视频另有缩放三档循环：适配（等比居中留黑边）→ 铺满（取大边，超出由控件裁掉）→ 1:1（原始像素）。
 

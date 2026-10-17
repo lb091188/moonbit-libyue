@@ -1,5 +1,7 @@
 import {
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/base",
+  "NoahLiu/native-gui/widget" @widget,
+
   "NoahLiu/native-gui/render",
   "NoahLiu/native-gui/ui",
   "NoahLiu/native-gui/win",

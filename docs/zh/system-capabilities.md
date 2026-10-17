@@ -192,7 +192,7 @@ freedesktop 通知协议无 progress 字段，Windows / macOS 的原生进度呈
 | `Notification::set_progress(body : String, percent : Double, width? : Int = 10) -> Unit` | 设通知正文：首行原文 + 第二行进度 |
 
 ```moonbit
-let n = @core.Notification::new()
+let n = @shell.Notification::new()
 n.set_title("导出中")
 n.set_progress("正在导出 3/8 个文件", 37.5, width=4)
 n.show()

@@ -9,18 +9,18 @@
 /// 虚拟列表：`items` 变、窗口滚过一行边界、视口尺寸变化都会重挂可见区间。
 /// `row_of(i, item)` 造第 i 行的节点（`i` 是**源下标**，排序/过滤由调用方决定顺序）。
 pub fn[T] virt_list(
-  items : @core.Store[Array[T]],
+  items : @base.Store[Array[T]],
   height : Double,
   row_height : Double,
-  row_of : (Int, T) -> @core.Node,
+  row_of : (Int, T) -> @widget.Node,
   width? : Double = 0.0,
   overscan? : Int = 2,
-  rev? : @core.Store[Int],
+  rev? : @base.Store[Int],
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let rh = if row_height > 0.0 { row_height } else { 1.0 }
-  @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(viewport : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let lay = @style.empty_style()
     lay.flex_direction = Some(@yoga.Column)
@@ -30,7 +30,7 @@ pub fn[T] virt_list(
     lay.height = Some(height)
     @style.apply(viewport, @style.merge_all([lay, @style.merge_all(class)]))
     let state = ScrollState::new()
-    let inner = @core.Widget::new()
+    let inner = @widget.Widget::new()
     inner.node.set_flex_direction(@yoga.Column)
     inner.node.set_width(@yoga.percent(100.0))
     // 整块跟着偏移平移（与 `scroll_view` 同一套相对定位）：上占位只补「窗口第一行
@@ -63,7 +63,7 @@ pub fn[T] virt_list(
       inner.clear_children()
       // 上占位：让第一行落在正确的滚动位置
       if first > 0 {
-        let sp = @core.Widget::new()
+        let sp = @widget.Widget::new()
         sp.node.set_height(@yoga.fixed(first.to_double() * rh))
         inner.append_child(sp)
       }
@@ -76,11 +76,11 @@ pub fn[T] virt_list(
       // 内层高度与内容一致，避免「挂了几行就只高几行」）
       let rest = count - last
       if rest > 0 {
-        let sp = @core.Widget::new()
+        let sp = @widget.Widget::new()
         sp.node.set_height(@yoga.fixed(rest.to_double() * rh))
         inner.append_child(sp)
       }
-      @core.invalidate()
+      @widget.invalidate()
     }
 
     state.apply.val = fn() -> Unit { render_window(false) }
@@ -92,9 +92,9 @@ pub fn[T] virt_list(
       ]),
     )
     viewport.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 只同步几何（滚动条比例与夹取吃它），不在绘制里改子控件树
       state.view_h = r.h
@@ -106,7 +106,7 @@ pub fn[T] virt_list(
         p.stroke_rect(0.0, 0.0, r.w, r.h)
       }
     })
-    viewport.on_scroll = Some(fn(ev : @core.ScrollEvent) -> Bool {
+    viewport.on_scroll = Some(fn(ev : @widget.ScrollEvent) -> Bool {
       let before = state.offset
       state.scroll_by(0.0 - ev.dy * 30.0)
       state.offset != before
@@ -117,7 +117,7 @@ pub fn[T] virt_list(
         let rsid = r.signal().subscribe(fn(_v : Int) -> Unit {
           render_window(true)
         })
-        @core.sub_bag_register(fn() { r.signal().remove(rsid) })
+        @base.sub_bag_register(fn() { r.signal().remove(rsid) })
       }
       None => ()
     }
@@ -130,7 +130,7 @@ pub fn[T] virt_list(
         render_window(true)
       }
     })
-    @core.sub_bag_register(fn() { items.signal().remove(sid) })
+    @base.sub_bag_register(fn() { items.signal().remove(sid) })
     viewport.append_child(scroll_bar(state))
     render_window(true)
     handle(viewport)
@@ -143,18 +143,18 @@ pub fn[T] virt_list(
 /// 单元格画法与 `table` 完全一致（同一份 `table_row_widget`）。
 pub fn table_v(
   columns : Array[TableColumn],
-  rows : @core.Store[Array[TableRow]],
+  rows : @base.Store[Array[TableRow]],
   width? : Double = 560.0,
   height? : Double = 360.0,
   row_height? : Double = 32.0,
-  selection? : @core.Store[Array[Int]],
-  sort? : @core.Store[TableSort],
+  selection? : @base.Store[Array[Int]],
+  sort? : @base.Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i : Int, _r : TableRow) -> Unit { () },
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let head_h = 40.0
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     match selection {
       Some(s) => follow_store(s)
@@ -169,7 +169,7 @@ pub fn table_v(
     // 表头宽度扣掉滚动条（8px）与左右边框：数据行的列宽与表头一致
     w.node.set_width(@yoga.fixed(width))
     let widths : Ref[Array[Double]] = Ref(table_widths(columns, width - 10.0))
-    let rev = @core.Store::new(0)
+    let rev = @base.Store::new(0)
     @style.apply(
       w,
       @style.merge_all([
@@ -178,9 +178,9 @@ pub fn table_v(
       ]),
     )
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -206,8 +206,8 @@ pub fn table_v(
       rows,
       height,
       row_height,
-      fn(src : Int, row : TableRow) -> @core.Node {
-        @core.node_of(table_row_widget(
+      fn(src : Int, row : TableRow) -> @widget.Node {
+        @widget.node_of(table_row_widget(
           columns,
           widths.val,
           row,
@@ -251,17 +251,17 @@ pub fn StickyList::new() -> StickyList {
 /// 布局后读各组控件的矩形反推——组高由内容决定（行数/换行都可能变），读布局结果
 /// 比事先累加高度稳。
 pub fn sticky_list(
-  groups : Array[(String, Array[@core.Node])],
+  groups : Array[(String, Array[@widget.Node])],
   st : StickyList,
   width? : Double = 0.0,
   height? : Double = 0.0,
   head_h? : Double = 28.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let state = st.scroll
   let hh = head_h
-  @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(viewport : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let lay = @style.empty_style()
     lay.flex_direction = Some(@yoga.Column)
@@ -273,21 +273,21 @@ pub fn sticky_list(
     }
     @style.apply(viewport, @style.merge_all([lay, @style.merge_all(class)]))
     // 内容：整块跟着偏移平移（相对定位偏移只改落位、不改流内占位）
-    let content = @core.Widget::new()
+    let content = @widget.Widget::new()
     content.node.set_flex_direction(@yoga.Column)
     content.node.set_width(@yoga.percent(100.0))
     content.node.set_position(@yoga.Relative)
     content.node.set_flex_shrink(0.0)
     content.node.set_top(@yoga.fixed(0.0 - state.offset))
-    let group_widgets : Array[@core.Widget] = []
+    let group_widgets : Array[@widget.Widget] = []
     for g in groups {
       let title = g.0
       let rows = g.1
-      let gw = @core.Widget::new()
+      let gw = @widget.Widget::new()
       gw.node.set_flex_direction(@yoga.Column)
       gw.node.set_width(@yoga.percent(100.0))
       // 组标题（滚走的那一条，静态头）
-      let head = @core.Widget::new()
+      let head = @widget.Widget::new()
       head.node.set_height(@yoga.fixed(hh))
       head.node.set_width(@yoga.percent(100.0))
       @style.apply(
@@ -298,9 +298,9 @@ pub fn sticky_list(
         ]),
       )
       head.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let hs = @style.style_for(self)
         p.set_fill_color(@style.color_of(hs.background_color, @theme.theme_fill_zebra()))
@@ -320,13 +320,13 @@ pub fn sticky_list(
         )
       })
       gw.append_child(head)
-      @core.mount_children(gw, rows)
+      @widget.mount_children(gw, rows)
       content.append_child(gw)
       group_widgets.push(gw)
     }
     viewport.append_child(content)
     // 吸顶悬浮条
-    let sticky_bar = @core.Widget::new()
+    let sticky_bar = @widget.Widget::new()
     sticky_bar.node.set_position(@yoga.Absolute)
     sticky_bar.node.set_top(@yoga.fixed(0.0))
     sticky_bar.node.set_left(@yoga.fixed(0.0))
@@ -340,9 +340,9 @@ pub fn sticky_list(
       ]),
     )
     sticky_bar.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let bs = @style.style_for(self)
       p.set_fill_color(@style.color_of(bs.background_color, @theme.theme_bg_panel()))
@@ -366,9 +366,9 @@ pub fn sticky_list(
     viewport.append_child(sticky_bar)
     // 每帧布局后按「各组的实际矩形」反推当前组
     viewport.on_draw = Some(fn(
-      _s : @core.Widget,
+      _s : @widget.Widget,
       _p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       st.scroll.view_h = r.h
       st.scroll.content_h = content.rect.h
@@ -387,9 +387,9 @@ pub fn sticky_list(
     })
     st.scroll.apply.val = fn() -> Unit {
       content.node.set_top(@yoga.fixed(0.0 - state.offset))
-      @core.invalidate()
+      @widget.invalidate()
     }
-    viewport.on_scroll = Some(fn(ev : @core.ScrollEvent) -> Bool {
+    viewport.on_scroll = Some(fn(ev : @widget.ScrollEvent) -> Bool {
       let before = state.offset
       state.scroll_by(0.0 - ev.dy * 30.0)
       state.offset != before

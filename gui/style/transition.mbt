@@ -6,8 +6,8 @@
 // 走一圈 relayout，它们跟着长不额外排一次。
 // `opacity` 的生效点是 `apply` → `Widget` 字段（绘制遍历不逐帧读槽），不在集合里。
 //
-// 帧驱动复用进程级 `@core.set_timeout`：每拍只给活动中的控件局部置脏
-// （`@core.invalidate_id`），全部收敛就停表，不空转。
+// 帧驱动复用进程级 `@shell.set_timeout`：每拍只给活动中的控件局部置脏
+// （`@widget.invalidate_id`），全部收敛就停表，不空转。
 
 ///|
 /// 一条控件的过渡账。`shown` 是最近一次交出去的值——目标中途再变就从它续起，
@@ -252,16 +252,16 @@ pub fn step(id : Int, target : Style, now : Int64) -> Style {
 /// 新露出的那圈会被裁掉），其余走局部置脏。
 fn mark_dirty(id : Int, a : Anim) -> Unit {
   if grows_layout(a) {
-    @core.invalidate()
+    @widget.invalidate()
   } else {
-    @core.invalidate_id(id)
+    @widget.invalidate_id(id)
   }
 }
 
 ///|
 /// 一拍：把还没落定的过渡各自标脏（只标自己那一块）。全部落定就停表。
 fn tick() -> Unit {
-  let now = @core.now_ms()
+  let now = @shell.now_ms()
   let mut live = 0
   for id, a in anims {
     if !a.finished {
@@ -277,7 +277,7 @@ fn tick() -> Unit {
     }
   }
   if live > 0 {
-    let _ = @core.set_timeout(tick_ms, tick)
+    let _ = @shell.set_timeout(tick_ms, tick)
   } else {
     ticking.val = false
   }
@@ -288,7 +288,7 @@ fn tick() -> Unit {
 fn ensure_ticking() -> Unit {
   if !ticking.val {
     ticking.val = true
-    let _ = @core.set_timeout(tick_ms, tick)
+    let _ = @shell.set_timeout(tick_ms, tick)
   }
 }
 

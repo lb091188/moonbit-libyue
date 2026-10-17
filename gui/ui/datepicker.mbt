@@ -13,7 +13,7 @@
 /// 右侧下拉箭头；`clearable` 且悬停且有值时，箭头左侧画 ✕。
 /// `on_click` 收到的是**本地 x**：调用方据此区分「点 ✕ 清空」与「点其余处开合」。
 fn setup_picker_field(
-  w : @core.Widget,
+  w : @widget.Widget,
   width : Double,
   text_of : () -> String,
   filled : () -> Bool,
@@ -25,7 +25,7 @@ fn setup_picker_field(
   watch_theme()
   w.node.set_width(@yoga.fixed(width))
   w.node.set_height(@yoga.fixed(32.0))
-  w.cursor = @core.CURSOR_HAND
+  w.cursor = @widget.CURSOR_HAND
   // 字段底色/描边/文字色先折内置再读槽；「有没有填值」是数据态，留在 filled() 分支当回落
   @style.apply(
     w,
@@ -40,9 +40,9 @@ fn setup_picker_field(
     ]),
   )
   w.on_draw = Some(fn(
-    self : @core.Widget,
+    self : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     let st = @style.style_for(self)
     p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -92,14 +92,14 @@ fn setup_picker_field(
     }
   })
   w.on_pointer = Some(fn(
-    _self : @core.Widget,
-    ev : @core.PointerEvent,
+    _self : @widget.Widget,
+    ev : @widget.PointerEvent,
   ) -> Bool {
     match ev.kind {
       @widget.PointerKind::Down => true
       @widget.PointerKind::Up => {
         on_click(ev.x)
-        @core.invalidate()
+        @widget.invalidate()
         false
       }
       _ => false
@@ -117,28 +117,28 @@ fn clear_hit(local_x : Double, width : Double, clearable : Bool, filled : Bool) 
 /// 选择器字段的键盘开合：关着时空格/回车/↓ 开层，开着时回车/空格/Esc 收层
 /// （日历内部的方向键导航不在这层做，日历弹层里只保留点选）。
 fn attach_field_toggle_key(
-  w : @core.Widget,
+  w : @widget.Widget,
   open_id : Ref[Int],
   open_pop : () -> Unit,
   close_pop : () -> Unit,
 ) -> Unit {
-  w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+  w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
     if !ev.press {
       return false
     }
     let ks = ev.keysym
     if overlay_alive(open_id.val) {
-      if ks == @core.KS_RETURN ||
-        ks == @core.KS_SPACE ||
-        ks == @core.KS_ESCAPE {
+      if ks == @base.KS_RETURN ||
+        ks == @base.KS_SPACE ||
+        ks == @base.KS_ESCAPE {
         close_pop()
         true
       } else {
         false
       }
-    } else if ks == @core.KS_RETURN ||
-      ks == @core.KS_SPACE ||
-      ks == @core.KS_DOWN {
+    } else if ks == @base.KS_RETURN ||
+      ks == @base.KS_SPACE ||
+      ks == @base.KS_DOWN {
       open_pop()
       true
     } else {
@@ -154,8 +154,8 @@ fn calendar_popup(
   state_of : (DateYMD) -> CalCell,
   on_cell : (DateYMD) -> Unit,
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Node {
-  @core.node_of_new(fn(panel : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(panel : @widget.Widget) -> @widget.Widget {
     let _ = build_calendar(panel, today, state_of, on_cell, skin=skin)
     panel
   })
@@ -168,9 +168,9 @@ fn time_popup(
   on_confirm : (TimeHM) -> Unit,
   on_cancel : () -> Unit,
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Node {
+) -> @widget.Node {
   let cur : Ref[TimeHM] = Ref(initial)
-  @core.node_of_new(fn(panel : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(panel : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let font = @text.Font::new("", 14.0)
     panel.node.set_flex_direction(@yoga.Column)
@@ -184,9 +184,9 @@ fn time_popup(
       ]),
     )
     panel.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -197,14 +197,14 @@ fn time_popup(
     })
     // 顶部时间显示是**占位的子控件**，不是画在面板上的浮层：画在 (0,0,28) 而子件
     // 从内边距起排，第一行步进就被它压住（真机反馈「时间选择器位置不对」）。
-    let _ = @core.node_of_new(fn(hd : @core.Widget) -> @core.Widget {
+    let _ = @widget.node_of_new(fn(hd : @widget.Widget) -> @widget.Widget {
       watch_theme()
       hd.node.set_width(@yoga.percent(100.0))
       hd.node.set_height(@yoga.fixed(28.0))
       hd.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let st = @style.style_for(self)
         let _ = @text.draw_box_at(
@@ -223,10 +223,10 @@ fn time_popup(
       hd
     }).mount_into(panel)
     // 步进行：[−] 标签 [+]
-    fn stepper(label_text : String, step : (Int) -> TimeHM) -> @core.Node {
+    fn stepper(label_text : String, step : (Int) -> TimeHM) -> @widget.Node {
       view(
         [
-          @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
+          @widget.node_of_new(fn(b : @widget.Widget) -> @widget.Widget {
             watch_theme()
             b.node.set_width(@yoga.fixed(30.0))
             b.node.set_height(@yoga.fixed(28.0))
@@ -244,9 +244,9 @@ fn time_popup(
               ]),
             )
             b.on_draw = Some(fn(
-              self : @core.Widget,
+              self : @widget.Widget,
               p : @render.Painter,
-              r : @core.Rect,
+              r : @base.Rect,
             ) -> Unit {
               let st = @style.style_for(self)
               p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -261,16 +261,16 @@ fn time_popup(
               p.line_to(r.w - 10.0, r.h / 2.0)
               p.stroke()
             })
-            b.cursor = @core.CURSOR_HAND
+            b.cursor = @widget.CURSOR_HAND
             b.on_pointer = Some(fn(
-              _s : @core.Widget,
-              ev : @core.PointerEvent,
+              _s : @widget.Widget,
+              ev : @widget.PointerEvent,
             ) -> Bool {
               match ev.kind {
                 @widget.PointerKind::Down => true
                 @widget.PointerKind::Up => {
                   cur.val = step(-1)
-                  @core.invalidate()
+                  @widget.invalidate()
                   false
                 }
                 _ => false
@@ -279,7 +279,7 @@ fn time_popup(
             b
           }),
           text(label_text, font_size=12.0),
-          @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
+          @widget.node_of_new(fn(b : @widget.Widget) -> @widget.Widget {
             watch_theme()
             b.node.set_width(@yoga.fixed(30.0))
             b.node.set_height(@yoga.fixed(28.0))
@@ -297,9 +297,9 @@ fn time_popup(
               ]),
             )
             b.on_draw = Some(fn(
-              self : @core.Widget,
+              self : @widget.Widget,
               p : @render.Painter,
-              r : @core.Rect,
+              r : @base.Rect,
             ) -> Unit {
               let st = @style.style_for(self)
               p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -316,16 +316,16 @@ fn time_popup(
               p.line_to(r.w / 2.0, r.h - 8.0)
               p.stroke()
             })
-            b.cursor = @core.CURSOR_HAND
+            b.cursor = @widget.CURSOR_HAND
             b.on_pointer = Some(fn(
-              _s : @core.Widget,
-              ev : @core.PointerEvent,
+              _s : @widget.Widget,
+              ev : @widget.PointerEvent,
             ) -> Bool {
               match ev.kind {
                 @widget.PointerKind::Down => true
                 @widget.PointerKind::Up => {
                   cur.val = step(1)
-                  @core.invalidate()
+                  @widget.invalidate()
                   false
                 }
                 _ => false
@@ -351,7 +351,7 @@ fn time_popup(
     }).mount_into(panel)
     let _ = view(
       [
-        @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
+        @widget.node_of_new(fn(b : @widget.Widget) -> @widget.Widget {
           watch_theme()
           b.node.set_width(@yoga.fixed(70.0))
           b.node.set_height(@yoga.fixed(28.0))
@@ -369,9 +369,9 @@ fn time_popup(
             ]),
           )
           b.on_draw = Some(fn(
-            self : @core.Widget,
+            self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             let st = @style.style_for(self)
             p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -393,10 +393,10 @@ fn time_popup(
               valign=@text.Center,
             )
           })
-          b.cursor = @core.CURSOR_HAND
+          b.cursor = @widget.CURSOR_HAND
           b.on_pointer = Some(fn(
-            _s : @core.Widget,
-            ev : @core.PointerEvent,
+            _s : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               @widget.PointerKind::Down => true
@@ -409,7 +409,7 @@ fn time_popup(
           })
           b
         }),
-        @core.node_of_new(fn(b : @core.Widget) -> @core.Widget {
+        @widget.node_of_new(fn(b : @widget.Widget) -> @widget.Widget {
           watch_theme()
           b.node.set_width(@yoga.fixed(70.0))
           b.node.set_height(@yoga.fixed(28.0))
@@ -425,9 +425,9 @@ fn time_popup(
             ]),
           )
           b.on_draw = Some(fn(
-            self : @core.Widget,
+            self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             let st = @style.style_for(self)
             p.set_fill_color(@style.color_of(st.background_color, @theme.theme_primary()))
@@ -446,10 +446,10 @@ fn time_popup(
               valign=@text.Center,
             )
           })
-          b.cursor = @core.CURSOR_HAND
+          b.cursor = @widget.CURSOR_HAND
           b.on_pointer = Some(fn(
-            _s : @core.Widget,
-            ev : @core.PointerEvent,
+            _s : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               @widget.PointerKind::Down => true
@@ -479,7 +479,7 @@ fn time_popup(
 /// 键盘口径：空格/回车/↓ 开层、回车/Esc 收层（见 `attach_field_toggle_key`）；
 /// 字段自动进 Tab 链。
 pub fn date_picker(
-  value : @core.Store[DateYMD?],
+  value : @base.Store[DateYMD?],
   on_change? : (DateYMD) -> Unit = fn(_d : DateYMD) -> Unit { () },
   placeholder? : String = "请选择日期",
   clearable? : Bool = true,
@@ -487,21 +487,21 @@ pub fn date_picker(
   width? : Double = 180.0,
   focus_id? : Int = 0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(value)
   let t = today
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     let open_id : Ref[Int] = Ref(0)
     w.focus_id = auto_focus_id(focus_id)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
     let open_pop = fn() -> Unit {
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         calendar_popup(
           t,
           fn(d : DateYMD) -> CalCell {
@@ -566,27 +566,27 @@ pub fn date_picker(
 /// （先起点、再终点；已有完整区间时再从新起点开始），端点实心、区间内浅底。
 /// 键盘口径同 `date_picker`（开/收层），字段自动进 Tab 链。
 pub fn date_range_picker(
-  value : @core.Store[DateRange],
+  value : @base.Store[DateRange],
   on_change? : (DateRange) -> Unit = fn(_r : DateRange) -> Unit { () },
   placeholder? : String = "请选择日期区间",
   clearable? : Bool = true,
   today? : DateYMD = today_date(),
   width? : Double = 220.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(value)
   let t = today
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     let open_id : Ref[Int] = Ref(0)
     w.focus_id = auto_focus_id(0)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
     let open_pop = fn() -> Unit {
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         calendar_popup(
           t,
           fn(d : DateYMD) -> CalCell { range_state_of(value.get(), d) },
@@ -666,13 +666,13 @@ fn time_field(
   get : () -> TimeHM?,
   set : (TimeHM) -> Unit,
   placeholder? : String = "?:?",
-) -> @core.Node {
-  @core.node_of_new(fn(field : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(field : @widget.Widget) -> @widget.Widget {
     let open_id : Ref[Int] = Ref(0)
     field.focus_id = auto_focus_id(0)
     let close_pop = fn() -> Unit {
       if open_id.val != 0 {
-        @core.overlay_hide(open_id.val)
+        @widget.overlay_hide(open_id.val)
         open_id.val = 0
       }
     }
@@ -681,7 +681,7 @@ fn time_field(
         Some(t) => t
         None => TimeHM::{ h: 9, m: 0 }
       }
-      open_id.val = @core.overlay_show_at(
+      open_id.val = @widget.overlay_show_at(
         time_popup(
           init,
           fn(t : TimeHM) -> Unit {
@@ -728,13 +728,13 @@ fn time_field(
 ///|
 /// 时间区间选择器（EP TimePicker 区间形态）：起止两个时间字段（步进式弹层）。
 pub fn time_range_picker(
-  value : @core.Store[TimeRange],
+  value : @base.Store[TimeRange],
   on_change? : (TimeRange) -> Unit = fn(_r : TimeRange) -> Unit { () },
   width? : Double = 110.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(value)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Row)
     w.node.set_align_items(@yoga.AlignItems::Center)
@@ -767,32 +767,32 @@ pub fn time_range_picker(
 /// 日期时间区间选择器：起止各一对「日期字段 + 时间字段」，日期走日历弹层、
 /// 时间走步进弹层；任一侧任一维改动都会把整份区间写回 Store 并回调。
 pub fn datetime_range_picker(
-  value : @core.Store[DateTimeRange],
+  value : @base.Store[DateTimeRange],
   on_change? : (DateTimeRange) -> Unit = fn(_r : DateTimeRange) -> Unit { () },
   today? : DateYMD = today_date(),
   date_width? : Double = 130.0,
   time_width? : Double = 86.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   follow_store(value)
   let t = today
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Row)
     w.node.set_align_items(@yoga.AlignItems::Center)
     w.node.set_gap(0.0, 6.0)
-    fn date_field(is_start : Bool) -> @core.Node {
-      @core.node_of_new(fn(field : @core.Widget) -> @core.Widget {
+    fn date_field(is_start : Bool) -> @widget.Node {
+      @widget.node_of_new(fn(field : @widget.Widget) -> @widget.Widget {
         let open_id : Ref[Int] = Ref(0)
         field.focus_id = auto_focus_id(0)
         let close_pop = fn() -> Unit {
           if open_id.val != 0 {
-            @core.overlay_hide(open_id.val)
+            @widget.overlay_hide(open_id.val)
             open_id.val = 0
           }
         }
         let open_pop = fn() -> Unit {
-          open_id.val = @core.overlay_show_at(
+          open_id.val = @widget.overlay_show_at(
             calendar_popup(
               t,
               fn(d : DateYMD) -> CalCell {

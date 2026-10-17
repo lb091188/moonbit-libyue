@@ -337,10 +337,10 @@ pub fn ci_tooltip(
   on_leave? : () -> Unit = fn() { () },
   width? : Double = 0.0,
   height? : Double = 280.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.watch_theme()
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     let tip = CiTip::new()
     let dragging = Ref(false)
     let drag_a0 = Ref(0.0)
@@ -367,9 +367,9 @@ pub fn ci_tooltip(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       box.val = (r.w, r.h)
       p.set_fill_color(@theme.theme_bg_panel())
@@ -378,8 +378,8 @@ pub fn ci_tooltip(
       ci_tip_draw(p, tip, r.w, r.h)
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Move => {
@@ -399,7 +399,7 @@ pub fn ci_tooltip(
           }
           was_vis.val = tip.visible
           if need {
-            @core.invalidate()
+            @widget.invalidate()
           }
           true
         }
@@ -408,7 +408,7 @@ pub fn ci_tooltip(
           if was_vis.val {
             ci_tip_hide(tip)
             was_vis.val = false
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -440,12 +440,12 @@ pub fn ci_tooltip(
     match zoom {
       None => ()
       Some(z) =>
-        w.on_scroll = Some(fn(ev : @core.ScrollEvent) -> Bool {
+        w.on_scroll = Some(fn(ev : @widget.ScrollEvent) -> Bool {
           let (cw, ch) = box.val
           // ev.x/y 已是本地坐标；ev.dy 正=向上滚，旧口径 delta 正=下滚
           //（缩小），翻转符号接入
           ci_zoom_wheel(z, zmap(ev.x, ev.y, cw, ch), 0.0 - ev.dy)
-          @core.invalidate()
+          @widget.invalidate()
           true
         })
     }

@@ -4,8 +4,8 @@
 
 ///|
 /// n 行、每行 h 高的内容节点。
-fn scroll_rows(n : Int, h : Double, bg : String) -> Array[@core.Node] {
-  let rows : Array[@core.Node] = []
+fn scroll_rows(n : Int, h : Double, bg : String) -> Array[@widget.Node] {
+  let rows : Array[@widget.Node] = []
   for i = 0; i < n; i = i + 1 {
     rows.push(view([text("行 " + i.to_string(), font_size=12.0)], height=h, background_color=bg))
   }
@@ -13,7 +13,7 @@ fn scroll_rows(n : Int, h : Double, bg : String) -> Array[@core.Node] {
 }
 
 ///|
-fn paint(root : @core.Widget, w : Int, h : Int) -> @render.Bitmap {
+fn paint(root : @widget.Widget, w : Int, h : Int) -> @render.Bitmap {
   let bm = @render.Bitmap::new(w, h)
   let p = @render.Painter::new(bm)
   root.paint(p)
@@ -171,13 +171,13 @@ test "滚动容器：只给 grow 不给高度时视口不被内容撑高" {
   // 真机症状「内容超出窗口却滚不动」的根因钉桩：Yoga 的 flex 子项默认
   // min-size=auto，视口不写 min 0 就会被内容顶到自然高，max() 恒为 0。
   let st = ScrollState::new()
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(240.0, 140.0)
   root.set_column()
   let vp = scroll_view(
     scroll_rows(20, 20.0, @theme.theme_bg_panel()),
     st,
-    handle=fn(v : @core.Widget) -> Unit { v.node.set_flex_grow(1.0) },
+    handle=fn(v : @widget.Widget) -> Unit { v.node.set_flex_grow(1.0) },
   ).mount_into(root)
   root.relayout(240.0, 140.0)
   let _ = paint(root, 240, 140)

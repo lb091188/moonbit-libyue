@@ -5,7 +5,7 @@
 // `opacity` 的生效点是 `apply` 落宿主字段，不插值。
 
 ///|
-fn hover_card(label : String, sub : String, dur : Double) -> @core.Node {
+fn hover_card(label : String, sub : String, dur : Double) -> @widget.Node {
   @ui.view(
     [
       @ui.text(label, align=@text.Center),
@@ -48,9 +48,9 @@ fn anim_gif_path() -> String {
   "examples/showcase/assets/dot.gif"
 }
 
-pub fn page_anim(_app : @shared.App) -> @core.Node {
+pub fn page_anim(_app : @shared.App) -> @widget.Node {
   let gif_h : @ui.GifHandle = @ui.GifHandle::make()
-  let gif_note : @core.Store[String] = @core.Store::new("自转中")
+  let gif_note : @base.Store[String] = @base.Store::new("自转中")
   @shared.page([
     @shared.section(
       "属性过渡",

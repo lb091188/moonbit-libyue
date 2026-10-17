@@ -2,7 +2,7 @@
 //
 // 分层与旧链路（master `yue/charts`）一致：**纯函数与绘制分开**——数据窗口、
 // 坐标换算、刻度算法、扇区角度、回归这些不依赖任何平台，白盒直接钉住；绘制只
-// 读这些结果。组件一律返回 `@core.Node`（声明式），数据经 `@core.Store` 驱动：
+// 读这些结果。组件一律返回 `@widget.Node`（声明式），数据经 `@base.Store` 驱动：
 // 换数据只重绘画布，不重建控件树。
 //
 // 与 master 的两处形态差（记档）：CSS 式 `style` 通道不做（覆盖走类型化参数与
@@ -54,7 +54,7 @@ pub fn win_push(win : Array[Double], max_points : Int, v : Double) -> Array[Doub
 ///|
 /// 向多序列 Store 的第 i 个序列推点（窗口超限自动丢最旧），整表 set 一次触发
 /// 订阅者重绘；`i` 越界时无操作。
-pub fn series_push(series : @core.Store[Array[LineSeries]], i : Int, v : Double) -> Unit {
+pub fn series_push(series : @base.Store[Array[LineSeries]], i : Int, v : Double) -> Unit {
   let cur = series.get()
   if i < 0 || i >= cur.length() {
     return

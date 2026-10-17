@@ -6,7 +6,7 @@ test "分段控制器：点某段即写 Store，选中段底色与其余段不�
   if !ui_text_guard() {
     return
   }
-  let sel = @core.Store::new("甲")
+  let sel = @base.Store::new("甲")
   let (root, seg) = mounted(segmented(["甲", "乙", "很长的一段"], sel), 400.0, 60.0)
   let items = seg.children()
   assert_eq(items.length(), 3)
@@ -27,7 +27,7 @@ test "分段控制器：点某段即写 Store，选中段底色与其余段不�
 
 ///|
 test "面包屑：点非当前项直达、当前项与分隔符不改值" {
-  let sel = @core.Store::new("首页")
+  let sel = @base.Store::new("首页")
   let (root, crumb) = mounted(
     breadcrumb(["首页", "列表", "详情"], sel),
     400.0,
@@ -53,7 +53,7 @@ test "面包屑：点非当前项直达、当前项与分隔符不改值" {
 
 ///|
 test "分页：点页码直落、箭头步进、两端夹取不越界" {
-  let cur = @core.Store::new(1)
+  let cur = @base.Store::new(1)
   let (root, pg) = mounted(pagination(cur, 5), 400.0, 40.0)
   // 左箭头 + 5 个页码 + 右箭头
   let kids = pg.children()
@@ -77,7 +77,7 @@ test "分页：点页码直落、箭头步进、两端夹取不越界" {
 
 ///|
 test "步骤条：已完成/当前/待办三态底色互不相同，连线随当前步着色" {
-  let cur = @core.Store::new(1)
+  let cur = @base.Store::new(1)
   let (root, st) = mounted(
     steps(["下单", "付款", "发货", "签收"], cur),
     500.0,
@@ -129,7 +129,7 @@ test "折叠面板：默认只开第一块，各块独立开合、收起即不�
     240.0,
   )
   assert_eq(cl.children().length(), 3)
-  fn body(i : Int) -> @core.Widget { cl.children()[i].children()[1] }
+  fn body(i : Int) -> @widget.Widget { cl.children()[i].children()[1] }
 
   assert_eq([body(0).visible, body(1).visible, body(2).visible], [true, false, false])
   // 点第二块标题行：只开它自己
@@ -148,7 +148,7 @@ test "折叠面板：默认只开第一块，各块独立开合、收起即不�
 
 ///|
 test "侧边菜单：项宽跟随容器、点项写 Store、选中项底色与未选不同" {
-  let sel = @core.Store::new("首页")
+  let sel = @base.Store::new("首页")
   let (root, menu) = mounted(
     menu(["首页", "报表", "设置"], sel, icons=[("报表", @icons.IconKind::Box)]),
     300.0,
@@ -174,7 +174,7 @@ test "侧边菜单：项宽跟随容器、点项写 Store、选中项底色与�
 
 ///|
 test "分组侧边菜单：标题行收起/展开只影响本组" {
-  let sel = @core.Store::new("甲一")
+  let sel = @base.Store::new("甲一")
   let (root, menu) = mounted(
     menu_sections([
       ("组一", ["甲一", "甲二"]),
@@ -234,7 +234,7 @@ test "树：子层预建即收起，点父行展开、点叶子行不动作" {
 
 ///|
 test "页签：预建三页只显当前页，点页签与外部改 Store 都换页" {
-  let sel = @core.Store::new(0)
+  let sel = @base.Store::new(0)
   let (root, tabs) = mounted(
     tabs(
       [("概览", text("概览页")), ("明细", text("明细页")), ("设置", text("设置页"))],
@@ -260,8 +260,8 @@ test "页签：预建三页只显当前页，点页签与外部改 Store 都换�
 
 ///|
 test "穿梭框：点行选中、箭头搬运、搬完清空选中、外部改数据整列重建" {
-  let left = @core.Store::new(["甲", "乙", "丙"])
-  let right : @core.Store[Array[String]] = @core.Store::new([])
+  let left = @base.Store::new(["甲", "乙", "丙"])
+  let right : @base.Store[Array[String]] = @base.Store::new([])
   let (root, tr) = mounted(transfer(left, right, width=120.0), 320.0, 120.0)
   let kids = tr.children()
   assert_eq(kids.length(), 4)
@@ -298,8 +298,8 @@ test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿�
   if !ui_text_guard() {
     return
   }
-  let warm_of = fn(node : @core.Node, w : Double, h : Double) -> Int {
-    let root = @core.Widget::new()
+  let warm_of = fn(node : @widget.Node, w : Double, h : Double) -> Int {
+    let root = @widget.Widget::new()
     root.set_size(w, h)
     root.set_column()
     let _ = node.mount_into(root)
@@ -320,9 +320,9 @@ test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿�
     n
   }
   // 分段：内置皮肤只有选中段铺底，class 的底色铺进每一段
-  let plain_seg = warm_of(segmented(["甲", "乙"], @core.Store::new("甲")), 300.0, 60.0)
+  let plain_seg = warm_of(segmented(["甲", "乙"], @base.Store::new("甲")), 300.0, 60.0)
   let classed_seg = warm_of(
-    segmented(["甲", "乙"], @core.Store::new("甲"), class=[@style.style(background_color="#ff0000")]),
+    segmented(["甲", "乙"], @base.Store::new("甲"), class=[@style.style(background_color="#ff0000")]),
     300.0,
     60.0,
   )
@@ -331,14 +331,14 @@ test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿�
 
   // 页签：未选中页签的文字色吃 class 的 color
   let plain_tab = warm_of(
-    tabs([("概览", text("概览页")), ("明细", text("明细页"))], selected=@core.Store::new(0)),
+    tabs([("概览", text("概览页")), ("明细", text("明细页"))], selected=@base.Store::new(0)),
     320.0,
     120.0,
   )
   let classed_tab = warm_of(
     tabs(
       [("概览", text("概览页")), ("明细", text("明细页"))],
-      selected=@core.Store::new(0),
+      selected=@base.Store::new(0),
       class=[@style.style(color="#ff0000")],
     ),
     320.0,
@@ -347,8 +347,8 @@ test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿�
   assert_true(classed_tab > plain_tab)
 
   // 穿梭框：列表框的描边色与宽度吃 class（内置是 1px 主题描边色）
-  let left = @core.Store::new(["甲", "乙"])
-  let right : @core.Store[Array[String]] = @core.Store::new([])
+  let left = @base.Store::new(["甲", "乙"])
+  let right : @base.Store[Array[String]] = @base.Store::new([])
   let plain_tr = warm_of(transfer(left, right, width=100.0), 320.0, 120.0)
   let classed_tr = warm_of(
     transfer(
@@ -365,8 +365,8 @@ test "导航族只读样式槽：class 覆盖分段底色、页签字色与穿�
 
 ///|
 test "穿梭框：面板默认 200×160，height= 可覆，项少也占满面板高" {
-  let left = @core.Store::new(["甲"])
-  let right : @core.Store[Array[String]] = @core.Store::new([])
+  let left = @base.Store::new(["甲"])
+  let right : @base.Store[Array[String]] = @base.Store::new([])
   let (_, tr) = mounted(transfer(left, right), 460.0, 220.0)
   let lbox = tr.children()[0]
   assert_eq(lbox.rect.w, 200.0)
@@ -377,7 +377,7 @@ test "穿梭框：面板默认 200×160，height= 可覆，项少也占满面板
 
 ///|
 test "键盘可及性：分段空格/回车选中本段，左右键在段间移动选中" {
-  let sel = @core.Store::new("甲")
+  let sel = @base.Store::new("甲")
   let root = mount_root([segmented(["甲", "乙", "丙"], sel)], 300.0, 60.0)
   let seg = kid(root, 0)
   assert_eq(seg.kids.length(), 3)
@@ -386,16 +386,16 @@ test "键盘可及性：分段空格/回车选中本段，左右键在段间移�
   let key = fn(ks : Int) -> Unit {
     let _ = root.dispatch_key(item1.focus_id, { press: true, keysym: ks, mods: 0, })
   }
-  key(@core.KS_SPACE)
+  key(@base.KS_SPACE)
   assert_eq(sel.get(), "乙")
-  key(@core.KS_LEFT)
+  key(@base.KS_LEFT)
   assert_eq(sel.get(), "甲")
-  key(@core.KS_RIGHT)
+  key(@base.KS_RIGHT)
   assert_eq(sel.get(), "丙")
-  key(@core.KS_UP)
+  key(@base.KS_UP)
   assert_eq(sel.get(), "甲")
   // 回车/空格都是激活焦点段（乙），不是「确认当前选中」
-  key(@core.KS_RETURN)
+  key(@base.KS_RETURN)
   assert_eq(sel.get(), "乙")
 }
 
@@ -403,7 +403,7 @@ test "键盘可及性：分段空格/回车选中本段，左右键在段间移�
 /// 侧栏菜单键盘可及：声明 focus_id 进 Tab 链、空格/回车选中本项、方向键组内
 /// 环绕换选（修复前 focus_ids 为空——Tab 进不了侧栏、也没有焦点环可画）。
 test "menu_sections：键盘链可达且空格/方向键有效" {
-  let selected = @core.Store::new("首页")
+  let selected = @base.Store::new("首页")
   let root = mount_root(
     [
       menu_sections([ ("导航", [ "首页", "组件", "文档" ]), ("其它", []) ], selected, width=180.0),
@@ -414,7 +414,7 @@ test "menu_sections：键盘链可达且空格/方向键有效" {
   let ids = root.focus_ids()
   assert_eq(ids.length(), 3, msg="三个菜单项都应进 Tab 链")
   // 树里找第一个菜单项控件（focus_id 最小的树序项）
-  fn find_by_focus(w : @core.Widget, fid : Int) -> @core.Widget? {
+  fn find_by_focus(w : @widget.Widget, fid : Int) -> @widget.Widget? {
     if w.focus_id == fid {
       return Some(w)
     }
@@ -435,12 +435,12 @@ test "menu_sections：键盘链可达且空格/方向键有效" {
         None => fail("菜单项应挂 on_key")
         Some(k) => {
           // 空格选中本项
-          assert_true(k({ press: true, keysym: @core.KS_SPACE, mods: 0 }))
+          assert_true(k({ press: true, keysym: @base.KS_SPACE, mods: 0 }))
           assert_eq(selected.get(), "首页")
           // 方向键 → 下一项（环绕取模）
-          assert_true(k({ press: true, keysym: @core.KS_DOWN, mods: 0 }))
+          assert_true(k({ press: true, keysym: @base.KS_DOWN, mods: 0 }))
           assert_eq(selected.get(), "组件")
-          assert_true(k({ press: true, keysym: @core.KS_UP, mods: 0 }))
+          assert_true(k({ press: true, keysym: @base.KS_UP, mods: 0 }))
           assert_eq(selected.get(), "文档") // 从第一项 UP 环绕到最后一项
           // 修饰键组合的按键不误触（比如 Ctrl+X 的 X 不是这里的业务）
           assert_false(k({ press: true, keysym: 120, mods: 2 }))

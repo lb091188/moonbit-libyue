@@ -106,16 +106,16 @@ fn main {
   let toast = @ui.toast_layer(duration_ms=2200)
   // 播放列表：完整路径表 + 选中名（menu 的 Store 存显示名）
   let tracks : Ref[Array[String]] = Ref([])
-  let selected : @core.Store[String] = @core.Store::new("")
-  let track_line : @core.Store[String] = @core.Store::new("（还没载入视频）")
-  let tick_line : @core.Store[String] = @core.Store::new("")
-  let sub_line : @core.Store[String] = @core.Store::new("字幕：未打开（打开时回报来源与条数）")
-  let err_line : @core.Store[String] = @core.Store::new("")
+  let selected : @base.Store[String] = @base.Store::new("")
+  let track_line : @base.Store[String] = @base.Store::new("（还没载入视频）")
+  let tick_line : @base.Store[String] = @base.Store::new("")
+  let sub_line : @base.Store[String] = @base.Store::new("字幕：未打开（打开时回报来源与条数）")
+  let err_line : @base.Store[String] = @base.Store::new("")
   // 外挂字幕文本（空串 = 用容器内嵌轨；读取归本示例，组件只收文本）
   let sub_text : Ref[String] = Ref("")
-  let list_holder : Ref[@core.Widget?] = Ref(None)
-  let player_holder : Ref[@core.Widget?] = Ref(None)
-  let host : Ref[@core.App?] = Ref(None)
+  let list_holder : Ref[@widget.Widget?] = Ref(None)
+  let player_holder : Ref[@widget.Widget?] = Ref(None)
+  let host : Ref[@widget.App?] = Ref(None)
   let loaded : Ref[Bool] = Ref(false)
   fn fail(msg : String) -> Unit {
     err_line.set(msg)
@@ -385,7 +385,7 @@ fn main {
                   @ui.bind_label(track_line, fn(s) { s }),
                   @ui.bind_label(tick_line, fn(s) { s }, font_size=12.0, color="text_secondary"),
                   @ui.bind_label(sub_line, fn(s) { s }, font_size=12.0, color="text_secondary"),
-                  @core.bind_node(err_line.signal(), fn(e : String) -> @core.Node {
+                  @widget.bind_node(err_line.signal(), fn(e : String) -> @widget.Node {
                     if e.length() == 0 {
                       @ui.view([])
                     } else {
@@ -414,7 +414,7 @@ fn main {
     title="视频播放示例",
     width=1180,
     height=720,
-    handle=fn(a : @core.App) {
+    handle=fn(a : @widget.App) {
       host.val = Some(a)
       // 首帧后载入默认资产（此时挂载已完成，播放器能直接挂进视频区）
       let _ = a.timer(0, fn() -> Unit {

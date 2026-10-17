@@ -5,7 +5,7 @@
 // invalidate（on_draw 实时读 theme_current）。
 //
 // G7 迁移记档：旧链路容器 handle + schedule_paint 换成本栈
-// node_of_new + on_draw 字段 + @core.invalidate()；行高变化直接改
+// node_of_new + on_draw 字段 + @widget.invalidate()；行高变化直接改
 // yoga 节点高度（宿主每帧 relayout，无需手动布局）。
 
 ///|
@@ -61,21 +61,21 @@ fn draw_sparkline(
 /// 只重绘画布；行数变化时同步更新容器高度。draw 签名为
 /// (painter, width)；rows 存当前行数（供定高与刷新触发）。
 fn draw_rows(
-  rows : @core.Store[Int],
+  rows : @base.Store[Int],
   draw : (@render.Painter, Double) -> Unit,
-) -> @core.Node {
-  @core.node_of_new(fn(c : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(c : @widget.Widget) -> @widget.Widget {
     c.node.set_flex_direction(@yoga.Column)
     c.node.set_height(@yoga.fixed(rows.get().to_double() * row_h()))
-    c.on_draw = Some(fn(_s : @core.Widget, p : @render.Painter, r : @core.Rect) -> Unit {
+    c.on_draw = Some(fn(_s : @widget.Widget, p : @render.Painter, r : @base.Rect) -> Unit {
       draw(p, r.w)
     })
     rows.subscribe(fn(n) {
       c.node.set_height(@yoga.fixed(n.to_double() * row_h()))
-      @core.invalidate()
+      @widget.invalidate()
     })
     // 主题切换后重绘（绘制时读 theme_current）
-    ignore(@theme.on_theme_change(fn() { @core.invalidate() }))
+    ignore(@theme.on_theme_change(fn() { @widget.invalidate() }))
     c
   })
 }

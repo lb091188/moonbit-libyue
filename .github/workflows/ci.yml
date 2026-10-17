@@ -118,16 +118,16 @@ jobs:
         working-directory: gui
         run: moon check
 
-      # 16 个包全量(web 已出成独立模块 gui-webview,见下一节;base/shell/widget 是 G9 Batch 2
-      # 第一刀从 core 提出的响应式/焦点/记账层);dbus 包走真实
+      # 15 个包全量(web 已出成独立模块 gui-webview,见下一节;base/shell/widget 是 G9 Batch 2
+      # 从原 core 提出的三层,core 已于 import 迁移后整包退场);dbus 包走真实
       # 会话总线,CI 里由 dbus-run-session 提供(runner 默认只有系统总线)。
       # 失败时把关键行塞进 error 注解(匿名 API 可读),并回显输出尾部。
-      - name: 单元测试(库模块,16 包)
+      - name: 单元测试(库模块,15 包)
         working-directory: gui
         run: |
           set +e
           dbus-run-session -- moon test \
-            base shell widget core ui render text theme icons sys input win dbus chart mdview style \
+            base shell widget ui render text theme icons sys input win dbus chart mdview style \
             >/tmp/mt.out 2>&1
           code=$?
           set -e
@@ -273,7 +273,7 @@ jobs:
           do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
           && cd gui
           && moon check
-          && moon test base shell widget core ui render text theme icons input win chart mdview style
+          && moon test base shell widget ui render text theme icons input win chart mdview style
           && moon build --target native
           && cd ..\modules\ffmpeg-mbt
           && moon test src

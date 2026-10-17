@@ -83,17 +83,17 @@ fn main {
   let toast = @ui.toast_layer(duration_ms=2200)
   // 状态区四条线：加载标签（编码「kind|文本」，bind_node 重建换语义色）、
   // 常驻 URL 与标题、事件流水、能力结果（截断 + 可展开）
-  let url_in : @core.Store[String] = @core.Store::new(HOME_URL)
-  let status : @core.Store[String] = @core.Store::new("0|就绪")
-  let cur_url : @core.Store[String] = @core.Store::new(HOME_URL)
-  let title_st : @core.Store[String] = @core.Store::new("（无标题）")
-  let ev_count : @core.Store[Int] = @core.Store::new(0)
-  let ev_line : @core.Store[String] = @core.Store::new("（事件流水显示在此）")
-  let result_full : @core.Store[String] = @core.Store::new("（能力结果显示在此）")
-  let result_open : @core.Store[Bool] = @core.Store::new(false)
-  let result_view : @core.Store[String] = @core.Store::new("（能力结果显示在此）")
+  let url_in : @base.Store[String] = @base.Store::new(HOME_URL)
+  let status : @base.Store[String] = @base.Store::new("0|就绪")
+  let cur_url : @base.Store[String] = @base.Store::new(HOME_URL)
+  let title_st : @base.Store[String] = @base.Store::new("（无标题）")
+  let ev_count : @base.Store[Int] = @base.Store::new(0)
+  let ev_line : @base.Store[String] = @base.Store::new("（事件流水显示在此）")
+  let result_full : @base.Store[String] = @base.Store::new("（能力结果显示在此）")
+  let result_open : @base.Store[Bool] = @base.Store::new(false)
+  let result_view : @base.Store[String] = @base.Store::new("（能力结果显示在此）")
   let wv : Ref[@web.Webview?] = Ref(None)
-  let holder : Ref[@core.Widget?] = Ref(None)
+  let holder : Ref[@widget.Widget?] = Ref(None)
   // 三类策略的当前档（false = 拦截；启动排期重试时统一落到拦截）
   let pol_newwin : Ref[Bool] = Ref(false)
   let pol_perm : Ref[Bool] = Ref(false)
@@ -363,9 +363,9 @@ fn main {
         [
           @ui.row(
             [
-              @core.bind_node(
+              @widget.bind_node(
                 status.signal(),
-                fn(s : String) -> @core.Node {
+                fn(s : String) -> @widget.Node {
                   // 编码形如「k|文本」：首字符是状态档，其余是文本
                   let tag = s[:1]
                   let text = s[2:].to_owned()
@@ -410,9 +410,9 @@ fn main {
                 max_width=820.0,
                 handle=fn(w) { w.node.set_flex_grow(1.0) },
               ),
-              @core.bind_node(
+              @widget.bind_node(
                 result_open.signal(),
-                fn(open : Bool) -> @core.Node {
+                fn(open : Bool) -> @widget.Node {
                   @ui.button(
                     if open { "收起" } else { "展开" },
                     variant=@ui.Text,
@@ -440,7 +440,7 @@ fn main {
     title="浏览器示例",
     width=1120,
     height=780,
-    handle=fn(a : @core.App) {
+    handle=fn(a : @widget.App) {
       // webview 建在首帧之后（宿主循环已跑、窗口已上屏，与 showcase 旧页
       // 「选中页才建」的时机同口径）
       let _ = a.timer(0, fn() -> Unit {

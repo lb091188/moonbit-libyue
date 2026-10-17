@@ -123,7 +123,7 @@ test "HeatGrid::make：标签与矩阵原样入表" {
 
 ///|
 test "热力图组件：出像素、换数据画面变、空矩阵提示不崩" {
-  let d = @core.Store::new(
+  let d = @base.Store::new(
     HeatGrid::make(["一", "二", "三"], ["甲", "乙", "丙"], [
       [1.0, 2.0, 3.0],
       [2.0, 4.0, 6.0],

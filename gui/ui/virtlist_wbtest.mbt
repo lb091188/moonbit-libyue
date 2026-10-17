@@ -2,12 +2,12 @@
 // 表头固定不滚、虚拟表格的行点选与 table 同口径。
 
 ///|
-fn virt_items(n : Int) -> @core.Store[Array[Int]] {
+fn virt_items(n : Int) -> @base.Store[Array[Int]] {
   let out : Array[Int] = []
   for i = 0; i < n; i = i + 1 {
     out.push(i)
   }
-  @core.Store::new(out)
+  @base.Store::new(out)
 }
 
 ///|
@@ -19,7 +19,7 @@ test "虚拟列表：千行只挂可见区间，滚动后窗口平移、占位�
       items,
       200.0,
       20.0,
-      fn(i : Int, _x : Int) -> @core.Node {
+      fn(i : Int, _x : Int) -> @widget.Node {
         seen.push(i)
         view([text("行")], height=20.0)
       },
@@ -59,7 +59,7 @@ test "虚拟列表：拖滚动条改偏移、数据变短偏移夹回上界" {
       items,
       200.0,
       20.0,
-      fn(_i : Int, _x : Int) -> @core.Node {
+      fn(_i : Int, _x : Int) -> @widget.Node {
         view([text("行")], height=20.0)
       },
       width=300.0,
@@ -98,9 +98,9 @@ test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 tabl
     data.push(TableRow::make(["行 " + i.to_string(), (i * 2).to_string()]))
   }
 
-  let rows = @core.Store::new(data)
-  let sel : @core.Store[Array[Int]] = @core.Store::new([])
-  let sort = @core.Store::new({ column: -1, asc: true })
+  let rows = @base.Store::new(data)
+  let sel : @base.Store[Array[Int]] = @base.Store::new([])
+  let sort = @base.Store::new({ column: -1, asc: true })
   let clicks : Array[Int] = []
   let (root, tv) = mounted(
     table_v(
@@ -147,8 +147,8 @@ test "虚拟表格：表头固定不滚、行只挂可见区间、点选与 tabl
 ///|
 test "粘性列表：滚动跨过组边界时吸顶标题换文字，组内行照常滚走" {
   let st = StickyList::new()
-  let rows_of = fn(prefix : String) -> Array[@core.Node] {
-    let out : Array[@core.Node] = []
+  let rows_of = fn(prefix : String) -> Array[@widget.Node] {
+    let out : Array[@widget.Node] = []
     for i = 1; i <= 4; i = i + 1 {
       out.push(view([text(prefix + i.to_string(), font_size=12.0)], height=20.0))
     }
@@ -204,7 +204,7 @@ test "缺陷钉桩：滚动后可见行必须落在视口内（非整行偏移�
       items,
       150.0,
       30.0,
-      fn(i : Int, _x : Int) -> @core.Node {
+      fn(i : Int, _x : Int) -> @widget.Node {
         view([text("行 " + i.to_string())], height=30.0)
       },
       width=260.0,
@@ -266,8 +266,8 @@ test "虚拟列表与滚动族只读样式槽：class 覆盖视口描边与分�
   if !ui_text_guard() {
     return
   }
-  let red_count = fn(node : @core.Node, w : Double, h : Double) -> Int {
-    let root = @core.Widget::new()
+  let red_count = fn(node : @widget.Node, w : Double, h : Double) -> Int {
+    let root = @widget.Widget::new()
     root.set_size(w, h)
     root.set_column()
     let _ = node.mount_into(root)
@@ -287,7 +287,7 @@ test "虚拟列表与滚动族只读样式槽：class 覆盖视口描边与分�
     }
     n
   }
-  let row_of = fn(i : Int, _x : Int) -> @core.Node {
+  let row_of = fn(i : Int, _x : Int) -> @widget.Node {
     view([text("行 " + i.to_string())], height=30.0)
   }
   let plain = red_count(
@@ -312,7 +312,7 @@ test "虚拟列表与滚动族只读样式槽：class 覆盖视口描边与分�
 
   // 粘性列表：分组标题条的底色与文字色吃 class
   let st = StickyList::new()
-  let rows_of = fn() -> Array[@core.Node] {
+  let rows_of = fn() -> Array[@widget.Node] {
     [text("一行"), text("两行")]
   }
   let sticky_classed = red_count(
@@ -330,7 +330,7 @@ test "虚拟列表与滚动族只读样式槽：class 覆盖视口描边与分�
 
   // 滚动容器：内容超出视口才画框，框色吃 class
   let sc = ScrollState::new()
-  let many : Array[@core.Node] = []
+  let many : Array[@widget.Node] = []
   for i = 0; i < 20; i = i + 1 {
     let _ = many.push(text("内容行 " + i.to_string()))
   }

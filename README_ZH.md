@@ -4,7 +4,7 @@
 
 > **来时的路**：本库最初是 [赵成(zcbenz)](https://github.com/zcbenz) 的 [Yue / libyue](https://github.com/yue/yue) 的 MoonBit 封装，布局沿用 [Yoga](https://github.com/facebook/yoga) 的 flexbox。如今两者都不再是运行时依赖，只作行为参考与语料来源。也感谢 [MoonBit](https://github.com/moonbitlang)。
 
-[MoonBit](https://github.com/moonbitlang) 的**轻量跨平台桌面 GUI 框架**——窗口原生直连、渲染管线自绘、界面组件齐全、系统接口完备。一套代码跑 Windows ✅ / Linux ✅ 原生窗口，macOS 后端在 `mac` 分支落地中；`moon add` 后零配置直接运行。
+[MoonBit](https://github.com/moonbitlang) 的**跨平台桌面 GUI 框架**——一套 MoonBit 代码直出 Windows ✅ / Linux ✅ 原生窗口，托盘、通知、快捷键、文件对话框等系统能力开箱即用，`moon add` 后零配置直接运行。macOS 后端在 `mac` 分支落地中。
 
 简体中文 | [English](https://github.com/lb091188/moonbit-native-gui/blob/master/README.md)
 
@@ -16,9 +16,9 @@
 
 ## 核心特色
 
-**🖥 系统接口完备** —— 托盘、通知、全局快捷键、剪贴板、原生菜单、文件对话框、拖放、开机自启、空闲检测，以及音量 / 电源 / 壁纸 / 显示器 / 打印机 / 浏览器历史 / 已装应用等系统查询，统一在 `@sys` / `@core` API 之后。托盘按平台分 SNI / Shell_NotifyIcon / NSStatusItem 三种后端，Linux 另有 D-Bus 上的 MPRIS 媒体控制。能力探测 + 结构化降级，不静默失败。
+**🖥 系统接口完备** —— 托盘、通知、全局快捷键、剪贴板、原生菜单、文件对话框、拖放、开机自启等桌面常用能力开箱即用，另有音量 / 电源 / 壁纸 / 显示器 / 打印机等系统查询。能力探测 + 结构化降级，不静默失败。详见 [系统能力总览](docs/zh/system-capabilities.md)。
 
-**🎨 渲染管线自绘** —— 渲染走库自带的纯 MoonBit 软件光栅器，可选 Cairo 后端，不依赖 Skia 等重型图形引擎。Linux 实测：`hello` 最小窗口 release 二进制 **1.1 MB**、冷启动约 0.1 s 出窗；`showcase` 15 页全功能板 5.5 MB / 约 1 s。控件观感跨平台一致，默认跟随系统强调色与明暗模式，主题是可直接覆盖的普通值。
+**🎨 渲染管线自绘** —— 不依赖 Skia 等重型图形引擎，控件观感跨平台一致，默认跟随系统强调色与明暗模式，主题可按需定制。
 
 **📊 界面组件齐全** —— 折线 / 柱 / 饼 / 仪表 / 散点五类通用图，另有雷达 / 热力 / 蜡烛 / 漏斗 / 箱线 / 桑基 / 树 / 矩形树 / 旭日 / 地图等专项图，含横切交互层；Markdown 视图、内嵌 WebView 与自绘控件共用一个光栅器、一棵布局树。
 
@@ -46,7 +46,7 @@ fn main {
 
 ## 生态坐标
 
-MoonBit 生态的 GUI 能力各有分工：[MoUI](https://github.com/wzzc-dev/MoUI) 面向多端共享逻辑，[Sun](https://github.com/wzzc-dev/sun) 提供图形与文本渲染底层。native-gui 与它们零代码依赖，走第三条线——**桌面应用的一站式交付**：系统集成做深，桌面常用件做成开箱组件。
+MoonBit 生态的 GUI 能力各有分工：[MoUI](https://github.com/wzzc-dev/MoUI) 面向多端共享逻辑，[Sun](https://github.com/wzzc-dev/sun) 提供图形与文本渲染底层。native-gui 与它们零代码依赖，走第三条线——**桌面应用的一站式交付**：桌面常用能力开箱即用，常用控件做成现成组件。
 
 ## 包结构
 
@@ -57,7 +57,6 @@ MoonBit 生态的 GUI 能力各有分工：[MoUI](https://github.com/wzzc-dev/Mo
 | `NoahLiu/native-gui/base` | `@base` | 平台无关基元：`Store` / `Signal` / `ListStore` 响应式内核、焦点栈、键码常量、帧末合并与账本 |
 | `NoahLiu/native-gui/shell` | `@shell` | 系统能力壳层：菜单栏 / 右键菜单、全局热键门面、托盘、通知、外部打开，加上事件循环调度器与只读平台探针 |
 | `NoahLiu/native-gui/widget` | `@widget` | 自绘控件宿主：布局树映射、命中与事件路由、绘制遍历、声明式 `Node`、浮层（图层/原生两档）、拖放、输入映射、`App` 泵 |
-| `NoahLiu/native-gui/core` | `@core` | G9 Batch 2 迁移期门面：`@base`/`@shell`/`@widget` 名仍经 `@core` 转发可用 |
 | `.../native-gui/ui` | `@ui` | 自绘控件与组件库：窗口挂载、标签 / 按钮、表单、显示、导航、日期、表格与虚拟列表、输入框、滚动、浮层、代码视图、声明式层 |
 | `.../native-gui/render` | `@render` | 光栅器：纯 MoonBit 软件光栅 + Cairo 后端；位图、画布、图像、PNG |
 | `.../native-gui/text` | `@text` | 文本层：字体族、字体、富文本与区间属性（Pango / DirectWrite） |

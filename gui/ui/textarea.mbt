@@ -167,7 +167,7 @@ pub fn line_of_caret(lines : Array[TextLine], at : Int) -> Int {
 /// preedit 内联与单行框同源；换行键插入 `\n`，上下键按**显示行**移动（记住起算 x，
 /// 短行移动后仍回到该 x），Home/End 走行首行尾（带 Ctrl 仍是全文首末）。
 pub fn textarea(
-  store : @core.Store[String],
+  store : @base.Store[String],
   placeholder? : String = "",
   rows? : Int = 3,
   width? : Double = 260.0,
@@ -179,8 +179,8 @@ pub fn textarea(
   caret_on? : () -> Bool = fn() -> Bool { true },
   on_change? : (String) -> Unit = fn(_s : String) -> Unit { () },
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let ed = @input.Editor::new()
   attach_system_clipboard(ed)
   let _ = ed.insert_text(store.get())
@@ -205,7 +205,7 @@ pub fn textarea(
     }
   }
 
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let off = enabled_cell(None, false)
     let last_down = Ref(-1000000L)
@@ -214,7 +214,7 @@ pub fn textarea(
     let anchor = Ref(0)
     let pref_x : Ref[Double] = Ref(-1.0)
     w.focus_id = auto_focus_id(focus_id)
-    w.cursor = @core.CURSOR_TEXT
+    w.cursor = @widget.CURSOR_TEXT
     w.node.set_width(@yoga.fixed(width))
     w.node.set_height(@yoga.fixed(box_h))
     w.node.set_flex_shrink(0.0)
@@ -281,9 +281,9 @@ pub fn textarea(
     }
 
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let t = text_of()
       let lines = lines_of(t, r.w)
@@ -353,15 +353,15 @@ pub fn textarea(
       p.set_line_width(@style.number_of(sty.border_width, 1.0))
       p.stroke_rect(0.0, 0.0, r.w, r.h)
     })
-    w.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+    w.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
       if !ev.press || off.off {
         return false
       }
-      let shift = (ev.mods & @core.MOD_SHIFT) != 0
-      let ctrl = (ev.mods & @core.MOD_CTRL) != 0
+      let shift = (ev.mods & @base.MOD_SHIFT) != 0
+      let ctrl = (ev.mods & @base.MOD_CTRL) != 0
       let t = text_of()
       let lines = lines_of(t, w.rect.w)
-      if ev.keysym == @core.KS_RETURN {
+      if ev.keysym == @base.KS_RETURN {
         if ro {
           return false
         }
@@ -369,10 +369,10 @@ pub fn textarea(
         pref_x.val = -1.0
         push()
         ensure_visible(lines_of(ed.get_text(), w.rect.w))
-        @core.invalidate()
+        @widget.invalidate()
         return true
       }
-      if ev.keysym == @core.KS_UP || ev.keysym == @core.KS_DOWN {
+      if ev.keysym == @base.KS_UP || ev.keysym == @base.KS_DOWN {
         let caret = ed.caret_pos()
         let i = line_of_caret(lines, caret)
         let x = if pref_x.val >= 0.0 {
@@ -380,7 +380,7 @@ pub fn textarea(
         } else {
           caret_x_in(lines, caret)
         }
-        let j = if ev.keysym == @core.KS_UP { i - 1 } else { i + 1 }
+        let j = if ev.keysym == @base.KS_UP { i - 1 } else { i + 1 }
         if j < 0 || j >= lines.length() {
           pref_x.val = -1.0
           return false
@@ -409,13 +409,13 @@ pub fn textarea(
         }
         anchor.val = at
         ensure_visible(lines)
-        @core.invalidate()
+        @widget.invalidate()
         return true
       }
-      if !ctrl && (ev.keysym == @core.KS_HOME || ev.keysym == @core.KS_END) {
+      if !ctrl && (ev.keysym == @base.KS_HOME || ev.keysym == @base.KS_END) {
         let caret = ed.caret_pos()
         let ln = lines[line_of_caret(lines, caret)]
-        let at = if ev.keysym == @core.KS_HOME { ln.start } else { ln.end }
+        let at = if ev.keysym == @base.KS_HOME { ln.start } else { ln.end }
         pref_x.val = -1.0
         if shift {
           let a = match ed.selection() {
@@ -427,11 +427,11 @@ pub fn textarea(
           ed.select_range(at, at)
         }
         ensure_visible(lines)
-        @core.invalidate()
+        @widget.invalidate()
         return true
       }
-      let editing = ev.keysym == @core.KS_BACKSPACE || ev.keysym == @core.KS_DELETE
-      let nav = ctrl || (ev.keysym >= 65360 && ev.keysym <= 65367) || ev.keysym == @core.KS_TAB
+      let editing = ev.keysym == @base.KS_BACKSPACE || ev.keysym == @base.KS_DELETE
+      let nav = ctrl || (ev.keysym >= 65360 && ev.keysym <= 65367) || ev.keysym == @base.KS_TAB
       if ro && (editing || !nav) {
         return false
       }
@@ -443,7 +443,7 @@ pub fn textarea(
           push()
         }
         ensure_visible(lines_of(ed.get_text(), w.rect.w))
-        @core.invalidate()
+        @widget.invalidate()
       }
       handled
     })
@@ -451,21 +451,21 @@ pub fn textarea(
       let _ = ed.insert_text(t)
       push()
       ensure_visible(lines_of(ed.get_text(), w.rect.w))
-      @core.invalidate()
+      @widget.invalidate()
       true
     })
     w.on_preedit = Some(fn(t : String, _caret : Int) -> Unit {
       ed.set_preedit(t)
-      @core.invalidate()
+      @widget.invalidate()
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => {
           let lines = lines_of(text_of(), self.rect.w)
-          let now = @core.now_ms()
+          let now = @shell.now_ms()
           let dbl = (now - last_down.val) < 400L &&
             (ev.x - last_xy.val.0).abs() < 4.0 && (ev.y - last_xy.val.1).abs() < 4.0
           last_down.val = now
@@ -480,14 +480,14 @@ pub fn textarea(
             ed.select_range(at, at)
             anchor.val = at
           }
-          @core.invalidate()
+          @widget.invalidate()
           true
         }
         @widget.PointerKind::Move => {
           if dragging.val {
             let lines = lines_of(text_of(), self.rect.w)
             ed.select_range(anchor.val, byte_at(lines, ev.x, ev.y))
-            @core.invalidate()
+            @widget.invalidate()
           }
           dragging.val
         }
@@ -498,7 +498,7 @@ pub fn textarea(
         @widget.PointerKind::Leave => false
       }
     })
-    w.on_scroll = Some(fn(ev : @core.ScrollEvent) -> Bool {
+    w.on_scroll = Some(fn(ev : @widget.ScrollEvent) -> Bool {
       let before = st.offset
       st.scroll_by(0.0 - ev.dy * line_h * 3.0)
       st.offset != before
@@ -506,7 +506,7 @@ pub fn textarea(
     w.im_context = Some(fn() -> (String, Int)? {
       Some((ed.get_text(), ed.caret_pos()))
     })
-    w.im_cursor = Some(fn(self : @core.Widget) -> @core.Rect? {
+    w.im_cursor = Some(fn(self : @widget.Widget) -> @base.Rect? {
       let lines = lines_of(text_of(), self.rect.w)
       let caret = ed.caret_pos()
       Some({
@@ -522,10 +522,10 @@ pub fn textarea(
     let sid = store.subscribe_id(fn(t : String) -> Unit {
       if t != ed.get_text() {
         ed.set_text(t)
-        @core.invalidate()
+        @widget.invalidate()
       }
     })
-    @core.sub_bag_register(fn() { store.remove(sid) })
+    @base.sub_bag_register(fn() { store.remove(sid) })
     fold_style(
       w,
       @style.style(background_color="bg_panel", border_color="border", border_width=1.0, color="text_regular").focus(border_color="primary"),

@@ -134,7 +134,7 @@ test "step：只改字号也按帧插值，中帧给中间值" {
 /// 测量期要按「这一帧该画的字号/行高」量：这两条是绘制与测量共用的属性，盒子若
 /// 还按基块量，字放大后就被裁在半盒里（看着仍是跳变）。这条把两边对齐钉住。
 test "resolved_for_measure：与绘制期同一份字号与行高，落定后跟目标值" {
-  let w = @core.Widget::new()
+  let w = @widget.Widget::new()
   apply(
     w,
     style(
@@ -169,7 +169,7 @@ test "resolved_for_measure：与绘制期同一份字号与行高，落定后跟
 
 ///|
 test "style_for：配了 transition_ms 才走插值，没配的控件不留账" {
-  let w = @core.Widget::new()
+  let w = @widget.Widget::new()
   apply(
     w,
     style(
@@ -186,7 +186,7 @@ test "style_for：配了 transition_ms 才走插值，没配的控件不留账" 
   w.hovered = false
   assert_eq(hex_of(style_for(w).background_color), "#000000")
   assert_false(anim_running(w.id))
-  let plain = @core.Widget::new()
+  let plain = @widget.Widget::new()
   apply(plain, style(background_color="#000000"))
   let before = anim_count()
   assert_eq(hex_of(style_for(plain).background_color), "#000000")

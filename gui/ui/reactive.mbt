@@ -24,16 +24,16 @@ pub fn[T] when_default_pred(v : T) -> Bool {
 ///|
 /// `when`（信号版·单支）：真挂 `then`、假隐藏——不销毁、状态不丢。
 pub fn[T] when(
-  cond : @core.Signal[T],
-  then : @core.Node,
+  cond : @base.Signal[T],
+  then : @widget.Node,
   pred? : (T) -> Bool = when_default_pred,
-) -> @core.Node {
-  @core.node_of_new(fn(host : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(host : @widget.Widget) -> @widget.Widget {
     let w = (then.mount)(host)
     w.set_visible(pred(cond.get()))
     let _ = cond.subscribe(fn(v : T) -> Unit {
       w.set_visible(pred(v))
-      let _ = @core.invalidate()
+      let _ = @widget.invalidate()
     })
     host
   })
@@ -42,19 +42,19 @@ pub fn[T] when(
 ///|
 /// `when`（双支常驻）：两支都预建，按信号切显隐（宿主包裹切显隐，零重建）。
 pub fn[T] when_else(
-  cond : @core.Signal[T],
-  then : @core.Node,
-  otherwise : @core.Node,
+  cond : @base.Signal[T],
+  then : @widget.Node,
+  otherwise : @widget.Node,
   pred? : (T) -> Bool = when_default_pred,
-) -> @core.Node {
-  @core.node_of_new(fn(host : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(host : @widget.Widget) -> @widget.Widget {
     let va = (then.mount)(host)
     let vb = (otherwise.mount)(host)
     fn apply(v : T) -> Unit {
       let t = pred(v)
       va.set_visible(t)
       vb.set_visible(!t)
-      let _ = @core.invalidate()
+      let _ = @widget.invalidate()
     }
     apply(cond.get())
     let _ = cond.subscribe(apply)
@@ -65,21 +65,21 @@ pub fn[T] when_else(
 ///|
 /// `when`（Store 形态）：同一棵树盯一个 `Store`（§3 第 5 条输入类组件同源）。
 pub fn[T] when_store(
-  cond : @core.Store[T],
-  then : @core.Node,
+  cond : @base.Store[T],
+  then : @widget.Node,
   pred? : (T) -> Bool = when_default_pred,
-) -> @core.Node {
+) -> @widget.Node {
   when(cond.signal(), then, pred=pred)
 }
 
 ///|
 /// `when_else`（Store 形态）。
 pub fn[T] when_else_store(
-  cond : @core.Store[T],
-  then : @core.Node,
-  otherwise : @core.Node,
+  cond : @base.Store[T],
+  then : @widget.Node,
+  otherwise : @widget.Node,
   pred? : (T) -> Bool = when_default_pred,
-) -> @core.Node {
+) -> @widget.Node {
   when_else(cond.signal(), then, otherwise, pred=pred)
 }
 
@@ -87,26 +87,26 @@ pub fn[T] when_else_store(
 /// `for_list`（keyed）：`build(item, index)` 建行；缺省判据「同键同值」（元素
 /// 内容变化不该触发行重挂——会变的字段各自做成 Store，§4.0）。
 pub fn[T, K : Eq] for_list(
-  ls : @core.ListStore[T],
-  build : (T, Int) -> @core.Node,
+  ls : @base.ListStore[T],
+  build : (T, Int) -> @widget.Node,
   key~ : (T) -> K,
   eq~ : (T, T) -> Bool = fn(_a : T, _b : T) -> Bool { true },
-) -> @core.Node {
+) -> @widget.Node {
   list_node(ls, build, key, eq)
 }
 
 ///|
 /// `for_list`（按下标对齐，等价无 `:key`）：长度收缩才卸多余行，改一格重挂那行。
 pub fn[T] for_list_indexed(
-  ls : @core.ListStore[T],
-  build : (T, Int) -> @core.Node,
-) -> @core.Node {
+  ls : @base.ListStore[T],
+  build : (T, Int) -> @widget.Node,
+) -> @widget.Node {
   // 下标对齐：键恒等 → 同下标比内容，内容变即重挂该行（Vue 无 :key 的语义）
   list_node(
     ls,
     build,
     fn(_t : T) -> Int { 0 },
-    fn(a : T, b : T) -> Bool { @core.index_same(a, b) },
+    fn(a : T, b : T) -> Bool { @base.index_same(a, b) },
     indexed=true,
   )
 }
@@ -115,18 +115,18 @@ pub fn[T] for_list_indexed(
 /// 记账核心：`keys`（键→行控件）+ 平行数组（下标→键/值/控件）。
 /// 一轮更新= 卸 removed/changed 的旧控件 → 按新序列逐位「复用挪位 / 新建插入」。
 fn[T, K : Eq] list_node(
-  ls : @core.ListStore[T],
-  build : (T, Int) -> @core.Node,
+  ls : @base.ListStore[T],
+  build : (T, Int) -> @widget.Node,
   key : (T) -> K,
   eq : (T, T) -> Bool,
   indexed~ : Bool = false,
-) -> @core.Node {
-  @core.node_of_new(fn(host : @core.Widget) -> @core.Widget {
+) -> @widget.Node {
+  @widget.node_of_new(fn(host : @widget.Widget) -> @widget.Widget {
     host.node.set_flex_direction(@yoga.Column)
     host.node.set_align_items(@yoga.AlignItems::Stretch)
     let ks : Array[K] = []
     let vs : Array[T] = []
-    let ws : Array[@core.Widget] = []
+    let ws : Array[@widget.Widget] = []
     fn sync(items : Array[T]) -> Unit {
       // 1) 差分卸账：键没了、或同键值变了——旧控件出树（重复键的多余行一并出）
       let mut cut = 0
@@ -210,7 +210,7 @@ fn[T, K : Eq] list_node(
           }
         }
       }
-      let _ = @core.invalidate()
+      let _ = @widget.invalidate()
     }
     sync(ls.get())
     let _ = ls.signal().subscribe(fn(items : Array[T]) -> Unit { sync(items) })
@@ -220,13 +220,13 @@ fn[T, K : Eq] list_node(
 
 ///|
 /// `when`（布尔源·常用档）：直接看 `Bool` 值显隐。
-pub fn when_bool(cond : @core.Signal[Bool], then : @core.Node) -> @core.Node {
+pub fn when_bool(cond : @base.Signal[Bool], then : @widget.Node) -> @widget.Node {
   when(cond, then, pred=fn(v : Bool) -> Bool { v })
 }
 
 ///|
 /// `when_store`（布尔源·常用档）。
-pub fn when_store_bool(cond : @core.Store[Bool], then : @core.Node) -> @core.Node {
+pub fn when_store_bool(cond : @base.Store[Bool], then : @widget.Node) -> @widget.Node {
   when_bool(cond.signal(), then)
 }
 
@@ -234,17 +234,17 @@ pub fn when_store_bool(cond : @core.Store[Bool], then : @core.Node) -> @core.Nod
 /// `when_else`（布尔源·常用档）：两支常驻、切显隐零重建（与 `swap_node` 同机制，
 /// 外面套一层宿主以便按 then/else 语义对齐位序；宿主本身不占绘制）。
 pub fn when_else_bool(
-  cond : @core.Signal[Bool],
-  then : @core.Node,
-  otherwise : @core.Node,
-) -> @core.Node {
-  @core.node_of_new(fn(host : @core.Widget) -> @core.Widget {
+  cond : @base.Signal[Bool],
+  then : @widget.Node,
+  otherwise : @widget.Node,
+) -> @widget.Node {
+  @widget.node_of_new(fn(host : @widget.Widget) -> @widget.Widget {
     let va = (then.mount)(host)
     let vb = (otherwise.mount)(host)
     fn apply(v : Bool) -> Unit {
       va.set_visible(v)
       vb.set_visible(!v)
-      let _ = @core.invalidate()
+      let _ = @widget.invalidate()
     }
     apply(cond.get())
     let _ = cond.subscribe(apply)
@@ -255,9 +255,9 @@ pub fn when_else_bool(
 ///|
 /// `when_else_store`（布尔源·常用档）。
 pub fn when_else_store_bool(
-  cond : @core.Store[Bool],
-  then : @core.Node,
-  otherwise : @core.Node,
-) -> @core.Node {
+  cond : @base.Store[Bool],
+  then : @widget.Node,
+  otherwise : @widget.Node,
+) -> @widget.Node {
   when_else_bool(cond.signal(), then, otherwise)
 }

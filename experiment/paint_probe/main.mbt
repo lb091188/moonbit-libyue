@@ -3,9 +3,9 @@
 // markdown / 纯填充」逐类隔离计时，定位剩下的钱花在哪。
 // 跑法：moon run experiment/paint_probe
 
-fn bench(name : String, build : () -> @core.Node, w : Int, h : Int, n : Int) -> Unit {
+fn bench(name : String, build : () -> @widget.Node, w : Int, h : Int, n : Int) -> Unit {
   let bm = @render.Bitmap::new(w, h)
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(w.to_double(), h.to_double())
   root.set_column()
   let _ = (build().mount)(root)
@@ -34,7 +34,7 @@ fn main {
     let _ = vals.push((i % 37).to_double())
     let _ = vals2.push(((i * 7) % 53).to_double())
   }
-  let lin = @core.Store::new([
+  let lin = @base.Store::new([
     @chart.LineSeries::make("负载", max_points=80).with_points(vals),
     @chart.LineSeries::make("延迟", max_points=80).with_points(vals2),
   ])
@@ -44,15 +44,15 @@ fn main {
     let _ = bar_arr.push(@chart.BarItem::make("c\{i}", ((i * 13) % 29).to_double() - 4.0))
     i += 1
   }
-  let bars = @core.Store::new(bar_arr)
-  let rings = @core.Store::new([
+  let bars = @base.Store::new(bar_arr)
+  let rings = @base.Store::new([
     @chart.DonutSlice::make("已完成", 46.0),
     @chart.DonutSlice::make("进行中", 33.0),
     @chart.DonutSlice::make("待办", 21.0),
   ])
   bench(
     "chart_row(折线80x2+柱29+环3, 330x130x2+210x130)",
-    fn() -> @core.Node {
+    fn() -> @widget.Node {
       @ui.view(
         [
           @chart.line_chart_it(lin, area=true, width=330.0, height=130.0),
@@ -75,10 +75,10 @@ fn main {
     let _ = tb_arr.push(@ui.TableRow::make(["虚拟行 \{i}", "\{i} 处", if i % 3 == 0 { "待修" } else { "通过" }]))
     i += 1
   }
-  let tb_rows = @core.Store::new(tb_arr)
+  let tb_rows = @base.Store::new(tb_arr)
   bench(
     "table_v(3列200行, 400x210)",
-    fn() -> @core.Node {
+    fn() -> @widget.Node {
       @ui.table_v(
         [
           @ui.TableColumn::make("名称", 160.0),
@@ -98,7 +98,7 @@ fn main {
   // ③ markdown：native-app 文档块同款（17 种 block + GFM）
   bench(
     "markdown_view(420 宽全要素)",
-    fn() -> @core.Node {
+    fn() -> @widget.Node {
       @mdview.markdown_view(
         "# 原生 GUI 栈\n\n段落含 **粗体**、*斜体*、~~删除线~~、`行内码` 与 [链接](https://moonbit-libyue.pages.dev)。\n\n- 无序项\n- [ ] 待办\n- [x] 已办\n\n1. 第一\n2. 第二\n\n> 引用块一行\n\n```moonbit\nfn main {\n  println(\"hi\")\n}\n```\n\n| 列甲 | 列乙 |\n| --- | ---: |\n| a | 1 |\n\n---\n\n术语\n: 定义\n\n脚注引用[^n1]。\n\n[^n1]: 脚注定义一行",
         width=420.0,

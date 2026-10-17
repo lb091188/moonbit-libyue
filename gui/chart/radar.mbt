@@ -293,19 +293,19 @@ fn radar_draw_chart(
 /// 0）；两者各经一个 Store 驱动，set 后只重绘画布不重建控件树；主题切换
 /// 现取色自动跟随。
 pub fn radar_chart_t(
-  indicators : @core.Store[Array[RadarIndicator]],
-  series : @core.Store[Array[RadarSeries]],
+  indicators : @base.Store[Array[RadarIndicator]],
+  series : @base.Store[Array[RadarSeries]],
   rings? : Int = 4,
   show_legend? : Bool = true,
   width? : Double = 0.0,
   height? : Double = 340.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(indicators)
   @ui.follow_store(series)
   let nrings = rings
   let legend = show_legend
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -315,9 +315,9 @@ pub fn radar_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

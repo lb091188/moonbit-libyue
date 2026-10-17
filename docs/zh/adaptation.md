@@ -241,7 +241,7 @@
 - **平台探测走运行期 `@sys.sys_platform()`**（C 桩 `ffi_sys_platform` 回 1/2/3 → "windows"/"macos"/"linux"），与 AGENTS 规则 11「运行时探测 + 模式匹配、禁用 `#cfg`」一致；`is_mac` 判据同源（决定 `CmdOrCtrl` 映射）。
 - **两个本工具链小坑（都已在代码里踩过）**：① `Array` **没有 `find`**——回查表线性扫用手写循环（`for h in arr { if … return Some(h) }`）；数组追加用 `arr.push(x)`，**不要写 `arr + [x]`**（解析器把 `+` 当 infix，报 `unexpected token infix 1`，错误信息离根因很远）。② `inspect(value, content="…")` 的 `content` 是**与 value 字符串化结果比较**的字符串——布尔值要传 `"true"`/`"false"`，传 "supported" 这类描述词必失败（本批与 taskbar 批各踩一次，记此一处）。
 - **回证**：`gui/core/hotkey_wbtest.mbt` 2 条（未注册 id 回查给空串；「连上了才硬断言」——后端可用时空加速串必须走 `Err(Failed)` 而不是崩或静默成功，其余平台只打印 skip）；`moon test ./gui/core` **118/118**（原 116 + 新增 2）。`examples/native-app` 的热键区块从直调 `@win.*` 切到 `@core.hotkey_*`（注册 / 轮询两处，轮询命中直接拿 spec 回显），`--deny-warn` 零警告、冒烟 100 秒无 panic 无 CRITICAL。
-- **本批未做且不假装完成**：Linux `XGrabKey` 与 macOS 热键后端（门面已就位，后端落地不改调用方）；tray/notify 两族既有 API 的统一重构（明确不做，理由见第一条）。
+- **本批未做且不假装完成**：macOS 热键后端（门面已就位，后端落地不改调用方）；Linux `XGrabKey` 已在同批 W22 Linux 档落地，见下文「Linux 全局热键后端」条；tray/notify 两族既有 API 的统一重构（明确不做，理由见第一条）。
 
 ### MoonBit 原生 GUI 栈 · Linux 全局热键后端（W22 Linux 档：X11 `XGrabKey`，2026-10-16）
 

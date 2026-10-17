@@ -238,7 +238,7 @@ pub fn sort_rows(rows : Array[TableRow], sort : TableSort) -> Array[TableRow] {
 fn draw_cell(
   p : @render.Painter,
   cell : TableCell,
-  r : @core.Rect,
+  r : @base.Rect,
   align : @text.TextAlign,
   font : @text.Font,
   small_font : @text.Font,
@@ -330,16 +330,16 @@ fn draw_cell(
 fn table_header(
   columns : Array[TableColumn],
   widths : Ref[Array[Double]],
-  sort : @core.Store[TableSort]?,
+  sort : @base.Store[TableSort]?,
   head_h : Double,
   on_resize? : ((Int, Double) -> Unit)? = None,
-  selection? : @core.Store[Array[Int]]? = None,
+  selection? : @base.Store[Array[Int]]? = None,
   row_count? : () -> Int = fn() -> Int { 0 },
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Widget {
+) -> @widget.Widget {
   let head_font = @text.Font::new("", 13.0, weight=@text.SemiBold)
   // 全选框切换：全选（或部分）→ 清空，未选 → 全选
-  fn toggle_all(sel : @core.Store[Array[Int]]) -> Unit {
+  fn toggle_all(sel : @base.Store[Array[Int]]) -> Unit {
     let n = row_count()
     let cur = sel.get()
     if n > 0 && cur.length() >= n {
@@ -351,9 +351,9 @@ fn table_header(
       }
       sel.set(all)
     }
-    @core.invalidate()
+    @widget.invalidate()
   }
-      let head = @core.Widget::new()
+      let head = @widget.Widget::new()
       head.node.set_flex_direction(@yoga.Row)
       head.node.set_height(@yoga.fixed(head_h))
       head.node.set_width(@yoga.percent(100.0))
@@ -361,12 +361,12 @@ fn table_header(
         let col = columns[j]
         let idx = j
         // 多选表第一列带全选框（其余列/无多选不带）
-        let sel_here : @core.Store[Array[Int]]? = if j == 0 { selection } else { None }
+        let sel_here : @base.Store[Array[Int]]? = if j == 0 { selection } else { None }
         let title_x = match sel_here {
           Some(_) => 30.0
           None => 10.0
         }
-        let cell = @core.Widget::new()
+        let cell = @widget.Widget::new()
         cell.node.set_width(@yoga.fixed(widths.val[j]))
         cell.node.set_height(@yoga.fixed(head_h))
         @style.apply(
@@ -377,9 +377,9 @@ fn table_header(
           ]),
         )
         cell.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           p.set_fill_color(@style.color_of(st.background_color, @theme.theme_fill_zebra()))
@@ -478,10 +478,10 @@ fn table_header(
           None => false
         }
         if col.sortable {
-          cell.cursor = @core.CURSOR_HAND
+          cell.cursor = @widget.CURSOR_HAND
           cell.on_pointer = Some(fn(
-            self : @core.Widget,
-            ev : @core.PointerEvent,
+            self : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               // 贴列边界那 3px 的按下让给表头（列宽拖动）：单元格自己吃下按下就
@@ -512,7 +512,7 @@ fn table_header(
                     } else {
                       s.set({ column: idx, asc: true })
                     }
-                    @core.invalidate()
+                    @widget.invalidate()
                   }
                   None => ()
                 }
@@ -522,10 +522,10 @@ fn table_header(
             }
           })
         } else if sel_clickable {
-          cell.cursor = @core.CURSOR_HAND
+          cell.cursor = @widget.CURSOR_HAND
           cell.on_pointer = Some(fn(
-            _self : @core.Widget,
-            ev : @core.PointerEvent,
+            _self : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               @widget.PointerKind::Up =>
@@ -549,8 +549,8 @@ fn table_header(
   let drag_left0 : Ref[Double] = Ref(0.0)
   let drag_right0 : Ref[Double] = Ref(0.0)
   head.on_pointer = Some(fn(
-    self : @core.Widget,
-    ev : @core.PointerEvent,
+    self : @widget.Widget,
+    ev : @widget.PointerEvent,
   ) -> Bool {
     match ev.kind {
       @widget.PointerKind::Down => {
@@ -585,7 +585,7 @@ fn table_header(
             Some(f) => f(drag.val, nw)
             None => ()
           }
-          @core.invalidate()
+          @widget.invalidate()
           true
         } else {
           false
@@ -616,13 +616,13 @@ fn table_row_widget(
   row : TableRow,
   src : Int,
   row_height : Double,
-  selection : @core.Store[Array[Int]]?,
+  selection : @base.Store[Array[Int]]?,
   on_row_click : (Int, TableRow) -> Unit,
   skin~ : @style.Style = @style.empty_style(),
-) -> @core.Widget {
+) -> @widget.Widget {
   let font = @text.Font::new("", 13.0)
   let small_font = @text.Font::new("", 12.0)
-          let row_w = @core.Widget::new()
+          let row_w = @widget.Widget::new()
           row_w.node.set_flex_direction(@yoga.Row)
           row_w.node.set_width(@yoga.percent(100.0))
           row_w.node.set_height(@yoga.fixed(row_height))
@@ -642,9 +642,9 @@ fn table_row_widget(
             ]),
           )
           row_w.on_draw = Some(fn(
-            self : @core.Widget,
+            self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             let st = @style.style_for(self)
             let mut bg = @style.color_of(st.background_color, "")
@@ -674,15 +674,15 @@ fn table_row_widget(
           })
           for j = 0; j < columns.length(); j = j + 1 {
             let col = columns[j]
-            let cell = @core.Widget::new()
+            let cell = @widget.Widget::new()
             cell.node.set_width(@yoga.fixed(cols_w[j]))
             cell.node.set_height(@yoga.fixed(row_height))
             let content = cell_of(row, j)
             @style.apply(cell, skin)
             cell.on_draw = Some(fn(
-              self : @core.Widget,
+              self : @widget.Widget,
               p : @render.Painter,
-              r : @core.Rect,
+              r : @base.Rect,
             ) -> Unit {
               let st = @style.style_for(self)
               draw_cell(
@@ -697,10 +697,10 @@ fn table_row_widget(
             })
             row_w.append_child(cell)
           }
-          row_w.cursor = @core.CURSOR_HAND
+          row_w.cursor = @widget.CURSOR_HAND
           row_w.on_pointer = Some(fn(
-            _s : @core.Widget,
-            ev : @core.PointerEvent,
+            _s : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               @widget.PointerKind::Down => true
@@ -725,7 +725,7 @@ fn table_row_widget(
                   None => ()
                 }
                 on_row_click(src, row)
-                @core.invalidate()
+                @widget.invalidate()
                 false
               }
               _ => false
@@ -740,17 +740,17 @@ fn table_row_widget(
 /// （点框区切全选/清空，部分选中画横条；点标题区照旧排序）。
 pub fn table(
   columns : Array[TableColumn],
-  rows : @core.Store[Array[TableRow]],
+  rows : @base.Store[Array[TableRow]],
   width? : Double = 560.0,
   row_height? : Double = 36.0,
-  selection? : @core.Store[Array[Int]],
-  sort? : @core.Store[TableSort],
+  selection? : @base.Store[Array[Int]],
+  sort? : @base.Store[TableSort],
   on_row_click? : (Int, TableRow) -> Unit = fn(_i : Int, _r : TableRow) -> Unit { () },
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let head_h = 40.0
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     match selection {
       Some(s) => follow_store(s)
@@ -765,12 +765,12 @@ pub fn table(
     w.node.set_width(@yoga.fixed(width))
     // 列宽是活的：表头拖动时改它，行内单元格跟着改宽（不重建树）
     let widths : Ref[Array[Double]] = Ref(table_widths(columns, width - 2.0))
-    let body_cells : Ref[Array[Array[@core.Widget]]] = Ref([])
+    let body_cells : Ref[Array[Array[@widget.Widget]]] = Ref([])
     @style.apply(w, @style.style(background_color="bg_panel", border_color="border", border_width=1.0))
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let st = @style.style_for(self)
       p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -800,7 +800,7 @@ pub fn table(
       ),
     )
     // ---- 数据行（重建式） ----
-    let body = @core.Widget::new()
+    let body = @widget.Widget::new()
     body.node.set_flex_direction(@yoga.Column)
     body.node.set_width(@yoga.percent(100.0))
     w.append_child(body)
@@ -825,13 +825,13 @@ pub fn table(
         body.append_child(row_w)
         body_cells.val.push(row_w.children())
       }
-      @core.invalidate()
+      @widget.invalidate()
     }
 
     let sid = rows.signal().subscribe(fn(_v : Array[TableRow]) -> Unit {
       render_all()
     })
-    @core.sub_bag_register(fn() { rows.signal().remove(sid) })
+    @base.sub_bag_register(fn() { rows.signal().remove(sid) })
     render_all()
     fold_style(w, @style.empty_style(), class)
     handle(w)

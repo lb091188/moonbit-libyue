@@ -470,8 +470,8 @@ test {
 }
 
 ///|
-fn md_mounted(node : @core.Node, w : Double, h : Double) -> (@core.Widget, @core.Widget) {
-  let root = @core.Widget::new()
+fn md_mounted(node : @widget.Node, w : Double, h : Double) -> (@widget.Widget, @widget.Widget) {
+  let root = @widget.Widget::new()
   root.set_size(w, h)
   root.set_column()
   root.node.set_align_items(@yoga.AlignItems::FlexStart)
@@ -537,7 +537,7 @@ test "markdown_view 组件:链接点击走 on_link 回调、手型光标" {
 /// rect=(0,111,18,0) 而正文在 102..120）。
 test "有序列表：序号与正文落在同一条基线上" {
   let node = markdown_view("1. 第一\n2. 第二", width=300.0)
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(300.0, 200.0)
   root.set_column()
   root.node.set_align_items(@yoga.AlignItems::FlexStart)
@@ -555,7 +555,7 @@ test "有序列表：序号与正文落在同一条基线上" {
   let marker = cells[0]
   assert_true(marker.rect.h > 0.0, msg="标记格高度为 0（未注册测量）")
   // 两格都非空墨，且底边（基线附近）相差不超过 2px
-  let ink_of = fn(w : @core.Widget) -> (Int, Int) {
+  let ink_of = fn(w : @widget.Widget) -> (Int, Int) {
     let x0 = w.rect.x.round().to_int()
     let y0 = w.rect.y.round().to_int()
     let x1 = (w.rect.x + w.rect.w).round().to_int()
@@ -590,8 +590,8 @@ test "有序列表：序号与正文落在同一条基线上" {
 
 ///|
 /// 折行与落色判据共用:把节点挂进定宽根、回一次布局。
-fn mount_doc(node : @core.Node, w : Double, h : Double) -> @core.Widget {
-  let root = @core.Widget::new()
+fn mount_doc(node : @widget.Node, w : Double, h : Double) -> @widget.Widget {
+  let root = @widget.Widget::new()
   root.set_size(w, h)
   root.set_column()
   root.node.set_align_items(@yoga.AlignItems::FlexStart)
@@ -610,7 +610,7 @@ test {
   let doc_w = 300.0
   let root = mount_doc(markdown_view(src, width=doc_w), 360.0, 400.0)
   let widest = Ref(0.0)
-  let stack : Array[@core.Widget] = root.children()
+  let stack : Array[@widget.Widget] = root.children()
   while stack.length() > 0 {
     let w = stack.pop().unwrap()
     if w.rect.w > widest.val {
@@ -636,7 +636,7 @@ test {
   let doc_w = 200.0
   let root = mount_doc(markdown_view(src, width=doc_w), 260.0, 300.0)
   let widest = Ref(0.0)
-  let stack : Array[@core.Widget] = root.children()
+  let stack : Array[@widget.Widget] = root.children()
   while stack.length() > 0 {
     let w = stack.pop().unwrap()
     if w.rect.w > widest.val {

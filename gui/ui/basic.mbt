@@ -1,5 +1,5 @@
 // 基础原语：容器 / 面板 / 分隔线 / 文本 / 图像 / 图标（§2 前端化命名后）。
-// 一律返回 `@core.Node`（建树不实例化），颜色在 `on_draw` 里现取主题值。
+// 一律返回 `@widget.Node`（建树不实例化），颜色在 `on_draw` 里现取主题值。
 //
 // 与 master 的一条差仍成立：禁用态配色暂用「fill_hover 底 + text_secondary
 // 字」，真正的 disabled 色板随主题批补进 `Theme`。
@@ -9,7 +9,7 @@
 /// 通用容器：方向、两个轴的间距、内边距、尺寸、底色与描边。
 /// 尺寸给 0 表示按内容；要撑满剩余空间用 `grow=1.0`。
 pub fn view(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   direction? : @yoga.FlexDirection = @yoga.Column,
   row_gap? : Double = 0.0,
   column_gap? : Double = 0.0,
@@ -22,8 +22,8 @@ pub fn view(
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Stretch,
   justify_content? : @yoga.JustifyContent = @yoga.JustifyContent::FlexStart,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   // 散参数（颜色与布局同规则）全部折进匿名块：`class` 在后 ⇒ class > 散参数
   // 由数组顺序直接成立，节点上不再留第二条写入路径（§1.5）
   let lay = @style.empty_style()
@@ -64,14 +64,14 @@ pub fn view(
     },
   ]
   let anon = @style.merge_all(blocks)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     // 样式先落（class 覆盖散参数由数组顺序保证），再读 resolved 供绘制
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 绘制期只读样式槽并按状态选桶（§1.5 唯一路径）：散参数与 class 都在挂载时
       // 折进槽里，`handle=` 里后 apply 的样式下一帧就生效
@@ -98,7 +98,7 @@ pub fn view(
         }
       }
     })
-    @core.mount_children(w, children)
+    @widget.mount_children(w, children)
     handle(w)
     w
   })
@@ -108,12 +108,12 @@ pub fn view(
 /// 带标题的面板（标题在上、内容在下，面板底 + 描边）。
 pub fn panel(
   title : String,
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   padding? : Double = 10.0,
   row_gap? : Double = 6.0,
   width? : Double = 0.0,
-) -> @core.Node {
-  let body : Array[@core.Node] = [text(title, font_size=12.0, color="text_secondary")]
+) -> @widget.Node {
+  let body : Array[@widget.Node] = [text(title, font_size=12.0, color="text_secondary")]
   for c in children {
     body.push(c)
   }
@@ -134,10 +134,10 @@ fn separator_impl(
   vertical~ : Option[Bool],
   color~ : Option[String],
   class~ : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   let vertical = vertical.unwrap_or(false)
   let color = color.unwrap_or("")
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     if vertical {
       w.node.set_width(@yoga.fixed(1.0))
@@ -153,9 +153,9 @@ fn separator_impl(
     }
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       p.set_fill_color(@style.color_of(s.background_color, @theme.theme_border()))
@@ -171,7 +171,7 @@ fn separator_impl(
 /// 这也是旧链路 `bind_label` 的对应物（就地改文本，不重建子树），§3 通则里
 /// 展示类 `*_dyn` 信号版的原型。
 pub fn text_dyn(
-  sig : @core.Signal[String],
+  sig : @base.Signal[String],
   role? : TextRole = Plain,
   font_size? : Double = 13.0,
   color? : String = "",
@@ -184,8 +184,8 @@ pub fn text_dyn(
   shrink_by_role? : Bool = false,
   anon? : @style.Style = @style.empty_style(),
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let src = text_source(
     sig.get(),
     role=role,
@@ -198,14 +198,14 @@ pub fn text_dyn(
     wrap=wrap,
     ellipsis=ellipsis,
   )
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     fold_style(w, anon, class)
     attach_text_measure(w, src)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let _ = draw_text_in(self, p, src)
     })
@@ -214,7 +214,7 @@ pub fn text_dyn(
       w.node.set_flex_shrink(0.0)
     }
     let sid = sig.subscribe(fn(v : String) -> Unit { relabel(w, src, v) })
-    @core.sub_bag_register(fn() { sig.remove(sid) })
+    @base.sub_bag_register(fn() { sig.remove(sid) })
     handle(w)
     w
   })
@@ -239,8 +239,8 @@ pub fn text(
   wrap? : Bool = false,
   ellipsis? : Bool = false,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let f = role_font(role)
   let eff_size = if has_role(role) { f.size } else { font_size }
   let eff_weight =
@@ -258,7 +258,7 @@ pub fn text(
     None => @style.empty_style()
   }
   text_dyn(
-    @core.Signal::new(content),
+    @base.Signal::new(content),
     role=role,
     font_size=eff_size,
     color=color,
@@ -286,20 +286,20 @@ pub fn divider(
   vertical? : Bool = false,
   color? : String = "",
   class? : Array[@style.Style] = [],
-) -> @core.Node {
+) -> @widget.Node {
   if text.length() == 0 {
     separator_impl(vertical=Some(vertical), color=Some(color), class=class)
   } else {
     let font = @text.Font::new("", 12.0)
-    @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+    @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
       watch_theme()
       w.node.set_height(@yoga.fixed(20.0))
       w.node.set_width(@yoga.percent(100.0))
       fold_style(w, @style.empty_style(), class)
       w.on_draw = Some(fn(
-        self : @core.Widget,
+        self : @widget.Widget,
         p : @render.Painter,
-        r : @core.Rect,
+        r : @base.Rect,
       ) -> Unit {
         let s = @style.style_for(self)
         let line = @style.color_of(s.background_color, @theme.theme_border())
@@ -325,18 +325,18 @@ pub fn image(
   path : String,
   width? : Double = 0.0,
   height? : Double = 0.0,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let img = @render.Image::new_from_file(path)
   let w0 = if width > 0.0 { width } else { img.get_width() }
   let h0 = if height > 0.0 { height } else { img.get_height() }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     w.node.set_width(@yoga.fixed(w0))
     w.node.set_height(@yoga.fixed(h0))
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       if !img.is_empty() {
         p.flush()
@@ -356,21 +356,21 @@ pub fn icon(
   size? : Double = 16.0,
   color? : String = "",
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let anon = match fg_block(color) {
     Some(b) => b
     None => @style.empty_style()
   }
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(size))
     w.node.set_height(@yoga.fixed(size))
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let c = @style.color_of(s.color, @theme.theme_text_regular())
@@ -399,8 +399,8 @@ pub fn icon_button(
   disabled? : Bool = false,
   enabled? : Enabled? = None,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   // 内置皮肤（圆角 + 悬停浅底 + 按下更深）写成样式块：基块没有底色，
   // 底色只从状态桶来，绘制期按 `self` 的态选桶即等价于旧的 hovered/pressed 分支
   let skin = @style.style(border_radius=4.0).hover(background_color="fill_hover").active(
@@ -414,18 +414,18 @@ pub fn icon_button(
     },
   ]
   let anon = @style.merge_all(blocks)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     let off = enabled_cell(enabled, disabled)
     w.node.set_width(@yoga.fixed(box_size))
     w.node.set_height(@yoga.fixed(box_size))
     w.node.set_flex_shrink(0.0)
-    w.cursor_fn = Some(enabled_cursor(off, @core.CURSOR_HAND))
+    w.cursor_fn = Some(enabled_cursor(off, @widget.CURSOR_HAND))
     fold_style(w, anon, class)
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let s = @style.style_for(self)
       let bg = @style.color_of(s.background_color, "")
@@ -442,8 +442,8 @@ pub fn icon_button(
       @icons.draw_icon(p, kind, r.w / 2.0, r.h / 2.0, icon_size / 2.0, c)
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => !off.off

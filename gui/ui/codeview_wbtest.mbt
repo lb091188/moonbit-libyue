@@ -3,7 +3,7 @@
 // 分词断言与 master components_wbtest 同源平移。
 
 ///|
-fn mounted_bm(w : @core.Widget) -> @render.Bitmap {
+fn mounted_bm(w : @widget.Widget) -> @render.Bitmap {
   let bm = @render.Bitmap::new(w.rect.w.round().to_int() + 2, w.rect.h.round().to_int() + 2)
   let p = @render.Painter::new(bm)
   w.paint_at(p, w.rect.x, w.rect.y)

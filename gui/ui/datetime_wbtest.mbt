@@ -29,7 +29,7 @@ fn cell_name(c : CalCell) -> String {
 
 ///|
 /// Store 里选中的日期（无值给 "-"）。
-fn sel_str(v : @core.Store[DateYMD?]) -> String {
+fn sel_str(v : @base.Store[DateYMD?]) -> String {
   match v.get() {
     Some(x) => x.format()
     None => "-"
@@ -37,13 +37,13 @@ fn sel_str(v : @core.Store[DateYMD?]) -> String {
 }
 
 ///|
-fn cell_at(panel : @core.Widget, idx : Int) -> @core.Widget {
+fn cell_at(panel : @widget.Widget, idx : Int) -> @widget.Widget {
   let grid = panel.children()[2]
   grid.children()[idx / 7].children()[idx % 7]
 }
 
 ///|
-fn pick(root : @core.Widget, c : @core.Widget) -> Unit {
+fn pick(root : @widget.Widget, c : @widget.Widget) -> Unit {
   let x = c.rect.x + c.rect.w / 2.0
   let y = c.rect.y + c.rect.h / 2.0
   let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x, y, button: 1, mods: 0 })
@@ -52,7 +52,7 @@ fn pick(root : @core.Widget, c : @core.Widget) -> Unit {
 
 ///|
 /// 面板底色取样点（左侧 padding 带，任何格子都够不到）。
-fn bg_of(bm : @render.Bitmap, panel : @core.Widget) -> (Int, Int, Int, Int) {
+fn bg_of(bm : @render.Bitmap, panel : @widget.Widget) -> (Int, Int, Int, Int) {
   px(bm, (panel.rect.x + 2.0).round().to_int(), (panel.rect.y + 60.0).round().to_int())
 }
 
@@ -131,7 +131,7 @@ test "本地今天：走平台日历时间而不是单调时钟" {
 ///|
 test "日历面板：点当月格选中并写 Store，跨月格与格外松开都不算一次" {
   let picked : Array[String] = []
-  let v = @core.Store::new(None)
+  let v = @base.Store::new(None)
   let (root, panel) = mounted(
     calendar(
       on_pick=fn(x : DateYMD) -> Unit { picked.push(x.format()) },
@@ -174,7 +174,7 @@ test "日历面板：点当月格选中并写 Store，跨月格与格外松开�
 ///|
 test "日历面板：切月后可选日期跟着换，选中格画实心方块" {
   let picked : Array[String] = []
-  let v = @core.Store::new(None)
+  let v = @base.Store::new(None)
   let (root, panel) = mounted(
     calendar(
       on_pick=fn(x : DateYMD) -> Unit { picked.push(x.format()) },
@@ -222,7 +222,7 @@ test "日历面板：切月后可选日期跟着换，选中格画实心方块" 
 
 ///|
 test "外部改 Store 即换选中格；区间格子映射端点实心、中间浅底" {
-  let v = @core.Store::new(None)
+  let v = @base.Store::new(None)
   let (root, panel) = mounted(
     calendar(value=v, today=d(2026, 10, 11)),
     300.0,

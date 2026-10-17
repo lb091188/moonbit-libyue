@@ -3,7 +3,7 @@
 //
 // 与 master 线的差（G7 记档）：① 句柄类字段（窗口/托盘/对话框）暂不带——
 // 那几页各自迁入时再加，避免共享层替未迁的页预置死字段（窗口页 2026-10-13
-// 迁入时加了 `host`：取 `@core.App` 宿主，经 `App::window()` 调窗口级 API）；② 主题跟随不再用
+// 迁入时加了 `host`：取 `@widget.App` 宿主，经 `App::window()` 调窗口级 API）；② 主题跟随不再用
 // `on_system_theme_change` 回调（旧链路的平台事件通道），改为「跟随开关 +
 // 定时读系统偏好」：见 `main.mbt` 的 tick，手动选色/切深浅先把跟随关掉。
 
@@ -11,33 +11,33 @@
 /// 跨页共享状态：导航、主题、跨页计数。
 pub(all) struct App {
   /// 侧栏与页切换共用的导航状态（存页名）
-  selected : @core.Store[String]
+  selected : @base.Store[String]
   /// 轻提示推送（转发 `toast_layer` 的函数值字段）
   toast : (String, @ui.SemanticType) -> Unit
   /// 深浅：跟随开关打开时由定时器写，按钮手动改时先关跟随
-  dark_mode : @core.Store[Bool]
+  dark_mode : @base.Store[Bool]
   /// 主题主色（hex）：空串 = 内置基准盘，否则 `theme_from_accent` 公式派生
-  accent : @core.Store[String]
+  accent : @base.Store[String]
   /// 跟随系统深浅/主色开关（「跟随系统」按钮置真，手动选色置假）
-  follow : @core.Store[Bool]
+  follow : @base.Store[Bool]
   /// 主题页共享信号：基础页 Button 触发，数据页 Statistic/Progress 展示；
   /// visits/ratio 为 computed 派生（信号版消灭了手动 subscribe 接线）
-  counter : @core.Signal[Int]
-  visits : @core.Signal[String]
-  ratio : @core.Signal[Double]
+  counter : @base.Signal[Int]
+  visits : @base.Signal[String]
+  ratio : @base.Signal[Double]
   /// 最近一次链接点击（基础页回显）
-  picked_lang : @core.Signal[String]
+  picked_lang : @base.Signal[String]
   /// 对话框可见性（反馈页的按钮是触发方，两个对话框挂在 main 的窗口根）
-  dlg_basic : @core.Store[Bool]
-  dlg_form : @core.Store[Bool]
+  dlg_basic : @base.Store[Bool]
+  dlg_form : @base.Store[Bool]
   /// 表单对话框里的名称框（Store 是文本状态的唯一权威，`input` 直连）
-  dlg_name : @core.Store[String]
+  dlg_name : @base.Store[String]
   /// 最近一次对话框确认的回显（与 `dlg_name` 分开，避免确认把输入框内容改掉）
-  dlg_result : @core.Store[String]
+  dlg_result : @base.Store[String]
   /// 宿主句柄（挂载时由 main 的 handle 回调填入）：窗口页要调 `@win.Window` 的
   /// 标题/尺寸/无边框、快捷键页要开轮询表，都经它取。页函数体跑完时还没挂载，
   /// 所以是 Ref——按钮点击时读，那时早已填上。
-  host : Ref[@core.App?]
+  host : Ref[@widget.App?]
 }
 
 ///|

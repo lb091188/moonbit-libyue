@@ -34,7 +34,7 @@ test "TreeItem 构造 / 子列表可变 / Store 驱动" {
   assert_eq(a.children.length(), 2)
   assert_eq(a.children[1].name, "b")
   // Store 驱动：set 换整表（子树已在引用内改好），订阅收到通知
-  let st : @core.Store[TreeItem] = @core.Store::new(solo)
+  let st : @base.Store[TreeItem] = @base.Store::new(solo)
   let hits = Ref(0)
   st.subscribe(fn(_r) { hits.val = hits.val + 1 })
   st.set_always(with_val)
@@ -266,7 +266,7 @@ test "树图组件：两形态出像素、换数据画面变" {
     value: None,
     children: [mk("甲", 3.0), mk("乙", 2.0), branch],
   }
-  let root = @core.Store::new(top)
+  let root = @base.Store::new(top)
   let (r1, w1) = mounted(tree_chart_t(root, width=280.0, height=150.0), 320.0, 170.0)
   assert_true(ink_of(bm_of(w1)) > 400)
   // 纵向形态出像素

@@ -2,11 +2,11 @@
 
 ///|
 fn split_mounted(
-  node : @core.Node,
+  node : @widget.Node,
   w : Double,
   h : Double,
-) -> (@core.Widget, @core.Widget) {
-  let root = @core.Widget::new()
+) -> (@widget.Widget, @widget.Widget) {
+  let root = @widget.Widget::new()
   root.set_size(w, h)
   root.set_column()
   let kid = node.mount_into(root)
@@ -33,7 +33,7 @@ test "分隔把手：拖动增量按窗口坐标算、把手平移不把自己�
     Some(h) => assert_eq(h.id, bar.id)
     None => assert_true(false)
   }
-  let send = fn(kind : @core.PointerKind, x : Double) -> Unit {
+  let send = fn(kind : @widget.PointerKind, x : Double) -> Unit {
     // 与宿主同款：按下时命中的控件在抬起前一直收事件（指针捕获期）
     let _ = root.dispatch_pointer_to(
       bar.id,
@@ -69,7 +69,7 @@ test "分隔把手：两个最小宽度夹取仍然生效" {
     200.0,
   )
   let bar = w.children()[1]
-  let send = fn(kind : @core.PointerKind, x : Double) -> Unit {
+  let send = fn(kind : @widget.PointerKind, x : Double) -> Unit {
     let _ = root.dispatch_pointer_to(
       bar.id,
       { kind, x, y: 100.0, button: 1, mods: 0 },

@@ -39,8 +39,8 @@ fn data_cmp_num_str(a : String, b : String) -> Int {
 
 ///|
 /// 粘性列表演示行：每组四行普通文本行。
-fn sticky_rows(g : Int) -> Array[@core.Node] {
-  let rows : Array[@core.Node] = []
+fn sticky_rows(g : Int) -> Array[@widget.Node] {
+  let rows : Array[@widget.Node] = []
   for i = 0; i < 4; i = i + 1 {
     let label = "第 \{g} 组 · 第 \{i + 1} 行（滚动时看顶部吸顶条）"
     rows.push(@ui.text(label, role=@ui.Body))
@@ -48,7 +48,7 @@ fn sticky_rows(g : Int) -> Array[@core.Node] {
   rows
 }
 
-pub fn page_data(app : @shared.App) -> @core.Node {
+pub fn page_data(app : @shared.App) -> @widget.Node {
   // 语言表基础数据 + 排序显示数据（表头点击写 sort，订阅里重排）
   let lang_base : Array[@ui.TableRow] = [
     @ui.TableRow::make(["MoonBit", "2023", "多范式,云 + 端"]),
@@ -58,10 +58,10 @@ pub fn page_data(app : @shared.App) -> @core.Node {
   ]
   // 初值给一份**快照**：Store 的内建去重按值比，若存的就是 `lang_base` 这个对象，
   // 「添加一行」原地 push 之后再 set，新旧值是同一个数组 ⇒ 通知被吞、整表不重建
-  let table_rows : @core.Store[Array[@ui.TableRow]] = @core.Store::new(
+  let table_rows : @base.Store[Array[@ui.TableRow]] = @base.Store::new(
     lang_base.copy(),
   )
-  let table_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
+  let table_sort : @base.Store[@ui.TableSort] = @base.Store::new({ column: -1, asc: true })
   fn reorder_langs() -> Unit {
     let st = table_sort.get()
     if st.column < 0 || st.column >= lang_base[0].cells.length() {
@@ -87,8 +87,8 @@ pub fn page_data(app : @shared.App) -> @core.Node {
   }
 
   table_sort.subscribe(fn(_st) { reorder_langs() })
-  let table_picked : @core.Store[String] = @core.Store::new("未选中")
-  let table_sel : @core.Store[Array[Int]] = @core.Store::new([])
+  let table_picked : @base.Store[String] = @base.Store::new("未选中")
+  let table_sel : @base.Store[Array[Int]] = @base.Store::new([])
   let rich_base : Array[@ui.TableRow] = [
     {
       cells: [
@@ -115,8 +115,8 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       ],
     },
   ]
-  let rich_rows : @core.Store[Array[@ui.TableRow]] = @core.Store::new(rich_base)
-  let rich_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
+  let rich_rows : @base.Store[Array[@ui.TableRow]] = @base.Store::new(rich_base)
+  let rich_sort : @base.Store[@ui.TableSort] = @base.Store::new({ column: -1, asc: true })
   rich_sort.subscribe(fn(st) {
     if st.column != 0 {
       rich_rows.set(rich_base)
@@ -154,8 +154,8 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       ]),
     )
   }
-  let v_rows : @core.Store[Array[@ui.TableRow]] = @core.Store::new(v_rows_data)
-  let v_sort : @core.Store[@ui.TableSort] = @core.Store::new({ column: -1, asc: true })
+  let v_rows : @base.Store[Array[@ui.TableRow]] = @base.Store::new(v_rows_data)
+  let v_sort : @base.Store[@ui.TableSort] = @base.Store::new({ column: -1, asc: true })
   v_sort.subscribe(fn(st) {
     if st.column < 0 || st.column >= 4 {
       v_rows.set(v_rows_data)
@@ -184,8 +184,8 @@ pub fn page_data(app : @shared.App) -> @core.Node {
     })
     v_rows.set(rows)
   })
-  let transfer_left : @core.Store[Array[String]] = @core.Store::new(["北京", "上海", "广州"])
-  let transfer_right : @core.Store[Array[String]] = @core.Store::new(["深圳"])
+  let transfer_left : @base.Store[Array[String]] = @base.Store::new(["北京", "上海", "广州"])
+  let transfer_right : @base.Store[Array[String]] = @base.Store::new(["深圳"])
   @shared.page([
     @shared.section(
       "标签徽标",
@@ -381,10 +381,10 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       ],
       code=[
         "// 单选：点击行回显（on_row_click）",
-        "let rows = @core.Store::new([",
+        "let rows = @base.Store::new([",
         "  @ui.TableRow::make([\"MoonBit\", \"2023\", \"多范式\"]),",
         "])",
-        "let sort = @core.Store::new({ column: -1, asc: true })",
+        "let sort = @base.Store::new({ column: -1, asc: true })",
         "@ui.table(",
         "  [",
         "    @ui.TableColumn::make(\"语言\", 140.0),",
@@ -395,7 +395,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         "  on_row_click=fn(i, _r) { () },",
         ")",
         "// 多选：复选框列（selection）",
-        "let sel : @core.Store[Array[Int]] = @core.Store::new([])",
+        "let sel : @base.Store[Array[Int]] = @base.Store::new([])",
         "@ui.table(columns, rows, selection=sel, width=460.0)",
         "@ui.bind(sel.signal(), fn(s) { \"已选 \\{s.length()} 行\" })",
       ],
@@ -421,7 +421,7 @@ pub fn page_data(app : @shared.App) -> @core.Node {
       code=[
         "let data : Array[@ui.TableRow] = []",
         "for i in 0..<10000 { data.push(@ui.TableRow::make([(i + 1).to_string(), \"条目 \\{i + 1}\"])) }",
-        "@ui.table_v(columns, @core.Store::new(data), width=520.0, height=220.0)",
+        "@ui.table_v(columns, @base.Store::new(data), width=520.0, height=220.0)",
       ],
     ),
     @shared.section(
@@ -470,8 +470,8 @@ pub fn page_data(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "let left = @core.Store::new([\"北京\", \"上海\", \"广州\"])",
-        "let right = @core.Store::new([\"深圳\"])",
+        "let left = @base.Store::new([\"北京\", \"上海\", \"广州\"])",
+        "let right = @base.Store::new([\"深圳\"])",
         "@ui.transfer(left, right)",
         "@ui.carousel([@ui.text(\"第一屏\")], width=320.0, height=80.0)",
       ],

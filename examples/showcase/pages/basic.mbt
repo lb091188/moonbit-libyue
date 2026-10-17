@@ -15,10 +15,10 @@
 //    新栈声明式层就住在 `ui/declarative.mbt`）。
 
 ///|
-pub fn page_basic(app : @shared.App) -> @core.Node {
+pub fn page_basic(app : @shared.App) -> @widget.Node {
   // 两个悬停/光标组各配一个文本框状态
-  let box_a : @core.Store[String] = @core.Store::new("组内输入框")
-  let box_b : @core.Store[String] = @core.Store::new("组内输入框")
+  let box_a : @base.Store[String] = @base.Store::new("组内输入框")
+  let box_b : @base.Store[String] = @base.Store::new("组内输入框")
   @shared.page([
     @shared.section(
       "主题",

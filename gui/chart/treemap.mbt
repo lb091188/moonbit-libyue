@@ -504,17 +504,17 @@ fn tm_draw_nodes(
 /// （提亮 + 描边），命中表在每次 on_draw 重建、与绘制用同一 layout。
 /// 数据经 Store 驱动，set 后只重绘画布不重建控件树。
 pub fn tm_chart_t(
-  items : @core.Store[Array[TmItem]],
+  items : @base.Store[Array[TmItem]],
   levels? : Int = 2,
   gap? : Double = 4.0,
   width? : Double = 0.0,
   height? : Double = 360.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(items)
   let lv = levels
   let gp = gap
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     // 拍平画卷（on_draw 重建）：(项, 矩形, 兄弟序, 兄弟数)
     let flat : Array[(TmItem, TmRect, Int, Int)] = []
@@ -527,9 +527,9 @@ pub fn tm_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -545,8 +545,8 @@ pub fn tm_chart_t(
     })
     // hover 命中倒序取最深（子项在父项之后入卷，后命中即更深）
     w.on_pointer = Some(fn(
-      _self : @core.Widget,
-      ev : @core.PointerEvent,
+      _self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Move => {
@@ -562,14 +562,14 @@ pub fn tm_chart_t(
           }
           if hit != hover.val {
             hover.val = hit
-            @core.invalidate()
+            @widget.invalidate()
           }
           true
         }
         @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }

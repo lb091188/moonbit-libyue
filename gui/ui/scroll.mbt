@@ -84,8 +84,8 @@ const SCROLL_BAR_W : Double = 8.0
 /// 滚动条控件（贴在视口右缘、与视口同高）：轨道 + 拇指（长度按视口/内容比例、
 /// 下限 16px 便于抓），点轨道跳转、按住拖动（拇指中心跟随指针）、松手即止。
 /// `scroll_view` 与 `virt_list` 共用。
-fn scroll_bar(state : ScrollState) -> @core.Widget {
-  let bar = @core.Widget::new()
+fn scroll_bar(state : ScrollState) -> @widget.Widget {
+  let bar = @widget.Widget::new()
   bar.node.set_position(@yoga.Absolute)
   bar.node.set_top(@yoga.fixed(0.0))
   bar.node.set_bottom(@yoga.fixed(0.0))
@@ -93,9 +93,9 @@ fn scroll_bar(state : ScrollState) -> @core.Widget {
   bar.node.set_width(@yoga.fixed(SCROLL_BAR_W))
   let dragging = Ref(false)
   bar.on_draw = Some(fn(
-    _self : @core.Widget,
+    _self : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     let vh = state.view_h
     let ch = state.content_h
@@ -111,8 +111,8 @@ fn scroll_bar(state : ScrollState) -> @core.Widget {
     }
   })
   bar.on_pointer = Some(fn(
-    self : @core.Widget,
-    ev : @core.PointerEvent,
+    self : @widget.Widget,
+    ev : @widget.PointerEvent,
   ) -> Bool {
     let vh = self.rect.h
     let m = state.max()
@@ -153,14 +153,14 @@ fn scroll_bar(state : ScrollState) -> @core.Widget {
 /// 垂直滚动容器：`height` 是视口高（0 = 由父容器给），内容按自然高度排布并可
 /// 超出视口；超出部分被裁剪，滚动条画在右缘。
 pub fn scroll_view(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   state : ScrollState,
   width? : Double = 0.0,
   height? : Double = 0.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
-  @core.node_of_new(fn(viewport : @core.Widget) -> @core.Widget {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
+  @widget.node_of_new(fn(viewport : @widget.Widget) -> @widget.Widget {
     watch_theme()
     viewport.node.set_flex_direction(@yoga.Column)
     // 视口必须能缩到父给的尺寸：Yoga 的 flex 子项默认 min-size 为 auto，不写这两条
@@ -187,25 +187,25 @@ pub fn scroll_view(
       ]),
       class,
     )
-    let content = @core.Widget::new()
+    let content = @widget.Widget::new()
     content.node.set_flex_direction(@yoga.Column)
     content.node.set_width(@yoga.percent(100.0))
     content.node.set_position(@yoga.Relative)
     // 不收缩：内容必须按自然高度撑开，超出视口的部分才谈得上滚动
     content.node.set_flex_shrink(0.0)
     content.node.set_top(@yoga.fixed(0.0 - state.offset))
-    @core.mount_children(content, children)
+    @widget.mount_children(content, children)
     viewport.append_child(content)
     state.apply.val = fn() -> Unit {
       content.node.set_top(@yoga.fixed(0.0 - state.offset))
-      @core.invalidate()
+      @widget.invalidate()
     }
 
     viewport.append_child(scroll_bar(state))
     viewport.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 布局已定：把几何抄给状态（滚动条比例与夹取都用它），再画一层描边
       state.view_h = r.h
@@ -217,7 +217,7 @@ pub fn scroll_view(
         p.stroke_rect(0.0, 0.0, r.w, r.h)
       }
     })
-    viewport.on_scroll = Some(fn(ev : @core.ScrollEvent) -> Bool {
+    viewport.on_scroll = Some(fn(ev : @widget.ScrollEvent) -> Bool {
       let before = state.offset
       // 一格滚 3 行（与常见桌面滚动量同量级），dy 正=向上滚
       state.scroll_by(0.0 - ev.dy * 30.0)

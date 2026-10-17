@@ -9,21 +9,21 @@ fn color_of(bm : @render.Bitmap, x : Int, y : Int) -> (Int, Int, Int, Int) {
 
 ///|
 /// 把节点挂进根控件并跑一轮布局，返回根（绘制时整棵树都摆好位置）。
-fn mount_root(children : Array[@core.Node], w : Double, h : Double) -> @core.Widget {
-  let root = @core.Widget::new()
+fn mount_root(children : Array[@widget.Node], w : Double, h : Double) -> @widget.Widget {
+  let root = @widget.Widget::new()
   root.set_size(w, h)
   root.set_column()
   // 交叉轴不拉伸：组件的测量尺寸才是看得见的真值（默认 stretch 会把
   // 列容器里的子项宽度拉到整行）
   root.node.set_align_items(@yoga.AlignItems::FlexStart)
-  @core.mount_children(root, children)
+  @widget.mount_children(root, children)
   root.relayout(w, h)
   root
 }
 
 ///|
 /// 找根下第 n 个直接子控件。
-fn kid(root : @core.Widget, i : Int) -> @core.Widget {
+fn kid(root : @widget.Widget, i : Int) -> @widget.Widget {
   root.children()[i]
 }
 
@@ -74,7 +74,7 @@ test "标签尺寸来自 Pango 测量；文本随信号变化就重测" {
   if !ui_text_guard() {
     return
   }
-  let src_text = @core.Signal::new("Hello 基线")
+  let src_text = @base.Signal::new("Hello 基线")
   let n = text_dyn(src_text, font_size=14.0)
   // 交叉轴不 stretch（列容器默认会把宽度拉到整行），才看得出测量给的真尺寸
   let root = mount_root([n], 240.0, 60.0)
@@ -193,12 +193,12 @@ test "按钮：光标请求跟着禁用单元走（禁用不请求手型，改�
   let cx = w.rect.x + w.rect.w / 2.0
   let cy = w.rect.y + w.rect.h / 2.0
   // 禁用：本控件不提请求 → 默认箭头（光标请求是命中查询时现算的）
-  assert_eq(root.cursor_at(cx, cy), @core.CURSOR_DEFAULT)
+  assert_eq(root.cursor_at(cx, cy), @widget.CURSOR_DEFAULT)
   // 同一个单元改回可用：下一次查询就是手型，不必重建控件
   set_disabled(cell, false)
-  assert_eq(root.cursor_at(cx, cy), @core.CURSOR_HAND)
+  assert_eq(root.cursor_at(cx, cy), @widget.CURSOR_HAND)
   set_disabled(cell, true)
-  assert_eq(root.cursor_at(cx, cy), @core.CURSOR_DEFAULT)
+  assert_eq(root.cursor_at(cx, cy), @widget.CURSOR_DEFAULT)
 }
 
 ///|
@@ -294,12 +294,12 @@ test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
   }
   let top = text("AAAA", font_size=20.0)
   let bottom = text("BBBB", font_size=20.0)
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.set_size(200.0, 200.0)
   root.set_column()
-  let a = @core.Widget::new()
+  let a = @widget.Widget::new()
   a.set_size(200.0, 100.0)
-  let b = @core.Widget::new()
+  let b = @widget.Widget::new()
   b.set_size(200.0, 100.0)
   root.append_child(a)
   root.append_child(b)
@@ -328,17 +328,17 @@ test "文本随控件原点落位并被裁剪（画在 Painter 会话上）" {
   assert_true(ink_in(100, 200) > 20)
 
   // 裁剪：窄盒里的长文本不得画到盒外
-  let narrow = @core.Widget::new()
+  let narrow = @widget.Widget::new()
   narrow.set_size(24.0, 24.0)
   let src = text_source("WWWWWWWWWWWWWWWWWW", font_size=20.0, wrap=false)
   narrow.on_draw = Some(fn(
-    self : @core.Widget,
+    self : @widget.Widget,
     pp : @render.Painter,
-    _r : @core.Rect,
+    _r : @base.Rect,
   ) -> Unit {
       let _ = draw_text_in(self, pp, src)
     })
-  let holder = @core.Widget::new()
+  let holder = @widget.Widget::new()
   holder.set_size(200.0, 200.0)
   holder.append_child(narrow)
   holder.relayout(200.0, 200.0)
@@ -420,7 +420,7 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
   }
   let queue : Ref[Array[() -> Unit]] = Ref([])
   let delays : Ref[Array[Int]] = Ref([])
-  @core.set_timer_hooks(
+  @shell.set_timer_hooks(
     fn(ms : Int, f : () -> Unit) -> Int {
       delays.val.push(ms)
       queue.val.push(f)
@@ -509,7 +509,7 @@ test "动图组件：按帧时长自转换帧、暂停不再换帧、play 续上
   let hs = GifHandle::make()
   let (_r2, _w2) = mounted(gif("/tmp/definitely-missing-gif.png", state=hs), 80.0, 80.0)
   assert_eq((hs.frame_count(), hs.is_running(), _w2.rect.w), (0, true, 0.0))
-  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+  @shell.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
 
 ///|
@@ -714,7 +714,7 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线" {
   }
   // 返回（首墨列, 有墨行数, 墨像素数）：对齐比首列，折行比行数，
   // 下划线比墨量（行距里落进最后一行的线不算「多一行」）
-  let ink_scan = fn(node : @core.Node, w : Double, h : Double) -> (
+  let ink_scan = fn(node : @widget.Node, w : Double, h : Double) -> (
     Int,
     Int,
     Int,
@@ -746,7 +746,7 @@ test "文本类样式属性真生效：对齐/换行/行高/下划线" {
   }
   let long_text = "一行中文文本用来比较左右位置与折行行数"
   // 1) text_align：同一盒宽下，居中的首墨列比左对齐靠右（文本明显窄于盒）
-  let box_of = fn(t : @core.Node) -> @core.Node {
+  let box_of = fn(t : @widget.Node) -> @widget.Node {
     view([t], width=220.0, height=24.0)
   }
   let (start_col, _sr, _si) = ink_scan(
@@ -832,7 +832,7 @@ test "图标字形随盒子缩放、不溢出、居中" {
     }
     (min_x, min_y, max_x, max_y)
   }
-  let paint = fn(nodes : Array[@core.Node], w : Int, h : Int) -> @render.Bitmap {
+  let paint = fn(nodes : Array[@widget.Node], w : Int, h : Int) -> @render.Bitmap {
     let root = mount_root(nodes, w.to_double(), h.to_double())
     let bm = @render.Bitmap::new(w, h)
     let p = @render.Painter::new(bm)

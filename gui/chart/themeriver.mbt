@@ -409,21 +409,21 @@ fn trv_draw(
 /// 对齐，负值按 0；两者各经一个 Store 驱动，set 后只重绘画布不重建
 /// 控件树；主题切换现取色自动跟随。
 pub fn trv_chart_t(
-  names : @core.Store[Array[String]],
-  values : @core.Store[Array[Array[Double]]],
+  names : @base.Store[Array[String]],
+  values : @base.Store[Array[Array[Double]]],
   baseline? : TrvBaseline = TrvZero,
   tension? : Double = 1.0,
   show_legend? : Bool = true,
   width? : Double = 0.0,
   height? : Double = 320.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(names)
   @ui.follow_store(values)
   let bl = baseline
   let tn = tension
   let lg = show_legend
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     w.node.set_height(@yoga.fixed(height))
     if width > 0.0 {
@@ -433,9 +433,9 @@ pub fn trv_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)

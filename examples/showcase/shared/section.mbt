@@ -5,7 +5,7 @@
 // toast 回显（钩子由 main 注入）。
 //
 // 新栈口径（G7 记档，与 master 线的三处机械差）：
-// ① 组件返回 `@core.Node` 且不接 `style=[...]`，间距/内边距一律走容器参数
+// ① 组件返回 `@widget.Node` 且不接 `style=[...]`，间距/内边距一律走容器参数
 //    （`padding`/`row_gap`）——旧链路那套 CSS 字符串在本栈不存在；
 // ② 显隐从 `View::set_visible` 换成 `Widget::set_visible`，惰性挂载从
 //    `Node::mount_into(View)` 换成 `Node::mount_into(Widget)`，机制不变；
@@ -23,7 +23,7 @@ pub struct Section {
   name : String
   title : String
   desc : String
-  content : Array[@core.Node]
+  content : Array[@widget.Node]
   code : Array[String]
 }
 
@@ -34,7 +34,7 @@ pub fn section(
   name : String,
   title : String,
   desc : String,
-  content : Array[@core.Node],
+  content : Array[@widget.Node],
   code? : Array[String] = [],
 ) -> Section {
   { name, title, desc, content, code }
@@ -43,8 +43,8 @@ pub fn section(
 ///|
 /// 一页 = 顶部 segmented 段列表（超宽自动换行）+ 段正文栈；选中段填满剩余
 /// 高度并自带滚动，其余段隐藏（不重建，滚动位置各自保留）。
-pub fn page(secs : Array[Section]) -> @core.Node {
-  let selected : @core.Store[String] = @core.Store::new(secs[0].name)
+pub fn page(secs : Array[Section]) -> @widget.Node {
+  let selected : @base.Store[String] = @base.Store::new(secs[0].name)
   let names : Array[String] = []
   for s in secs {
     names.push(s.name)
@@ -67,9 +67,9 @@ pub fn page(secs : Array[Section]) -> @core.Node {
     // 段条是不可压缩的定高头部：正文够高时（Markdown 段整篇文档）压缩量
     // 会全落到「min=0 且没设 flex_shrink=0」的这一层，实测 44px → 23.3px，
     // 标签戳出条外。收缩的活儿交给下面的正文列（min=0 + grow）。
-    handle=fn(w : @core.Widget) -> Unit { w.node.set_flex_shrink(0.0) },
+    handle=fn(w : @widget.Widget) -> Unit { w.node.set_flex_shrink(0.0) },
   )
-  let bodies : Array[@core.Node] = []
+  let bodies : Array[@widget.Node] = []
   for s in secs {
     bodies.push(section_body(s, selected))
   }
@@ -83,9 +83,9 @@ pub fn page(secs : Array[Section]) -> @core.Node {
 /// （图标墙页要建 803 个图标控件，见 section_body 的同口径记档）。
 pub fn nav_page(
   name : String,
-  selected : @core.Store[String],
-  content : @core.Node,
-) -> @core.Node {
+  selected : @base.Store[String],
+  content : @widget.Node,
+) -> @widget.Node {
   let mounted : Ref[Bool] = Ref(false)
   @ui.col([], grow=1.0, handle=fn(c) {
     fn ensure(s : String) -> Unit {
@@ -107,7 +107,7 @@ pub fn nav_page(
 /// 标题/说明/代码骨架，首次选中才把 content 挂进占位容器——全量挂载意味着
 /// 启动即建 111 段全部控件（图标墙页 803 个图标控件），debug 构建秒级；
 /// 挂过之后保形，显隐/滚动位置语义不变。
-fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
+fn section_body(s : Section, selected : @base.Store[String]) -> @widget.Node {
   let mounted : Ref[Bool] = Ref(false)
   let holder = @ui.col([], row_gap=8.0, handle=fn(h) {
     fn ensure(name : String) -> Unit {
@@ -122,7 +122,7 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
     ensure(selected.get())
     selected.subscribe(ensure)
   })
-  let inner : Array[@core.Node] = [
+  let inner : Array[@widget.Node] = [
     @ui.text(s.title, role=@ui.Section),
   ]
   if s.desc.length() > 0 {
@@ -159,7 +159,7 @@ fn section_body(s : Section, selected : @core.Store[String]) -> @core.Node {
 
 ///|
 /// 代码区顶行：左「代码」小标，右「复制」按钮（toast 回显）。
-fn code_copy_row(lines : Array[String]) -> @core.Node {
+fn code_copy_row(lines : Array[String]) -> @widget.Node {
   @ui.row(
     [
       @ui.text("代码", role=@ui.Secondary),

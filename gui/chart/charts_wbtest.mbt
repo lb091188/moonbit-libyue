@@ -2,7 +2,7 @@
 // 出像素、悬停高亮、仪表盘插值）。绘制像素用 `paint_at` 抵消绝对落位后取样。
 
 ///|
-fn bm_of(w : @core.Widget) -> @render.Bitmap {
+fn bm_of(w : @widget.Widget) -> @render.Bitmap {
   let bm = @render.Bitmap::new(w.rect.w.round().to_int() + 2, w.rect.h.round().to_int() + 2)
   let p = @render.Painter::new(bm)
   w.paint_at(p, w.rect.x, w.rect.y)
@@ -42,8 +42,8 @@ fn close(a : Double, b : Double) -> Bool {
 
 ///|
 /// 挂进根控件并跑一轮布局（交叉轴不拉伸，组件自己算出的宽才是看得见的真值）。
-fn mounted(node : @core.Node, w : Double, h : Double) -> (@core.Widget, @core.Widget) {
-  let root = @core.Widget::new()
+fn mounted(node : @widget.Node, w : Double, h : Double) -> (@widget.Widget, @widget.Widget) {
+  let root = @widget.Widget::new()
   root.set_size(w, h)
   root.set_column()
   root.node.set_align_items(@yoga.AlignItems::FlexStart)
@@ -63,7 +63,7 @@ test "滚动窗口：定长丢最旧、越界索引无操作、Store 推点整�
   // 入参窗口不变
   assert_eq(w3, [1.0, 2.0, 3.0])
   assert_eq(win_push([], 0, 5.0), [5.0])
-  let s = @core.Store::new([LineSeries::make("a", max_points=2)])
+  let s = @base.Store::new([LineSeries::make("a", max_points=2)])
   series_push(s, 0, 1.0)
   series_push(s, 0, 2.0)
   series_push(s, 0, 3.0)
@@ -192,7 +192,7 @@ test "回归与散点值域、8 位色串、类目标签截断" {
 
 ///|
 test "折线图：Store 推点后画面变化、空窗只画网格与提示" {
-  let s = @core.Store::new([LineSeries::make("a", max_points=50)])
+  let s = @base.Store::new([LineSeries::make("a", max_points=50)])
   let (root, w) = mounted(line_chart_t(s, height=120.0), 320.0, 140.0)
   assert_eq((w.rect.w, w.rect.h), (320.0, 120.0))
   let empty = bm_of(w)
@@ -211,7 +211,7 @@ test "折线图：Store 推点后画面变化、空窗只画网格与提示" {
 
 ///|
 test "柱状图：悬停那根换浅底并标数值，离开后复原" {
-  let data = @core.Store::new([
+  let data = @base.Store::new([
     BarItem::make("甲", 30.0),
     BarItem::make("乙", -12.0),
     BarItem::make("丙", 48.0),
@@ -240,7 +240,7 @@ test "柱状图：悬停那根换浅底并标数值，离开后复原" {
 
 ///|
 test "环形图：扇区与图例出像素、donut_hit 指到扇区与中心孔" {
-  let data = @core.Store::new([
+  let data = @base.Store::new([
     DonutSlice::make("甲", 40.0),
     DonutSlice::make("乙", 35.0),
     DonutSlice::make("丙", 25.0),
@@ -259,7 +259,7 @@ test "环形图：扇区与图例出像素、donut_hit 指到扇区与中心孔"
 
 ///|
 test "仪表盘：值弧随 Store 平滑逼近目标，smooth=false 直接跳到位" {
-  let v = @core.Store::new(0.0)
+  let v = @base.Store::new(0.0)
   let (_root, w) = mounted(
     gauge_t(v, width=220.0, height=180.0, smooth=false),
     260.0,
@@ -270,14 +270,14 @@ test "仪表盘：值弧随 Store 平滑逼近目标，smooth=false 直接跳到
   assert_true(diff_of(bm_of(w), zero) > 100)
   // 平滑版：排了延时链，逐拍逼近（跑几拍后应已接近目标）
   let fired : Ref[Array[() -> Unit]] = Ref([])
-  @core.set_timer_hooks(
+  @shell.set_timer_hooks(
     fn(_ms : Int, f : () -> Unit) -> Int {
       fired.val.push(f)
       fired.val.length()
     },
     fn(_id : Int) -> Unit { () },
   )
-  let v2 = @core.Store::new(0.0)
+  let v2 = @base.Store::new(0.0)
   let (_r2, w2) = mounted(gauge_t(v2, width=220.0, height=180.0), 260.0, 200.0)
   let before = bm_of(w2)
   v2.set(0.8)
@@ -288,12 +288,12 @@ test "仪表盘：值弧随 Store 平滑逼近目标，smooth=false 直接跳到
     n = n + 1
   }
   assert_true(diff_of(bm_of(w2), before) > 100)
-  @core.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
+  @shell.set_timer_hooks(fn(_ms, _f) { 0 }, fn(_id) { () })
 }
 
 ///|
 test "散点图：点列与趋势线出像素、空数据只画网格与提示" {
-  let pts = @core.Store::new([])
+  let pts = @base.Store::new([])
   let (root, w) = mounted(
     scatter_t(pts, trend=true, width=320.0, height=180.0),
     360.0,
@@ -332,7 +332,7 @@ test "散点图：圆点形状与千点级实心度上限" {
     (c.r - target.0).abs() <= 6 && (c.g - target.1).abs() <= 6 &&
     (c.b - target.2).abs() <= 6
   }
-  let one = @core.Store::new([(5.0, 7.0)])
+  let one = @base.Store::new([(5.0, 7.0)])
   let (_r1, w1) = mounted(
     scatter_t(one, dot=15.0, width=320.0, height=260.0),
     320.0,
@@ -357,7 +357,7 @@ test "散点图：圆点形状与千点级实心度上限" {
   let bh = max_y - min_y + 1
   let cx = (min_x + max_x) / 2
   let cy = (min_y + max_y) / 2
-  let many = @core.Store::new([])
+  let many = @base.Store::new([])
   let data : Array[(Double, Double)] = []
   let mut s = 42
   for _i in 0..<2000 {

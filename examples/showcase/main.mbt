@@ -51,7 +51,7 @@ fn apply_theme(app : @shared.App) -> Unit {
 
 ///|
 /// 侧栏里的深/浅切换按钮：手动改即视为「不跟随系统」。
-fn theme_toggle_button(app : @shared.App) -> @core.Node {
+fn theme_toggle_button(app : @shared.App) -> @widget.Node {
   @ui.icon_button(
     @icons.Moon,
     on_click=fn() {
@@ -100,24 +100,24 @@ fn build_menu_bar(app : @shared.App) -> @shell.MenuBar {
 
 ///|
 fn main {
-  let selected : @core.Store[String] = @core.Store::new("基础组件")
+  let selected : @base.Store[String] = @base.Store::new("基础组件")
   let toast_push = @ui.toast_layer(duration_ms=2600)
   // 代码区「复制」的回显走同一 toast 层
   @shared.code_toast.val = Some(toast_push)
-  let counter = @core.Signal::new(0)
+  let counter = @base.Signal::new(0)
   let app : @shared.App = {
     selected,
     toast: toast_push,
-    dark_mode: @core.Store::new(@win.sys_color_scheme() == "dark"),
+    dark_mode: @base.Store::new(@win.sys_color_scheme() == "dark"),
     // 启动即跟随系统主色调（系统无主色概念时回落内置 primary）
-    accent: @core.Store::new(@win.sys_accent()),
-    follow: @core.Store::new(true),
+    accent: @base.Store::new(@win.sys_accent()),
+    follow: @base.Store::new(true),
     counter,
     // visits/ratio 由 counter 派生（computed 自动收集依赖，不写手动接线）
-    visits: @core.Signal::computed(fn() {
+    visits: @base.Signal::computed(fn() {
       (counter.get() * 1601 + 12804).to_string()
     }),
-    ratio: @core.Signal::computed(fn() {
+    ratio: @base.Signal::computed(fn() {
       let r = 0.25 + counter.get().to_double() * 0.1
       if r > 1.0 {
         1.0
@@ -125,11 +125,11 @@ fn main {
         r
       }
     }),
-    picked_lang: @core.Signal::new(""),
-    dlg_basic: @core.Store::new(false),
-    dlg_form: @core.Store::new(false),
-    dlg_name: @core.Store::new(""),
-    dlg_result: @core.Store::new(""),
+    picked_lang: @base.Signal::new(""),
+    dlg_basic: @base.Store::new(false),
+    dlg_form: @base.Store::new(false),
+    dlg_name: @base.Store::new(""),
+    dlg_result: @base.Store::new(""),
     // 宿主句柄：挂载时由下方 handle 回调填入（窗口页/快捷键页取用）
     host: Ref(None),
   }
@@ -153,7 +153,7 @@ fn main {
     }
     Err(e) => println("SHOWCASE-INST: 单实例降级（\{e}）")
   }
-  let slot : Ref[@core.App?] = Ref(None)
+  let slot : Ref[@widget.App?] = Ref(None)
   let mounted = @ui.mount_window(
     [
       @ui.row(
@@ -245,7 +245,7 @@ fn main {
                   @ui.text("名称", role=@ui.Body),
                   @ui.input(app.dlg_name, placeholder="例如：开发库", width=320.0),
                   @ui.text("地址", role=@ui.Body),
-                  @ui.input(@core.Store::new(""), placeholder="host:port", width=320.0),
+                  @ui.input(@base.Store::new(""), placeholder="host:port", width=320.0),
                 ],
                 on_confirm=fn() { app.dlg_result.set(app.dlg_name.get()) },
                 width=380.0,
@@ -261,7 +261,7 @@ fn main {
     title=SHOWCASE_TITLE,
     width=1280,
     height=720,
-    handle=fn(a : @core.App) {
+    handle=fn(a : @widget.App) {
       slot.val = Some(a)
       // 窗口页/快捷键页经 `app.host` 取宿主（页函数体跑完时还没挂载，这里填）
       app.host.val = Some(a)
@@ -312,12 +312,12 @@ fn main {
       // 时内核自动保持内部剪贴板，见 gui/ui/clipboard.mbt）
       @ui.use_system_clipboard(true)
       println("SHOWCASE-READY title=\{SHOWCASE_TITLE} pages=15 follow=1")
-      @core.paint_profile_reset()
+      @base.paint_profile_reset()
       host.run()
     }
   }
   println("SHOWCASE-DONE page=\{selected.get()}")
   // 帧耗时分段账本：切页/渲染卡顿归因用（布局 vs 绘制 vs 上屏，见 gui/core/prof.mbt）。
-  let prof = @core.paint_profile_summary()
+  let prof = @base.paint_profile_summary()
   println("SHOWCASE-PROF " + prof)
 }

@@ -254,7 +254,7 @@ pub fn drag_position() -> (Double, Double) {
 
 ///|
 /// 当前指针下的投放目标控件 id（0 = 没有可投处）。拖入高亮由绘制方读它自判
-/// （`@core.drag_hover() == self.id`），所以不需要 enter/update/leave 三个回调。
+/// （`@widget.drag_hover() == self.id`），所以不需要 enter/update/leave 三个回调。
 pub fn drag_hover() -> Int {
   match drag_current.val {
     Some(s) => s.hover

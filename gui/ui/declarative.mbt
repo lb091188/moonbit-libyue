@@ -1,6 +1,6 @@
 // 声明式层 L1 构造器：让页面与示例「调用点不变、只换实现」的那一层。
 //
-// 新栈的组件本身就返回 `@core.Node`，所以与组件**同名**的构造器（`label` /
+// 新栈的组件本身就返回 `@widget.Node`，所以与组件**同名**的构造器（`label` /
 // `button` / `input` / `checkbox` / `container` / `group` / `separator` /
 // `image` / `icon` / `radio_group` / `slider` / `progress`）不再另包一层——
 // 直接用组件即可。这里只补三类东西：
@@ -28,7 +28,7 @@
 ///|
 /// 垂直布局容器（`container` 的 Column 形态）。
 pub fn col(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   row_gap? : Double = 0.0,
   padding? : Double = 0.0,
   width? : Double = 0.0,
@@ -38,8 +38,8 @@ pub fn col(
   border_color? : String = "",
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Stretch,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   view(
     children,
     direction=@yoga.Column,
@@ -59,7 +59,7 @@ pub fn col(
 ///|
 /// 水平布局容器（`container` 的 Row 形态）。
 pub fn row(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   column_gap? : Double = 0.0,
   padding? : Double = 0.0,
   width? : Double = 0.0,
@@ -69,8 +69,8 @@ pub fn row(
   border_color? : String = "",
   align_items? : @yoga.AlignItems = @yoga.AlignItems::Center,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   view(
     children,
     direction=@yoga.Row,
@@ -107,12 +107,12 @@ pub fn row(
 /// （只重算这一条链，不重建子树）。文本恒单行——旧链路那条「默认自动换行会在
 /// hbox 里被压成两行」的坑在本栈同样成立，故 `wrap=false`。
 pub fn[A] bind_label(
-  store : @core.Store[A],
+  store : @base.Store[A],
   f : (A) -> String,
   font_size? : Double = 13.0,
   color? : String = "",
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   bind(
     store.signal(),
     f,
@@ -125,25 +125,25 @@ pub fn[A] bind_label(
 ///|
 /// 声明式文本绑定（信号版）：源信号或 `computed` 派生信号都能直接喂。
 pub fn[A] bind(
-  sig : @core.Signal[A],
+  sig : @base.Signal[A],
   f : (A) -> String,
   font_size? : Double = 13.0,
   color? : String = "",
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let src = text_source(f(sig.get()), font_size=font_size, color=color, wrap=false)
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     attach_text_measure(w, src)
     w.on_draw = Some(fn(
-      _s : @core.Widget,
+      _s : @widget.Widget,
       p : @render.Painter,
-      _r : @core.Rect,
+      _r : @base.Rect,
     ) -> Unit {
       let _ = draw_text_in(w, p, src)
     })
     let sid = sig.subscribe(fn(v : A) -> Unit { relabel(w, src, f(v)) })
-    @core.sub_bag_register(fn() { sig.remove(sid) })
+    @base.sub_bag_register(fn() { sig.remove(sid) })
     handle(w)
     w
   })
@@ -157,7 +157,7 @@ pub fn[A] bind(
 /// 独占事件，祖先收不到 enter）；本栈宿主的悬停态本身就是父链语义，
 /// 所以这里既不排定时器也不查指针。
 pub fn hover_group(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   on_click? : () -> Unit = fn() -> Unit { () },
   padding? : Double = 8.0,
   row_gap? : Double = 4.0,
@@ -165,11 +165,11 @@ pub fn hover_group(
   background_color? : String = "",
   hover_bg? : String = "",
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let base_bg = background_color
   let lit_bg = hover_bg
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_flex_direction(@yoga.Column)
     w.node.set_align_items(@yoga.AlignItems::FlexStart)
@@ -182,11 +182,11 @@ pub fn hover_group(
     if width > 0.0 {
       w.node.set_width(@yoga.fixed(width))
     }
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.on_draw = Some(fn(
-      self : @core.Widget,
+      self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let fill = if self.hovered {
         if lit_bg.length() > 0 { lit_bg } else { @theme.theme_fill_hover() }
@@ -202,8 +202,8 @@ pub fn hover_group(
       p.stroke_rect(0.0, 0.0, r.w, r.h)
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Down => true
@@ -216,7 +216,7 @@ pub fn hover_group(
         _ => false
       }
     })
-    @core.mount_children(w, children)
+    @widget.mount_children(w, children)
     fold_style(w, @style.empty_style(), class)
     handle(w)
     w
@@ -232,13 +232,13 @@ pub fn hover_group(
 /// （原生窗口有这两条通道）；本栈的窗口居中由 WM 决定、关闭只把宿主循环停下，
 /// 故不提供这两个参数，退出后的收尾写在调用方 `run()` 之后。
 pub fn mount_window(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   title? : String = "",
   width? : Int = 800,
   height? : Int = 600,
-  handle? : (@core.App) -> Unit = fn(_a : @core.App) -> Unit { () },
-) -> @core.App? {
-  match @core.App::new(width, height, title) {
+  handle? : (@widget.App) -> Unit = fn(_a : @widget.App) -> Unit { () },
+) -> @widget.App? {
+  match @widget.App::new(width, height, title) {
     None => None
     Some(app) => {
       app.mount(children)
@@ -254,12 +254,12 @@ pub fn mount_window(
 /// 收 Signal 的入口自订阅自差分（`for_list` 管列表差分、`when` 管显隐、
 /// `*_dyn` 管展示文本），整棵换内容才走 `bind_node`。
 pub fn mount_window_render(
-  render : () -> Array[@core.Node],
+  render : () -> Array[@widget.Node],
   title? : String = "",
   width? : Int = 800,
   height? : Int = 600,
-  handle? : (@core.App) -> Unit = fn(_a : @core.App) -> Unit { () },
-) -> @core.App? {
+  handle? : (@widget.App) -> Unit = fn(_a : @widget.App) -> Unit { () },
+) -> @widget.App? {
   mount_window(render(), title=title, width=width, height=height, handle=handle)
 }
 
@@ -269,15 +269,15 @@ pub fn mount_window_render(
 /// （比如卡片里那颗按钮）时以它为准，其余位置回退到组的形状——不需要像旧链路
 /// 那样把光标递归设进每个子孙。
 pub fn cursor_group(
-  children : Array[@core.Node],
+  children : Array[@widget.Node],
   direction? : @yoga.FlexDirection = @yoga.Column,
   row_gap? : Double = 0.0,
   column_gap? : Double = 0.0,
   padding? : Double = 0.0,
   width? : Double = 0.0,
-  cursor? : Int = @core.CURSOR_HAND,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  cursor? : Int = @widget.CURSOR_HAND,
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   view(
     children,
     direction=direction,
@@ -285,7 +285,7 @@ pub fn cursor_group(
     column_gap=column_gap,
     padding=padding,
     width=width,
-    handle=fn(w : @core.Widget) -> Unit {
+    handle=fn(w : @widget.Widget) -> Unit {
       w.cursor = cursor
       handle(w)
     },

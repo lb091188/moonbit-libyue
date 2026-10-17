@@ -649,17 +649,17 @@ fn gph_draw_chart(
 /// 数据 set 或画布尺寸变化才重算。数据经 Store 驱动，set 后只重绘画布
 /// 不重建控件树；主题切换现取色自动跟随。
 pub fn gph_chart_t(
-  data : @core.Store[GraphData],
+  data : @base.Store[GraphData],
   iterations? : Int = 300,
   show_labels? : Bool = true,
   width? : Double = 0.0,
   height? : Double = 320.0,
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(data)
   let iters = iterations
   let labels = show_labels
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     @ui.watch_theme()
     // 布局缓存：(画布宽, 画布高, 布局)；None 表示数据已变更待重算
     let cache : Ref[(Double, Double, GraphLayout)?] = Ref(None)
@@ -671,9 +671,9 @@ pub fn gph_chart_t(
       w.node.set_min_width(@yoga.fixed(120.0))
     }
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       p.set_fill_color(@theme.theme_bg_panel())
       p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -692,9 +692,9 @@ pub fn gph_chart_t(
     })
     let sid = data.subscribe_id(fn(_d : GraphData) -> Unit {
       cache.val = None
-      @core.invalidate()
+      @widget.invalidate()
     })
-    @core.sub_bag_register(fn() { data.remove(sid) })
+    @base.sub_bag_register(fn() { data.remove(sid) })
     handle(w)
     w
   })

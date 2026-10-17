@@ -1,4 +1,4 @@
-// 定时器自排链探针：验证 `@core.set_timeout` 的任务在真实宿主泵下会不会被
+// 定时器自排链探针：验证 `@shell.set_timeout` 的任务在真实宿主泵下会不会被
 // `advance` 跑到（showcase 折线推点链同款机制，第一拍挂节点挂载回调，最小化
 // 复现）。读数不写 stdout（进程被强杀时缓冲会吞掉），逐拍覆盖写
 // C:/tmp/timerprobe.log：ARMED=挂载回调已跑并排上首拍；step i / ticks t /
@@ -17,31 +17,31 @@ fn dump(s : String) -> Unit {
 
 ///|
 fn main {
-  let app_ref : Ref[@core.App?] = Ref(None)
+  let app_ref : Ref[@widget.App?] = Ref(None)
   let tick : Ref[() -> Unit] = Ref(fn() { () })
   let n : Ref[Int] = Ref(0)
   tick.val = fn() -> Unit {
     n.val = n.val + 1
     if n.val < 100 {
-      let _ = @core.set_timeout(200, (tick.val))
+      let _ = @shell.set_timeout(200, (tick.val))
     }
   }
   let app = match @ui.mount_window(
     [
       @ui.col(
         [@ui.text("timer probe")],
-        handle=fn(_w : @core.Widget) -> Unit {
+        handle=fn(_w : @widget.Widget) -> Unit {
           // 与 showcase 折线段同口径：第一拍挂在挂载回调上
           (tick.val)()
           // 看门狗：3 秒后退窗。它若响，说明单次 set_timeout 是通的
-          let _ = @core.set_timeout(3000, fn() -> Unit {
+          let _ = @shell.set_timeout(3000, fn() -> Unit {
             dump("WATCHDOG fired ticks=" + n.val.to_string())
             match app_ref.val {
               Some(a) => a.close_window()
               None => ()
             }
           })
-          dump("ARMED pending=" + (@core.host_loop().pending()).to_string())
+          dump("ARMED pending=" + (@shell.host_loop().pending()).to_string())
         },
       ),
     ],
@@ -57,8 +57,8 @@ fn main {
   }
   app_ref.val = Some(app)
   // 分辨实验：App::new 返回之后（钩子按契约必已装好）再排一个定时器
-  let _ = @core.set_timeout(400, fn() -> Unit { dump("POST-TIMER fired") })
-  dump("POST-ARM pending=" + (@core.host_loop().pending()).to_string())
+  let _ = @shell.set_timeout(400, fn() -> Unit { dump("POST-TIMER fired") })
+  dump("POST-ARM pending=" + (@shell.host_loop().pending()).to_string())
   // 手动驱动：约 6 秒上限（每步 wait 受 wait_budget 钳 1s），必然正常退出
   let t0 = @win.now_ms()
   let mut steps = 0
@@ -67,7 +67,7 @@ fn main {
     steps = steps + 1
     dump(
       "step=" + steps.to_string() + " ticks=" + n.val.to_string() +
-      " pending=" + (@core.host_loop().pending()).to_string() +
+      " pending=" + (@shell.host_loop().pending()).to_string() +
       " now=" + (@win.now_ms() - t0).to_string(),
     )
   }

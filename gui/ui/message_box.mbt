@@ -93,7 +93,7 @@ fn msgbox_alloc_focus_id() -> Int {
 /// - `close_on_mask`：点遮罩空白处是否收起（默认否——消息框通常要求显式作答）。
 /// - `width`：面板固定宽（正文按它折行）。
 pub fn message_box(
-  visible : @core.Store[Bool],
+  visible : @base.Store[Bool],
   title : String,
   content : String,
   kind? : MsgBoxKind = Information,
@@ -104,13 +104,13 @@ pub fn message_box(
   close_on_mask? : Bool = false,
   width? : Double = 420.0,
   class? : Array[@style.Style] = [],
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   // 用显式 mount 而不是 `node_of_new`：后者的 finish 在构造期就跑，而「按 Store
   // 立刻开层」要求浮层宿主已经就位（宿主是 App 建窗时装的）。同 `dialog`。
   {
-    mount: fn(parent : @core.Widget) -> @core.Widget {
-      let anchor = @core.Widget::new()
+    mount: fn(parent : @widget.Widget) -> @widget.Widget {
+      let anchor = @widget.Widget::new()
       watch_theme()
       // 锚点是个 0 尺寸占位：可见性只由 Store 驱动，不在页面里占位
       anchor.node.set_height(@yoga.fixed(0.0))
@@ -127,11 +127,11 @@ pub fn message_box(
       // 收层：关浮层 + 还焦点。**幂等**（Store 订阅与按钮回调都会调它）
       let teardown_open = fn() -> Unit {
         if open_id.val != 0 {
-          @core.overlay_hide(open_id.val)
+          @widget.overlay_hide(open_id.val)
           open_id.val = 0
         }
         if focus_id.val != 0 {
-          match @core.host_active() {
+          match @widget.host_active() {
             Some(a) => {
               a.focus.unregister(focus_id.val)
               // 还回开框前那个焦点（>0 才可能还在栈里；不在栈里时 focus 给 false，
@@ -161,18 +161,18 @@ pub fn message_box(
         if open_id.val != 0 {
           return
         }
-        let panel = @core.Widget::new()
-        let panel_node = @core.node_of(panel)
+        let panel = @widget.Widget::new()
+        let panel_node = @widget.node_of(panel)
         // 遮罩：铺满窗口 + 吃下按下（视觉模态，点击不穿透到内容）
-        let scrim = @core.node_of_new(fn(s : @core.Widget) -> @core.Widget {
+        let scrim = @widget.node_of_new(fn(s : @widget.Widget) -> @widget.Widget {
           watch_theme()
           s.node.set_width(@yoga.percent(100.0))
           s.node.set_height(@yoga.percent(100.0))
           s.node.set_justify_content(@yoga.JustifyContent::Center)
           s.node.set_align_items(@yoga.AlignItems::Center)
           s.on_pointer = Some(fn(
-            self : @core.Widget,
-            ev : @core.PointerEvent,
+            self : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               @widget.PointerKind::Down => true
@@ -191,7 +191,7 @@ pub fn message_box(
           s
         })
         // 标题栏：标题文字 + 右上角 ✕
-        let title_bar = @core.Widget::new()
+        let title_bar = @widget.Widget::new()
         title_bar.node.set_flex_direction(@yoga.Row)
         title_bar.node.set_height(@yoga.fixed(40.0))
         title_bar.node.set_align_items(@yoga.AlignItems::Center)
@@ -201,9 +201,9 @@ pub fn message_box(
           @style.merge_all([@style.style(color="text_primary"), paint_subset(class)]),
         )
         title_bar.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           let _ = @text.draw_box_at(
@@ -219,13 +219,13 @@ pub fn message_box(
             valign=@text.Center,
           )
         })
-        let close_btn = @core.Widget::new()
+        let close_btn = @widget.Widget::new()
         close_btn.node.set_position(@yoga.Absolute)
         close_btn.node.set_top(@yoga.fixed(8.0))
         close_btn.node.set_right(@yoga.fixed(8.0))
         close_btn.node.set_width(@yoga.fixed(24.0))
         close_btn.node.set_height(@yoga.fixed(24.0))
-        close_btn.cursor = @core.CURSOR_HAND
+        close_btn.cursor = @widget.CURSOR_HAND
         @style.apply(
           close_btn,
           @style.merge_all([
@@ -234,9 +234,9 @@ pub fn message_box(
           ]),
         )
         close_btn.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           let bg = @style.color_of(st.background_color, "")
@@ -254,8 +254,8 @@ pub fn message_box(
           p.stroke()
         })
         close_btn.on_pointer = Some(fn(
-          _s : @core.Widget,
-          ev : @core.PointerEvent,
+          _s : @widget.Widget,
+          ev : @widget.PointerEvent,
         ) -> Bool {
           match ev.kind {
             @widget.PointerKind::Down => true
@@ -267,13 +267,13 @@ pub fn message_box(
           }
         })
         // 正文区：图标 + (正文 / 副行)
-        let body = @core.Widget::new()
+        let body = @widget.Widget::new()
         body.node.set_flex_direction(@yoga.Row)
         body.node.set_width(@yoga.percent(100.0))
         body.set_padding(top=14.0, left=16.0)
         body.node.set_gap(0.0, 12.0)
         body.node.set_align_items(@yoga.AlignItems::FlexStart)
-        let icon_w = @core.Widget::new()
+        let icon_w = @widget.Widget::new()
         icon_w.node.set_width(@yoga.fixed(24.0))
         icon_w.node.set_height(@yoga.fixed(24.0))
         icon_w.node.set_flex_shrink(0.0)
@@ -290,14 +290,14 @@ pub fn message_box(
           ]),
         )
         icon_w.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           @icons.draw_icon(p, icon_kind, r.w / 2.0, r.h / 2.0, 11.0, @style.color_of(st.color, icon_color))
         })
-        let col = @core.Widget::new()
+        let col = @widget.Widget::new()
         col.node.set_flex_direction(@yoga.Column)
         col.node.set_width(@yoga.fixed(inner_w))
         col.node.set_gap(6.0, 0.0)
@@ -320,7 +320,7 @@ pub fn message_box(
         body.append_child(icon_w)
         body.append_child(col)
         // 按钮区：按给定顺序从左到右，第一个是默认钮（主色）
-        let footer = @core.Widget::new()
+        let footer = @widget.Widget::new()
         footer.node.set_flex_direction(@yoga.Row)
         footer.node.set_height(@yoga.fixed(52.0))
         footer.node.set_justify_content(@yoga.JustifyContent::FlexEnd)
@@ -334,11 +334,11 @@ pub fn message_box(
             continue
           }
           let primary = i == 0
-          let b = @core.Widget::new()
+          let b = @widget.Widget::new()
           b.node.set_width(@yoga.fixed(text_width(input.0, btn_font) + 30.0))
           b.node.set_height(@yoga.fixed(30.0))
           b.node.set_flex_shrink(0.0)
-          b.cursor = @core.CURSOR_HAND
+          b.cursor = @widget.CURSOR_HAND
           // 主/次两档皮肤折进槽：基块=常态、hover 桶=点亮态（与对话框底钮同形）
           let skin = if primary {
             @style.style(
@@ -359,9 +359,9 @@ pub fn message_box(
           }
           @style.apply(b, @style.merge_all([skin, paint_subset(class)]))
           b.on_draw = Some(fn(
-            self : @core.Widget,
+            self : @widget.Widget,
             p : @render.Painter,
-            r : @core.Rect,
+            r : @base.Rect,
           ) -> Unit {
             let st = @style.style_for(self)
             p.set_fill_color(
@@ -391,8 +391,8 @@ pub fn message_box(
             )
           })
           b.on_pointer = Some(fn(
-            _s : @core.Widget,
-            ev : @core.PointerEvent,
+            _s : @widget.Widget,
+            ev : @widget.PointerEvent,
           ) -> Bool {
             match ev.kind {
               @widget.PointerKind::Down => true
@@ -421,9 +421,9 @@ pub fn message_box(
           ]),
         )
         panel.on_draw = Some(fn(
-          self : @core.Widget,
+          self : @widget.Widget,
           p : @render.Painter,
-          r : @core.Rect,
+          r : @base.Rect,
         ) -> Unit {
           let st = @style.style_for(self)
           p.set_fill_color(@style.color_of(st.background_color, @theme.theme_bg_panel()))
@@ -434,14 +434,14 @@ pub fn message_box(
         })
         // Esc 收起、Enter 触发默认钮：键盘事件按焦点投递，面板自己就是焦点控件
         // （层级上它比遮罩深，键先到它这里）
-        panel.on_key = Some(fn(ev : @core.KeyEvent) -> Bool {
+        panel.on_key = Some(fn(ev : @widget.KeyEvent) -> Bool {
           if !ev.press {
             return false
           }
-          if ev.keysym == @core.KS_ESCAPE {
+          if ev.keysym == @base.KS_ESCAPE {
             dismiss()
             true
-          } else if ev.keysym == @core.KS_RETURN {
+          } else if ev.keysym == @base.KS_RETURN {
             // Enter = 第一个按钮（默认钮）；没有按钮时等同 ✕
             if buttons.length() > 0 {
               respond(msgbox_default_code(buttons))
@@ -458,7 +458,7 @@ pub fn message_box(
         panel.append_child(body)
         panel.append_child(footer)
         // 接管焦点：Esc/Enter 要有落点。记住原焦点，收层时还回去。
-        match @core.host_active() {
+        match @widget.host_active() {
           Some(a) => {
             let fid = msgbox_alloc_focus_id()
             focus_id.val = fid
@@ -472,7 +472,7 @@ pub fn message_box(
           }
           None => ()
         }
-        open_id.val = @core.overlay_show_full(scrim)
+        open_id.val = @widget.overlay_show_full(scrim)
         handle(anchor)
       }
 
@@ -485,7 +485,7 @@ pub fn message_box(
           teardown_open()
         }
       })
-      @core.sub_bag_register(fn() { sig.remove(sid) })
+      @base.sub_bag_register(fn() { sig.remove(sid) })
       if visible.get() {
         open()
       }

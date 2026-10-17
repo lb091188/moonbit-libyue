@@ -1,6 +1,6 @@
 # 组件速查（@ui）
 
-自绘控件与组件库全部住在 `NoahLiu/native-gui/ui`（别名 `@ui`）。每个组件是一个**返回 `@core.Node` 的构造器**——把界面描述成一棵节点树，交给 `@ui.mount_window([...])` 一次挂载。本文按家族列每个组件的入口签名与用途，作速查用；参数一律以代码为准（`gui/ui/*.mbt`）。
+自绘控件与组件库全部住在 `NoahLiu/native-gui/ui`（别名 `@ui`）。每个组件是一个**返回 `@widget.Node` 的构造器**——把界面描述成一棵节点树，交给 `@ui.mount_window([...])` 一次挂载。本文按家族列每个组件的入口签名与用途，作速查用；参数一律以代码为准（`gui/ui/*.mbt`）。
 
 > 各组件的可运行示例集中在 `examples/showcase`（14 页演示板，每页一个源文件），是最快的上手参照。
 
@@ -8,9 +8,9 @@
 
 **类型化参数 + `class` 样式通道。** 组件只给类型化参数——尺寸、颜色、值——不接 CSS 字符串表；外观覆盖走两条路：散参数（`font_size` / `background_color` 等），或 `class? : Array[@style.Style]` 叠 `Style` 值块、数组尾赢。样式层的完整形态见 [design.md](design.md)。
 
-**状态走 `Store`，不写胶水。** 值类控件（复选/单选/开关/滑块/输入框/进度…）的当前值由 `@core.Store[T]` 持有：组件读写它，外部改它即刷新组件。展示类另有 `x` 收值、`x_dyn` 收 `Signal[T]` 两条入口，同一份画法。
+**状态走 `Store`，不写胶水。** 值类控件（复选/单选/开关/滑块/输入框/进度…）的当前值由 `@base.Store[T]` 持有：组件读写它，外部改它即刷新组件。展示类另有 `x` 收值、`x_dyn` 收 `Signal[T]` 两条入口，同一份画法。
 
-**事件一律 `on_*`。** 回调命名统一 `on_click` / `on_change` / `on_drop` …；`handle?` 拿回内部 `@core.Widget` 句柄做框架未暴露的操作，不是事件。
+**事件一律 `on_*`。** 回调命名统一 `on_click` / `on_change` / `on_drop` …；`handle?` 拿回内部 `@widget.Widget` 句柄做框架未暴露的操作，不是事件。
 
 **键盘可及性内建。** 表单族控件（按钮/复选/单选/开关/步进/滑杆/评分/下拉/取色/日期时间/分段）默认自动领焦点号进 Tab 链，聚焦时描边转主题色；空格/回车激活，方向键按控件语义调值或换选。
 
@@ -139,7 +139,7 @@
 | `time_range_picker(value : Store[TimeRange], on_change?, …)` | 时间区间选择器，步进器形态、非 `input` |
 | `datetime_range_picker(value : Store[DateTimeRange], on_change?, …)` | 日期时间区间选择器 |
 
-> 「今天」走 `wm_local_date` → `@core.local_ymd()` 取系统日历时间；单调钟 `now_ms` 不能推日期。
+> 「今天」走 `wm_local_date` → `@shell.local_ymd()` 取系统日历时间；单调钟 `now_ms` 不能推日期。
 
 ## 响应式控制
 
@@ -148,7 +148,7 @@
 | `when(cond : Signal[T], then : Node, pred?)` | 信号版显隐：真挂 `then`、假隐藏，不销毁、状态不丢；另有布尔源常用档 `when_bool` |
 | `when_else(cond, then, otherwise, pred?)` | 双支常驻、按信号切显隐，`swap_node` 落地、零重建；`when_else_bool` 是布尔源档 |
 | `when_store` / `when_store_bool` / `when_else_store` / `when_else_store_bool` | 上面各条的 `Store[T]` 形态 |
-| `for_list(ls : @core.ListStore[T], build : (T, Int) -> Node, key~, eq?)` | keyed 列表差分：`build(item, index)` 建行，缺省判据「同键同值」，会变字段各自做成 Store |
+| `for_list(ls : @base.ListStore[T], build : (T, Int) -> Node, key~, eq?)` | keyed 列表差分：`build(item, index)` 建行，缺省判据「同键同值」，会变字段各自做成 Store |
 | `for_list_indexed(ls, build)` | 按下标对齐、等价无 `:key`：长度收缩才卸多余行 |
 
 > 整棵换内容走 `bind_node`；`ListStore` 的键控差分随 `@core` 响应式层（详见 [declarative.md](declarative.md)）。

@@ -8,10 +8,10 @@
 //    （菜单栏形态已在 `examples/native-app` 演示，弹出形态随窗口页接线批补）；
 // ③ `radio_group` 同页级 Store 的口径与 master 一致：菜单项/面包屑写**存在**
 //    的页面名会直接切换页面（共享同一导航 Store 是刻意的联动演示）。
-pub fn page_nav(app : @shared.App) -> @core.Node {
-  let page_no : @core.Store[Int] = @core.Store::new(2)
-  let step : @core.Store[Int] = @core.Store::new(1)
-  let last_op : @core.Store[String] = @core.Store::new("（尚未操作）")
+pub fn page_nav(app : @shared.App) -> @widget.Node {
+  let page_no : @base.Store[Int] = @base.Store::new(2)
+  let step : @base.Store[Int] = @base.Store::new(1)
+  let last_op : @base.Store[String] = @base.Store::new("（尚未操作）")
   @shared.page([
     @shared.section(
       "侧栏",
@@ -26,7 +26,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
         ]),
       ],
       code=[
-        "let selected = @core.Store::new(\"基础组件\")",
+        "let selected = @base.Store::new(\"基础组件\")",
         "@ui.menu_sections(",
         "  [(\"组件\", [\"基础组件\", \"表单组件\"]), (\"系统能力\", [\"系统集成\"])],",
         "  selected,",
@@ -135,7 +135,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
       "当前页主题色实底白字，悬停浅蓝；点击页码切换。",
       [@ui.pagination(page_no, 5)],
       code=[
-        "let page_no : @core.Store[Int] = @core.Store::new(2)",
+        "let page_no : @base.Store[Int] = @base.Store::new(2)",
         "@ui.pagination(page_no, 5)",
       ],
     ),
@@ -173,7 +173,7 @@ pub fn page_nav(app : @shared.App) -> @core.Node {
         ),
       ],
       code=[
-        "let step : @core.Store[Int] = @core.Store::new(1)",
+        "let step : @base.Store[Int] = @base.Store::new(1)",
         "@ui.steps([\"填写\", \"确认\", \"完成\"], step)",
         "@ui.button(\"下一步\", variant=@ui.Solid, on_click=fn() { step.update(fn(n) { if n + 1 > 2 { 2 } else { n + 1 } }) })",
       ],

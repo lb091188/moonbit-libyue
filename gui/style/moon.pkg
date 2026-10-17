@@ -9,7 +9,8 @@ import {
   "NoahLiu/yoga-mbt/src" @yoga,
   "moonbitlang/core/abort",
   "NoahLiu/native-gui/text" @text,
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/shell",
+  "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/theme",
 }
 

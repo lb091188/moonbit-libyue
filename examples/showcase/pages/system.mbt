@@ -20,7 +20,7 @@ const AUTOSTART_APP_ID : String = "libyue.showcase"
 
 ///|
 /// 宿主窗口 id → 对话框 parent（0 = 无父窗口；这里恒有父）。
-fn dialog_parent(a : @core.App) -> Int64 {
+fn dialog_parent(a : @widget.App) -> Int64 {
   a.wid().to_int64()
 }
 
@@ -68,7 +68,7 @@ fn tray_poll_loop() -> Unit {
   let tick : Ref[() -> Unit] = Ref(fn() { () })
   tick.val = fn() -> Unit {
     let _ = @shell.dispatch_tray_event()
-    match @core.host_active() {
+    match @widget.host_active() {
       Some(a) => ignore(a.timer(200, tick.val))
       None => ()
     }
@@ -116,26 +116,26 @@ fn msgbox_result_label(r : @win.MessageBoxResult) -> String {
 
 ///|
 /// 系统集成页。页内私有状态（回显/托盘句柄/周期表句柄）不进共享 App。
-pub fn page_system(app : @shared.App) -> @core.Node {
-  let file_out : @core.Store[String] = @core.Store::new("（还没选过文件）")
-  let mb_out : @core.Store[String] = @core.Store::new("（还没弹过框）")
-  let nt_out : @core.Store[String] = @core.Store::new("（还没发过通知）")
-  let cb_out : @core.Store[String] = @core.Store::new("（还没动过剪贴板）")
-  let timer_out : @core.Store[String] = @core.Store::new("（表未起）")
-  let ticks : @core.Store[Int] = @core.Store::new(0)
-  let tray_note : @core.Store[String] = @core.Store::new("（还没建托盘）")
-  let tray_clicks : @core.Store[Int] = @core.Store::new(0)
+pub fn page_system(app : @shared.App) -> @widget.Node {
+  let file_out : @base.Store[String] = @base.Store::new("（还没选过文件）")
+  let mb_out : @base.Store[String] = @base.Store::new("（还没弹过框）")
+  let nt_out : @base.Store[String] = @base.Store::new("（还没发过通知）")
+  let cb_out : @base.Store[String] = @base.Store::new("（还没动过剪贴板）")
+  let timer_out : @base.Store[String] = @base.Store::new("（表未起）")
+  let ticks : @base.Store[Int] = @base.Store::new(0)
+  let tray_note : @base.Store[String] = @base.Store::new("（还没建托盘）")
+  let tray_clicks : @base.Store[Int] = @base.Store::new(0)
   // 托盘句柄（挂载闭包里建托盘时填入）：挂菜单 / 改提示要拿它
   let tray_holder : Ref[@shell.Tray?] = Ref(None)
-  let auto_state : @core.Store[String] = @core.Store::new("（未读）")
-  let ext_out : @core.Store[String] = @core.Store::new("（还没打开过外部）")
-  let si_out : @core.Store[String] = @core.Store::new("（点「刷新」读一次）")
-  let vol_out : @core.Store[String] = @core.Store::new("（还没读过音量）")
+  let auto_state : @base.Store[String] = @base.Store::new("（未读）")
+  let ext_out : @base.Store[String] = @base.Store::new("（还没打开过外部）")
+  let si_out : @base.Store[String] = @base.Store::new("（点「刷新」读一次）")
+  let vol_out : @base.Store[String] = @base.Store::new("（还没读过音量）")
   // 周期表句柄（0 = 没起）；停表用
   let tick_id : Ref[Int] = Ref(0)
   // 自启动开关：Store 是唯一态，subscribe 落进真实系统状态。
   // priming 标志：初值读取不算「用户改动」，不能反向写一遍系统
-  let auto_on : @core.Store[Bool] = @core.Store::new(false)
+  let auto_on : @base.Store[Bool] = @base.Store::new(false)
   let auto_primed : Ref[Bool] = Ref(false)
   auto_on.subscribe(fn(v : Bool) -> Unit {
     if !auto_primed.val {
@@ -362,7 +362,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
           [
             @ui.button("1.5 秒后提示", on_click=fn() {
               ignore(
-                @core.set_timeout(1500, fn() {
+                @shell.set_timeout(1500, fn() {
                   app.toast_push("延时任务触发", @ui.Success)
                 }),
               )
@@ -409,7 +409,7 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       ],
       code=[
         "// 单次延时（进程级）",
-        "ignore(@core.set_timeout(1500, fn() {",
+        "ignore(@shell.set_timeout(1500, fn() {",
         "  app.toast_push(\"延时任务触发\", Success)",
         "}))",
         "// 周期表：回调里自重排，且每次都要记回新句柄才可停",
@@ -424,11 +424,11 @@ pub fn page_system(app : @shared.App) -> @core.Node {
       [
         // 零尺寸挂载钩子：建托盘（启动即出图标）在构造期，派发表起表必须挂
         // 真·挂载时机（Node::on_mount）——node_of_new 的 finish 是构造期执行，
-        // 那时宿主还没建好，tray_poll_loop 首拍读到 @core.host_active() 为 None
+        // 那时宿主还没建好，tray_poll_loop 首拍读到 @widget.host_active() 为 None
         // 就永久不再重排，之后左右键事件全压在队列里没人抽，右键「自动弹出已挂
         // 的菜单」也走不到；真机表现正是「图标在、点了没反应、菜单弹不出」。
         // （与快捷键页轮询表、图表页推点同一条坑的第 3 处。）
-        @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+        @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
           // 图标句柄只是 Win32 那一档要的东西（HICON），Linux 的 SNI 不读它、
           // 面板用库内置位图显示——所以拿到什么照传、拿不到也照建。
           // （旧写法把整段挂在 icon 成功之后，而 wm_icon_from_bgra 在 GTK 分支

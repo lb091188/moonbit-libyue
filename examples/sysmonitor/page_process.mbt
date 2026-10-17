@@ -132,11 +132,11 @@ fn sort_of_col(j : Int) -> ProcSort? {
 /// 排序条件走 @ui.TableSort Store（表头点击由 table_v 组件内切换，
 /// 本页订阅后重建数据），箭头显示与点击切换因此对组件透明。
 struct ProcPage {
-  rows : @core.Store[Array[@ui.TableRow]]
-  sel : @core.Store[Array[Int]]
-  msg : @core.Store[String]
-  status : @core.Store[String]
-  sort : @core.Store[@ui.TableSort]
+  rows : @base.Store[Array[@ui.TableRow]]
+  sel : @base.Store[Array[Int]]
+  msg : @base.Store[String]
+  status : @base.Store[String]
+  sort : @base.Store[@ui.TableSort]
   mut pids : Array[Int]
   mut query : String
   mut nice_text : String
@@ -275,20 +275,20 @@ fn ProcPage::renice_selected(self : ProcPage, platform : String) -> Unit {
 }
 
 ///|
-fn page_process(app : App) -> @core.Node {
+fn page_process(app : App) -> @widget.Node {
   // 平台化文案：Windows kill 一律 TerminateProcess 一档、优先级四档
   // 离散钳制；Linux 维持 SIGTERM/SIGKILL 两档与连续 nice
   let platform : String = if on_windows() { "windows" } else { "linux" }
   let (end_label, force_label) = kill_button_labels(platform)
   let (prio_btn, prio_hint) = priority_ui(platform)
   let page : ProcPage = {
-    rows: @core.Store::new([]),
-    sel: @core.Store::new([]),
+    rows: @base.Store::new([]),
+    sel: @base.Store::new([]),
     // 初始消息即优先级口径说明（首次操作后被结果覆盖）
-    msg: @core.Store::new(prio_hint),
-    status: @core.Store::new("采样中…"),
+    msg: @base.Store::new(prio_hint),
+    status: @base.Store::new("采样中…"),
     // 初始排序：CPU% 降序（列 3）
-    sort: @core.Store::new(@ui.TableSort::{ column: 3, asc: false, }),
+    sort: @base.Store::new(@ui.TableSort::{ column: 3, asc: false, }),
     pids: [],
     query: "",
     nice_text: "10",
@@ -299,9 +299,9 @@ fn page_process(app : App) -> @core.Node {
   // 表头排序点击（table_v 组件内切换 Store）→ 重建数据
   page.sort.subscribe(fn(_s) { page.rebuild(app.procs.get()) })
 
-  let query_store : @core.Store[String] = @core.Store::new("")
-  let nice_store : @core.Store[String] = @core.Store::new("10")
-  let tools : Array[@core.Node] = [
+  let query_store : @base.Store[String] = @base.Store::new("")
+  let nice_store : @base.Store[String] = @base.Store::new("10")
+  let tools : Array[@widget.Node] = [
     @ui.text("搜索", color="text_secondary", role=Body),
     // 搜索框：文本经 store 双向投影，on_change 里重建派生数据
     @ui.input(

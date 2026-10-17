@@ -18,7 +18,7 @@ struct NetRow {
 ///|
 /// 页面状态：网卡行 + 行历史。
 struct NetPage {
-  rows : @core.Store[Array[NetRow]]
+  rows : @base.Store[Array[NetRow]]
   hist : Map[String, (Array[Double], Array[Double])]
 }
 
@@ -143,14 +143,14 @@ fn draw_net_rows(p : @render.Painter, w : Double, rows : Array[NetRow]) -> Unit 
 }
 
 ///|
-fn page_net(app : App) -> @core.Node {
-  let page : NetPage = { rows: @core.Store::new([]), hist: Map([]), }
+fn page_net(app : App) -> @widget.Node {
+  let page : NetPage = { rows: @base.Store::new([]), hist: Map([]), }
   page.rebuild(app.nets.get())
   app.nets.subscribe(fn(nets) { page.rebuild(nets) })
-  let net_n : @core.Store[Int] = @core.Store::new(page.rows.get().length())
+  let net_n : @base.Store[Int] = @base.Store::new(page.rows.get().length())
   page.rows.subscribe(fn(r) { net_n.set(r.length()) })
   // 非 lo 汇总收发曲线（两序列，120 点窗口）
-  let total : @core.Store[Array[@charts.LineSeries]] = @core.Store::new([
+  let total : @base.Store[Array[@charts.LineSeries]] = @base.Store::new([
     @charts.LineSeries::make("接收", max_points=120),
     @charts.LineSeries::make("发送", max_points=120),
   ])

@@ -60,7 +60,9 @@ moon add NoahLiu/native-gui
 
   ```
   import {
-    "NoahLiu/native-gui/core",
+    "NoahLiu/native-gui/base",
+    "NoahLiu/native-gui/shell",
+    "NoahLiu/native-gui/widget" @widget,
     "NoahLiu/native-gui/ui",
   }
 
@@ -69,7 +71,7 @@ moon add NoahLiu/native-gui
   supported_targets = "native"
   ```
 
-  `import` 让代码能访问库：`@ui.*` 提供控件、组件与声明式入口（`mount_window` 与各节点构造器），`@core.*` 提供应用宿主与响应式状态（`Store` / `Signal`）。`pkgtype(kind: "executable")` 与 `supported_targets = "native"` 声明本包是可执行入口、只出原生目标。
+  `import` 让代码能访问库：`@ui.*` 提供控件、组件与声明式入口（`mount_window` 与各节点构造器），`@base.*`/`@shell.*`/`@widget.*` 提供应用宿主与响应式状态（`Store` / `Signal`）。`pkgtype(kind: "executable")` 与 `supported_targets = "native"` 声明本包是可执行入口、只出原生目标。
 
 ## 3. 第一个窗口
 
@@ -77,7 +79,7 @@ moon add NoahLiu/native-gui
 
 ```moonbit
 fn main {
-  let count : @core.Store[Int] = @core.Store::new(0)
+  let count : @base.Store[Int] = @base.Store::new(0)
   let app = match @ui.mount_window(
     [
       @ui.col(
@@ -117,7 +119,7 @@ moon run .
 | 语法 | 含义 |
 |---|---|
 | `fn main { ... }` | 程序入口 |
-| `let count : @core.Store[Int] = ...` | 类型标注：`Store[Int]` 是一个整数状态盒 |
+| `let count : @base.Store[Int] = ...` | 类型标注：`Store[Int]` 是一个整数状态盒 |
 | `match expr { ... }` | 模式匹配，按分支取值（这里是拆 `Option`） |
 | `None => ... / Some(a) => a` | 可选值的两态：`None` 缺省、`Some(x)` 有值 |
 | `fn(n) { n + 1 }` | 匿名函数（lambda），作回调传入 |
@@ -133,7 +135,7 @@ moon run .
 **想做得好看**——默认已整套跟随系统深浅与主色，`follow_system_theme` 一行接上：
 
 ```moonbit
-handle=fn(a : @core.App) -> Unit {
+handle=fn(a : @widget.App) -> Unit {
   let _ = a.follow_system_theme(interval_ms=2000)
 }
 ```

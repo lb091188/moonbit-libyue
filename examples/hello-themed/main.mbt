@@ -6,8 +6,8 @@
 
 ///|
 fn main {
-  let name : @core.Store[String] = @core.Store::new("MoonBit")
-  let greet : @core.Store[String] = @core.Store::new("(点「问候」)")
+  let name : @base.Store[String] = @base.Store::new("MoonBit")
+  let greet : @base.Store[String] = @base.Store::new("(点「问候」)")
   let app = match @ui.mount_window(
     [
       @ui.col(
@@ -30,7 +30,7 @@ fn main {
     title="hello-themed",
     width=360,
     height=260,
-    handle=fn(a : @core.App) -> Unit {
+    handle=fn(a : @widget.App) -> Unit {
       // 启动即按系统偏好上色，之后每 2 秒看一次系统有没有切换；
       // 返回的停表函数在本栈里由宿主收尾，不必自己持有
       let _ = a.follow_system_theme(interval_ms=2000)

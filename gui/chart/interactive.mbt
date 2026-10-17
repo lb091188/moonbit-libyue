@@ -674,25 +674,25 @@ pub fn[T] ci_slice_range(arr : Array[T], i0 : Int, i1 : Int) -> Array[T] {
 /// 重建 items）；visible 与 items 同长的显隐位（不必预先对齐，绘制/点击
 /// 时按 ci_fit_len 补齐）。两个 Store 变化时自绘刷新。
 pub fn ci_legend(
-  items~ : @core.Store[Array[(String, Int)]],
+  items~ : @base.Store[Array[(String, Int)]],
   color_at~ : (Int) -> String,
-  visible~ : @core.Store[Array[Bool]],
+  visible~ : @base.Store[Array[Bool]],
   on_toggle? : (Int) -> Unit = fn(_i) { () },
-  handle? : (@core.Widget) -> Unit = @ui.default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = @ui.default_handle,
+) -> @widget.Node {
   @ui.follow_store(items)
   @ui.follow_store(visible)
   @ui.watch_theme()
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     let hover : Ref[Int] = Ref(-1)
     w.node.set_width(@yoga.percent(100.0))
     w.node.set_height(@yoga.fixed(24.0))
     w.node.set_flex_shrink(0.0)
-    w.cursor = @core.CURSOR_HAND
+    w.cursor = @widget.CURSOR_HAND
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       let its = items.get()
       let names : Array[String] = []
@@ -732,8 +732,8 @@ pub fn ci_legend(
       }
     })
     w.on_pointer = Some(fn(
-      self : @core.Widget,
-      ev : @core.PointerEvent,
+      self : @widget.Widget,
+      ev : @widget.PointerEvent,
     ) -> Bool {
       match ev.kind {
         @widget.PointerKind::Move => {
@@ -744,14 +744,14 @@ pub fn ci_legend(
           let idx = ci_legend_hit(ev.x, names, width=self.rect.w)
           if idx != hover.val {
             hover.val = idx
-            @core.invalidate()
+            @widget.invalidate()
           }
           true
         }
         @widget.PointerKind::Leave => {
           if hover.val != -1 {
             hover.val = -1
-            @core.invalidate()
+            @widget.invalidate()
           }
           false
         }
@@ -769,7 +769,7 @@ pub fn ci_legend(
               let n = items.get().length()
               visible.update(fn(vs) { ci_toggle_flag(ci_fit_len(vs, n), idx) })
               on_toggle(idx)
-              @core.invalidate()
+              @widget.invalidate()
               true
             } else {
               false

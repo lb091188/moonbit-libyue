@@ -89,7 +89,7 @@ pub let primary : Style = @style.style(
   background_color="primary",   // token 名；`#` 开头按 hex、命名色按 named（§1.4）
   color="#fff",
   border_radius=4.0,
-  cursor=@core.CURSOR_HAND,
+  cursor=@widget.CURSOR_HAND,
 )
 .hover(background_color="primary_hover")   // 状态方法现场开块；active(...) / focus(...) 同形
 
@@ -168,7 +168,7 @@ pub let card : Style = style(
 pub let card_flat : Style = merge(card, style(border_width=0.0))
 
 pub fn merge(base : Style, over : Style) -> Style           // 逐属性并集，后者赢；状态桶递归
-pub fn apply(w : @core.Widget, s : Style) -> Unit           // 布局字段走 Yoga；外观字段存进
+pub fn apply(w : @widget.Widget, s : Style) -> Unit           // 布局字段走 Yoga；外观字段存进
                                                              // widget 的 Style 槽，绘制期读
                                                              // self 并按状态选桶
 ```
@@ -393,20 +393,20 @@ struct Ctx {
 
 fn ctx_new() -> Ctx {
   let next_id : Ref[Int] = Ref(1)
-  let draft : Store[String] = @core.Store::new("")
-  let items : Store[Array[Task]] = @core.Store::new([])
-  let busy : Store[Bool] = @core.Store::new(false)
+  let draft : Store[String] = @base.Store::new("")
+  let items : Store[Array[Task]] = @base.Store::new([])
+  let busy : Store[Bool] = @base.Store::new(false)
   {
     draft,
     items,
     busy,
-    has_items: @core.Signal::computed(fn() { items.get().length() > 0 }),
+    has_items: @base.Signal::computed(fn() { items.get().length() > 0 }),
     add: fn() {
       let title = draft.get().trim()
       if title == "" { return }
-      let t = { id: next_id.val, title, done: @core.Store::new(false) }
+      let t = { id: next_id.val, title, done: @base.Store::new(false) }
       next_id.val += 1
-      @core.batch(fn() {        // 多次 set 合并为出批时的一轮通知
+      @base.batch(fn() {        // 多次 set 合并为出批时的一轮通知
         draft.set("")
         items.update(fn(ts) { [..ts, t] })
       })
@@ -448,7 +448,7 @@ fn main {
 
 ```moonbit
 // 目标形态：一个「任务页」——P1–P3 落地后可编译、可响应
-fn render(ctx : Ctx) -> @core.Node {
+fn render(ctx : Ctx) -> @widget.Node {
   @ui.col(
     [
       // 工具栏：input 直接收 Store（v-model 对应物，现状能力），
@@ -539,7 +539,7 @@ fn render(ctx : Ctx) -> @core.Node {
    `impl Eq`；图表数据窗口（`Array[LineSeries]` 等元素无 `Eq` 且比较代价高于收益）在
    chart 与示例里一律走 `set_always`。
 2. **自重排的周期表：句柄每拍都要记回**（2026-10-14）：本栈的延时只有单次形态
-   （`Loop::timer` / `@core.set_timeout` 都是一次性），周期任务靠回调尾自己重排。
+   （`Loop::timer` / `@shell.set_timeout` 都是一次性），周期任务靠回调尾自己重排。
    **重排拿到的新句柄必须覆盖调用方存着的那一份**，否则「停表」取消的是早已跑掉的
    旧号，取消返回 true/false 都停不住（`core/loop_wbtest.mbt` 钉住这条语义）。
 3. **三份文档的分工与状态口径**（2026-10-16 定案）：`roadmap.md` 是**功能面全景**——功能点 × 三平台状态四列，计划项与已完成项都在同一张目录里，不写接口与过程；仓库根 `TODO.md` **只跟踪未完成项**；批次过程、根因与实测细节**只**在 `adaptation.md`（中英两份）。三处互不复述。平台状态五档：✅ 有实现且有逐项回证（真机 / 探针 / 分包测试绿任一，且适配文档留了记录）· 🚧 有实现但回证只到「分支在位 + 分包绿」或分支未合流 · ❌ 未接 · — 该平台无对应面 · ？查过仍无定论。**「代码里有分支」不构成 ✅，最多 🚧**；查不出的格子留 ？进待核清单，不填假值。

@@ -3,7 +3,7 @@ supported_targets = "native"
 import {
   "mizchi/markdown" @mdast,
   "NoahLiu/yoga-mbt/src" @yoga,
-  "NoahLiu/native-gui/core",
+  "NoahLiu/native-gui/base",
   "NoahLiu/native-gui/widget" @widget,
   "NoahLiu/native-gui/render",
   "NoahLiu/native-gui/text",

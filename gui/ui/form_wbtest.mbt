@@ -5,7 +5,7 @@
 ///|
 /// 点击 = 按下 + 抬起。坐标是**窗口坐标**（`dispatch_pointer` 按坐标命中，
 /// 与宿主真实投递一致），所以调用方传 `w.rect.x + 局部x`。
-fn click(w : @core.Widget, x : Double, y : Double) -> Bool {
+fn click(w : @widget.Widget, x : Double, y : Double) -> Bool {
   let _ = w.dispatch_pointer({ kind: @widget.PointerKind::Down, x, y, button: 1, mods: 0, })
   let last = w.dispatch_pointer({ kind: @widget.PointerKind::Up, x, y, button: 1, mods: 0, })
   last
@@ -13,7 +13,7 @@ fn click(w : @core.Widget, x : Double, y : Double) -> Bool {
 
 ///|
 test "复选框：点一下换状态，再点回来；禁用态不动作" {
-  let on = @core.Store::new(false)
+  let on = @base.Store::new(false)
   let root = mount_root([checkbox("同意", on)], 240.0, 60.0)
   let w = kid(root, 0)
   assert_eq(on.get(), false)
@@ -38,7 +38,7 @@ test "复选框：点一下换状态，再点回来；禁用态不动作" {
   })
   assert_eq(on.get(), false)
 
-  let off = @core.Store::new(false)
+  let off = @base.Store::new(false)
   let root2 = mount_root([checkbox("禁用", off, disabled=true)], 240.0, 60.0)
   let w2 = kid(root2, 0)
   let consumed = click(w2, w2.rect.x + 6.0, w2.rect.y + 6.0)
@@ -50,7 +50,7 @@ test "复选框：点一下换状态，再点回来；禁用态不动作" {
 
 ///|
 test "单选组：点第几项就写第几项，横向排列" {
-  let pick = @core.Store::new(0)
+  let pick = @base.Store::new(0)
   let root = mount_root([radio_group(["甲", "乙", "丙"], pick)], 300.0, 60.0)
   let group = kid(root, 0)
   assert_eq(group.children().length(), 3)
@@ -68,7 +68,7 @@ test "单选组：点第几项就写第几项，横向排列" {
 
 ///|
 test "开关：胶囊尺寸固定，点击换值，绘制跟随 Store 现值" {
-  let on = @core.Store::new(false)
+  let on = @base.Store::new(false)
   let root = mount_root([switch(on, on_text="开", off_text="关")], 240.0, 60.0)
   let row = kid(root, 0)
   let pill = row.children()[0]
@@ -95,7 +95,7 @@ test "开关：胶囊尺寸固定，点击换值，绘制跟随 Store 现值" {
 
 ///|
 test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
-  let v = @core.Store::new(0.0)
+  let v = @base.Store::new(0.0)
   let root = mount_root([slider(v, width=120.0)], 240.0, 60.0)
   let w = kid(root, 0)
   assert_eq((w.rect.w, w.rect.h), (120.0, @theme.control_height))
@@ -106,7 +106,7 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
   // 拖出轨道仍然连续：靠宿主的「按身份投递」（真实事件流里由捕获期触发）。
   // 按坐标命中的 dispatch_pointer 投不进来——坐标已经出了控件矩形，命中测试
   // 就把事件给了别的（或不给），这正是宿主要做捕获的原因。
-  let drag = fn(kind : @core.PointerKind, x : Double) -> Unit {
+  let drag = fn(kind : @widget.PointerKind, x : Double) -> Unit {
     let _ = root.dispatch_pointer_to(w.id, {
       kind,
       x,
@@ -125,7 +125,7 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
   assert_eq(v.get(), 100.0)
 
   // 步长 25：只落在刻度上
-  let s = @core.Store::new(0.0)
+  let s = @base.Store::new(0.0)
   let root2 = mount_root([slider(s, width=100.0, step=25.0)], 240.0, 60.0)
   let w2 = kid(root2, 0)
   // 轨道宽 = 控件宽 - 2×手柄半径(6) = 88：x=50 → 比值 0.5 → 50（正好在刻度上）
@@ -142,7 +142,7 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
   assert_eq(s.get(), 100.0)
 
   // 禁用：不消费、不改值
-  let d = @core.Store::new(10.0)
+  let d = @base.Store::new(10.0)
   let root3 = mount_root([slider(d, width=100.0, disabled=true)], 240.0, 60.0)
   let w3 = kid(root3, 0)
   let consumed = w3.dispatch_pointer({
@@ -158,7 +158,7 @@ test "滑块：按下即取值，捕获期拖动跟手，step 吸附" {
 
 ///|
 test "进度条：填充比例按 Store 值，绘制像素两侧不同色" {
-  let v = @core.Store::new(0.0)
+  let v = @base.Store::new(0.0)
   let root = mount_root([progress(v, width=100.0, height=6.0)], 200.0, 40.0)
   let w = kid(root, 0)
   let bm = @render.Bitmap::new(120, 20)
@@ -178,7 +178,7 @@ test "进度条：填充比例按 Store 值，绘制像素两侧不同色" {
 
 ///|
 test "步进器：加减按步长夹在区间内，触边界那侧禁用" {
-  let n = @core.Store::new(0)
+  let n = @base.Store::new(0)
   let root = mount_root([stepper(n, min=0, max=2)], 260.0, 60.0)
   let row = kid(root, 0)
   assert_eq(row.children().length(), 3)
@@ -202,22 +202,22 @@ test "步进器：加减按步长夹在区间内，触边界那侧禁用" {
 
 ///|
 test "Store 订阅随回收袋退订：反复重挂不在 Store 上堆积订阅" {
-  let v = @core.Store::new(false)
-  let s2 = @core.Store::new(0.0)
+  let v = @base.Store::new(false)
+  let s2 = @base.Store::new(0.0)
   let mut i = 0
   while i < 5 {
     // 每一代都开袋挂载（bind_node 的形态），旧代订阅整袋退订
-    @core.sub_bag_begin()
-    let holder = @core.Widget::new()
-    @core.mount_children(holder, [checkbox("勾选", v), slider(s2, width=80.0)])
-    let offs = @core.sub_bag_end()
-    @core.sub_bag_discard(offs)
+    @base.sub_bag_begin()
+    let holder = @widget.Widget::new()
+    @widget.mount_children(holder, [checkbox("勾选", v), slider(s2, width=80.0)])
+    let offs = @base.sub_bag_end()
+    @base.sub_bag_discard(offs)
     i = i + 1
   }
   assert_eq((v.signal().sub_count(), s2.signal().sub_count()), (0, 0))
   // 不套袋的常规挂载：订阅随应用存活，注册一条就留一条
-  let holder2 = @core.Widget::new()
-  @core.mount_children(holder2, [checkbox("另一处", v)])
+  let holder2 = @widget.Widget::new()
+  @widget.mount_children(holder2, [checkbox("另一处", v)])
   assert_eq(v.signal().sub_count(), 1)
 }
 
@@ -225,7 +225,7 @@ test "Store 订阅随回收袋退订：反复重挂不在 Store 上堆积订阅"
 /// 单独画一个控件到贴合它的位图上：`paint_at(p, 自己的原点)` 把绝对落位抵消掉，
 /// 于是位图坐标=控件局部坐标（浮层里的控件绝对 y 在几十到几百，用 `paint` 会画到
 /// 位图外，取样永远读不到）。返回值仍是三元组，取样直接用局部坐标。
-fn shot(w : @core.Widget) -> (@render.Bitmap, Int, Int) {
+fn shot(w : @widget.Widget) -> (@render.Bitmap, Int, Int) {
   let bm = @render.Bitmap::new(w.rect.w.round().to_int() + 2, w.rect.h.round().to_int() + 2)
   let p = @render.Painter::new(bm)
   w.paint_at(p, w.rect.x, w.rect.y)
@@ -336,7 +336,7 @@ test "表单项：标签定宽右对齐、错误行常驻预留 18 高、文案�
   if !ui_text_guard() {
     return
   }
-  let err = @core.Store::new("")
+  let err = @base.Store::new("")
   let root = mount_root(
     [form_item("名称", text("控件区"), label_width=90.0, error=err)],
     320.0,
@@ -373,7 +373,7 @@ test "评分：星顶点几何、点击写值并回调、悬停只预亮不改�
   let r1 = (pts[1].0 * pts[1].0 + pts[1].1 * pts[1].1).sqrt()
   assert_true(r0 > r1)
 
-  let value = @core.Store::new(0)
+  let value = @base.Store::new(0)
   let mut cb = -1
   let root = mount_root([rate(value, max=5, on_change=fn(v) { cb = v })], 300.0, 60.0)
   let w = kid(root, 0)
@@ -404,22 +404,22 @@ test "评分：星顶点几何、点击写值并回调、悬停只预亮不改�
 
 ///|
 /// 取浮层里第 id 层的第 n 块子控件。
-fn overlay_kid(id : Int, n : Int) -> @core.Widget {
-  match @core.overlay_root_of(id) {
+fn overlay_kid(id : Int, n : Int) -> @widget.Widget {
+  match @widget.overlay_root_of(id) {
     Some(w) => w.children()[n]
-    None => @core.Widget::new()
+    None => @widget.Widget::new()
   }
 }
 
 ///|
 /// 下拉弹层的行列表（面板 → 滚动视口 → 内容）。
-fn select_rows(id : Int) -> Array[@core.Widget] {
+fn select_rows(id : Int) -> Array[@widget.Widget] {
   overlay_kid(id, 0).children()[0].children()[0].children()
 }
 
 ///|
 test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选中行浅底出像素" {
-  let v = @core.Store::new("")
+  let v = @base.Store::new("")
   let changes : Array[String] = []
   let (root, field) = mounted_with_overlay(
     select(["甲", "乙", "丙"], v, on_change=fn(s : String) -> Unit { changes.push(s) }, clearable=true, width=160.0),
@@ -427,25 +427,25 @@ test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选�
     300.0,
   )
   assert_eq(field.rect.w, 160.0)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   click_at(root, field, 40.0, 16.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(420.0, 300.0)
-  let rows = select_rows(@core.overlay_top_id())
+  let rows = select_rows(@widget.overlay_top_id())
   assert_eq(rows.length(), 3)
   assert_eq(rows[0].rect.h, 28.0)
   // 弹层落在字段下方 2px、与字段同宽
-  match @core.overlay_rect_of(@core.overlay_top_id()) {
+  match @widget.overlay_rect_of(@widget.overlay_top_id()) {
     Some(r) => assert_eq((r.x, r.y, r.w), (field.rect.x, field.rect.y + field.rect.h + 2.0, 160.0))
     None => assert_true(false)
   }
   click_at(root, rows[1], 30.0, 14.0)
-  assert_eq((v.get(), @core.overlay_count()), ("乙", 0))
+  assert_eq((v.get(), @widget.overlay_count()), ("乙", 0))
   assert_eq(changes, ["乙"])
   // 再点开：选中行（乙）有浅底，未选中行没有
   click_at(root, field, 40.0, 16.0)
   root.relayout(420.0, 300.0)
-  let rows2 = select_rows(@core.overlay_top_id())
+  let rows2 = select_rows(@widget.overlay_top_id())
   let (bm_a, ax, ay) = shot(rows2[0])
   let (bm_b, bx, by) = shot(rows2[1])
   let plain = color_of(bm_a, ax + 40, ay + 14)
@@ -470,28 +470,28 @@ test "下拉选择：点开列表、点选项回填并收起、✕ 清空、选�
 
 ///|
 test "下拉选择：点浮层外收起后，再点字段立刻能重开（句柄活性）" {
-  let v = @core.Store::new("甲")
+  let v = @base.Store::new("甲")
   let (root, field) = mounted_with_overlay(
     select(["甲", "乙"], v, width=140.0),
     420.0,
     300.0,
   )
   click_at(root, field, 30.0, 16.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(420.0, 300.0)
   // 点浮层外：图层吃掉这一击并收起（组件的句柄就此失效）
   let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Down, x: 380.0, y: 280.0, button: 1, mods: 0 })
   let _ = root.dispatch_pointer({ kind: @widget.PointerKind::Up, x: 380.0, y: 280.0, button: 1, mods: 0 })
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   // 第二次点字段应直接重开，而不是「先清旧句柄、要点两下」
   click_at(root, field, 30.0, 16.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
 }
 
 ///|
 test "取色器：字段点开色板网格、点色块写值并收起、选中格描边出像素" {
   let cs = ["#111111", "#222222", "#333333", "#444444", "#555555", "#666666"]
-  let v = @core.Store::new("#333333")
+  let v = @base.Store::new("#333333")
   let changes : Array[String] = []
   let (root, field) = mounted_with_overlay(
     color_picker(v, colors=cs, on_change=fn(c : String) -> Unit { changes.push(c) }, width=180.0),
@@ -499,10 +499,10 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
     320.0,
   )
   click_at(root, field, 40.0, 16.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(460.0, 320.0)
   // 面板 → 色板容器 → 两行（每行 5 格）
-  let grid = overlay_kid(@core.overlay_top_id(), 0).children()[0]
+  let grid = overlay_kid(@widget.overlay_top_id(), 0).children()[0]
   let lines = grid.children()
   assert_eq(lines.length(), 2)
   assert_eq(lines[0].children().length(), 5)
@@ -510,7 +510,7 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   // 面板按公式定尺寸 176x80；`set_padding` 改四边可选参数（没给的边按 0）
   // 后，色板容器不再有旧口径「只给左/上」留下的右下空带，网格占满面板
   assert_eq((grid.rect.w, grid.rect.h), (176.0, 80.0))
-  match @core.overlay_rect_of(@core.overlay_top_id()) {
+  match @widget.overlay_rect_of(@widget.overlay_top_id()) {
     Some(r) => assert_eq((r.w, r.h), (176.0, 80.0))
     None => assert_true(false)
   }
@@ -530,13 +530,13 @@ test "取色器：字段点开色板网格、点色块写值并收起、选中�
   assert_true(diff > 20)
   // 点第 6 格（第二行那格）写值并收起
   click_at(root, lines[1].children()[0], 12.0, 12.0)
-  assert_eq((v.get(), @core.overlay_count()), ("#666666", 0))
+  assert_eq((v.get(), @widget.overlay_count()), ("#666666", 0))
   assert_eq(changes, ["#666666"])
 }
 
 ///|
 test "可编辑下拉：点开全量候选、提交文本即过滤、上下键移高亮、回车回填、Esc 收层" {
-  let v = @core.Store::new("")
+  let v = @base.Store::new("")
   let changes : Array[String] = []
   let (root, w) = mounted_with_overlay(
     select(
@@ -552,37 +552,37 @@ test "可编辑下拉：点开全量候选、提交文本即过滤、上下键�
     320.0,
   )
   assert_eq(w.rect.w, 140.0)
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
   // 点字段：按下被里面的输入框消费，抬起冒泡到本组件才开层
   click_at(root, w, 30.0, 16.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   root.relayout(420.0, 320.0)
-  assert_eq(select_rows(@core.overlay_top_id()).length(), 3)
+  assert_eq(select_rows(@widget.overlay_top_id()).length(), 3)
   // 输入法提交「甲」→ 过滤成两行并自动开层
   let _ = root.dispatch_commit(1, "甲")
   root.relayout(420.0, 320.0)
-  assert_eq(@core.overlay_count(), 1)
-  assert_eq(select_rows(@core.overlay_top_id()).length(), 2)
+  assert_eq(@widget.overlay_count(), 1)
+  assert_eq(select_rows(@widget.overlay_top_id()).length(), 2)
   // 下键移高亮：第 2 行亮起（浅底 + 勾），第 1 行不亮
-  let (bm_a, ax, ay) = shot(select_rows(@core.overlay_top_id())[0])
-  let (bm_b, bx, by) = shot(select_rows(@core.overlay_top_id())[1])
+  let (bm_a, ax, ay) = shot(select_rows(@widget.overlay_top_id())[0])
+  let (bm_b, bx, by) = shot(select_rows(@widget.overlay_top_id())[1])
   assert_true(color_of(bm_a, ax + 40, ay + 14) != color_of(bm_b, bx + 40, by + 14))
-  let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_DOWN, mods: 0, })
-  let (bm_c, cx, cy) = shot(select_rows(@core.overlay_top_id())[0])
+  let _ = root.dispatch_key(1, { press: true, keysym: @base.KS_DOWN, mods: 0, })
+  let (bm_c, cx, cy) = shot(select_rows(@widget.overlay_top_id())[0])
   assert_true(color_of(bm_c, cx + 40, cy + 14) != color_of(bm_a, ax + 40, ay + 14))
   // 回车取高亮那一项
-  let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_RETURN, mods: 0, })
-  assert_eq((v.get(), @core.overlay_count()), ("甲二", 0))
+  let _ = root.dispatch_key(1, { press: true, keysym: @base.KS_RETURN, mods: 0, })
+  assert_eq((v.get(), @widget.overlay_count()), ("甲二", 0))
   assert_eq(changes, ["甲二"])
   // 再点开：过滤结果只剩一行；Esc 收层且不改值
   click_at(root, w, 30.0, 16.0)
   root.relayout(420.0, 320.0)
-  assert_eq(select_rows(@core.overlay_top_id()).length(), 1)
-  let _ = root.dispatch_key(1, { press: true, keysym: @core.KS_ESCAPE, mods: 0, })
-  assert_eq((@core.overlay_count(), v.get()), (0, "甲二"))
+  assert_eq(select_rows(@widget.overlay_top_id()).length(), 1)
+  let _ = root.dispatch_key(1, { press: true, keysym: @base.KS_ESCAPE, mods: 0, })
+  assert_eq((@widget.overlay_count(), v.get()), (0, "甲二"))
   // 过滤到空集时不开层
   let _ = root.dispatch_commit(1, "丙")
-  assert_eq(@core.overlay_count(), 0)
+  assert_eq(@widget.overlay_count(), 0)
 }
 
 ///|
@@ -616,7 +616,7 @@ test "按钮皮肤走样式槽：hover 桶点亮、class 覆盖、语义色随�
   assert_true(dark_c != base_c)
 
   // 数「红底像素」：class 与散参数两条覆盖路径都用它
-  let red_count : (@core.Node, Bool) -> Int = fn(node : @core.Node, lit : Bool) -> Int {
+  let red_count : (@widget.Node, Bool) -> Int = fn(node : @widget.Node, lit : Bool) -> Int {
     let r = mount_root([node], 200.0, 60.0)
     let wt = kid(r, 0)
     wt.hovered = lit
@@ -692,7 +692,7 @@ test "表单族只读样式槽：class 的绘制色落到标记控件" {
     n
   }
   // 复选框：勾（color）与未选框（border_color）各吃一条 class 属性
-  let on = @core.Store::new(true)
+  let on = @base.Store::new(true)
   let root = mount_root(
     [checkbox("同意", on, class=[@style.style(color="#ff0000", border_color="#0000ff")])],
     200.0,
@@ -707,7 +707,7 @@ test "表单族只读样式槽：class 的绘制色落到标记控件" {
   let by = box.rect.y.round().to_int()
   // 选中：勾与框都取强调色（class 的 color）
   assert_true(warm(bm, bx, by, 14, 14) > 4)
-  let off_box = @core.Store::new(false)
+  let off_box = @base.Store::new(false)
   let root_off = mount_root(
     [checkbox("不同意", off_box, class=[@style.style(color="#ff0000", border_color="#0000ff")])],
     200.0,
@@ -722,7 +722,7 @@ test "表单族只读样式槽：class 的绘制色落到标记控件" {
   assert_true(cool(bm_off, ob.rect.x.round().to_int(), ob.rect.y.round().to_int(), 14, 14) > 10)
 
   // 开关：开态底色吃 class 的 background_color，滑珠仍内置白
-  let sw = @core.Store::new(true)
+  let sw = @base.Store::new(true)
   let root2 = mount_root(
     [switch(sw, class=[@style.style(background_color="#ff0000")])],
     200.0,
@@ -739,7 +739,7 @@ test "表单族只读样式槽：class 的绘制色落到标记控件" {
   assert_true(warm(bm2, px0 + 1, py0 + 1, 14, 18) > 100)
 
   // 滑块：强调色吃 class 的 color（轨道底仍内置 border 色）
-  let v = @core.Store::new(80.0)
+  let v = @base.Store::new(80.0)
   let root3 = mount_root(
     [slider(v, min=0.0, max=100.0, width=120.0, class=[@style.style(color="#ff0000")])],
     200.0,
@@ -755,8 +755,8 @@ test "表单族只读样式槽：class 的绘制色落到标记控件" {
 
 ///|
 test "步进器三格共框：同高、首尾相接、点 +/- 改值且触界禁用" {
-  let st = @core.Store::new(1)
-  let root = @core.Widget::new()
+  let st = @base.Store::new(1)
+  let root = @widget.Widget::new()
   root.set_size(300.0, 80.0)
   root.set_column()
   let group = stepper(st, min=0, max=10).mount_into(root)
@@ -832,7 +832,7 @@ fn accent_count(bm : @render.Bitmap, x0 : Int, y0 : Int, w : Int, h : Int) -> In
 
 ///|
 /// 复选框标记区（14×14，去掉 1px 框线后的内部）。
-fn box_inside(bm : @render.Bitmap, box : @core.Widget) -> Int {
+fn box_inside(bm : @render.Bitmap, box : @widget.Widget) -> Int {
   accent_count(bm, box.rect.x.round().to_int() + 1, box.rect.y.round().to_int() + 1, 12, 12)
 }
 
@@ -840,8 +840,8 @@ fn box_inside(bm : @render.Bitmap, box : @core.Widget) -> Int {
 /// 勾要看得出是个勾：实心笔触覆盖 20 个像素以上；未选的那只框内不许掺强调色
 /// （旧口径下上一只控件的圆弧路径会漏画进来，两只看起来都是实心块）。
 test "复选框：勾是粗笔触，未选框内不掺强调色" {
-  let on = @core.Store::new(true)
-  let off = @core.Store::new(false)
+  let on = @base.Store::new(true)
+  let off = @base.Store::new(false)
   let root = mount_root([checkbox("甲", on), checkbox("乙", off)], 200.0, 60.0)
   let bm = @render.Bitmap::new(200, 60)
   let p = @render.Painter::new(bm)
@@ -854,14 +854,14 @@ test "复选框：勾是粗笔触，未选框内不掺强调色" {
 ///|
 /// 单选组同理：选中项=强调色环 + 强调色实心圆心，未选中项圆内只有灰环。
 test "单选组：选中项是环加心，未选中项圆内干净" {
-  let pick = @core.Store::new(0)
+  let pick = @base.Store::new(0)
   let root = mount_root([radio_group(["甲", "乙", "丙"], pick)], 300.0, 40.0)
   let bm = @render.Bitmap::new(300, 40)
   let p = @render.Painter::new(bm)
   root.paint(p)
   p.end()
   let g = kid(root, 0)
-  let dots = fn(i : Int) -> @core.Widget { g.children()[i].children()[0] }
+  let dots = fn(i : Int) -> @widget.Widget { g.children()[i].children()[0] }
   assert_true(box_inside(bm, dots(0)) > 12)
   assert_eq(box_inside(bm, dots(1)), 0)
   assert_eq(box_inside(bm, dots(2)), 0)
@@ -915,7 +915,7 @@ fn ink_text(row : Array[String]) -> String {
 /// 单选标记是「环—空白—心—空白—环」，不是糊成一片的实心板：中心行两端各
 /// 两格是环，紧挨着各两格必须留白，中间六格是圆心（且是实心的）。
 test "单选标记的环与心之间留得出一条空白" {
-  let pick = @core.Store::new(0)
+  let pick = @base.Store::new(0)
   let root = mount_root([radio_group(["甲"], pick)], 120.0, 30.0)
   let bm = @render.Bitmap::new(120, 30)
   let p = @render.Painter::new(bm)
@@ -949,7 +949,7 @@ test "单选标记的环与心之间留得出一条空白" {
 /// 开关是胶囊 + 圆珠：四角落在胶囊弧外（不落墨），滑珠按行收窄成圆
 /// （中缝 16 格满宽、上下两行只剩 6 格），不是两块直角矩形。
 test "开关是胶囊与圆珠，四角不落墨" {
-  let on = @core.Store::new(false)
+  let on = @base.Store::new(false)
   let root = mount_root([switch(on)], 120.0, 30.0)
   let bm = @render.Bitmap::new(120, 30)
   let p = @render.Painter::new(bm)
@@ -980,7 +980,7 @@ test "开关是胶囊与圆珠，四角不落墨" {
 /// 标记在行里居中，原点常落在半像素上（14 高的标记放进 17 高的行 → y=1.5），
 /// 1px 会摊成两行各半墨，框看着发虚变淡。
 test "复选框框线四边四角都满墨" {
-  let st = @core.Store::new(false)
+  let st = @base.Store::new(false)
   let root = mount_root([checkbox("甲", st)], 120.0, 30.0)
   let bm = @render.Bitmap::new(120, 30)
   let p = @render.Painter::new(bm)
@@ -1009,9 +1009,9 @@ test "复选框框线四边四角都满墨" {
 /// 键盘可及性（本批口径）：控件默认自动领焦点号进 Tab 链，空格/回车激活、
 /// 方向键调值。键只在按下投递（宿主口径），测试直接 `dispatch_key`。
 test "键盘可及性：复选/开关自动领号进 Tab 链，空格与回车切换，禁用不吃键" {
-  let on = @core.Store::new(false)
-  let sw = @core.Store::new(false)
-  let dis = @core.Store::new(false)
+  let on = @base.Store::new(false)
+  let sw = @base.Store::new(false)
+  let dis = @base.Store::new(false)
   let root = mount_root(
     [checkbox("甲", on), switch(sw), checkbox("乙", dis, disabled=true)],
     300.0,
@@ -1034,82 +1034,82 @@ test "键盘可及性：复选/开关自动领号进 Tab 链，空格与回车�
   }
   assert_true(has(cb.focus_id) && has(st.focus_id))
   // 空格开、回车关
-  let _ = root.dispatch_key(cb.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  let _ = root.dispatch_key(cb.focus_id, { press: true, keysym: @base.KS_SPACE, mods: 0, })
   assert_true(on.get())
-  let _ = root.dispatch_key(cb.focus_id, { press: true, keysym: @core.KS_RETURN, mods: 0, })
+  let _ = root.dispatch_key(cb.focus_id, { press: true, keysym: @base.KS_RETURN, mods: 0, })
   assert_eq(on.get(), false)
   // 开关同口径
-  let _ = root.dispatch_key(st.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  let _ = root.dispatch_key(st.focus_id, { press: true, keysym: @base.KS_SPACE, mods: 0, })
   assert_true(sw.get())
   // 禁用态不吃键
-  let _ = root.dispatch_key(dc.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  let _ = root.dispatch_key(dc.focus_id, { press: true, keysym: @base.KS_SPACE, mods: 0, })
   assert_eq(dis.get(), false)
 }
 
 ///|
 test "键盘可及性：单选空格选中本项，左右键在组内环绕换选" {
-  let v = @core.Store::new(0)
+  let v = @base.Store::new(0)
   let root = mount_root([radio_group(["甲", "乙", "丙"], v)], 300.0, 120.0)
   let group = kid(root, 0)
   assert_eq(group.kids.length(), 3)
   let item0 = group.kids[0]
   let item2 = group.kids[2]
   assert_true(item0.focus_id > 0 && item2.focus_id > 0)
-  let key = fn(w : @core.Widget, ks : Int) -> Unit {
+  let key = fn(w : @widget.Widget, ks : Int) -> Unit {
     let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
   }
-  key(item2, @core.KS_SPACE)
+  key(item2, @base.KS_SPACE)
   assert_eq(v.get(), 2)
   // ←/↑/→/↓ 都按「焦点项的下标」换选（不是相对当前值），到头环绕
-  key(item2, @core.KS_LEFT)
+  key(item2, @base.KS_LEFT)
   assert_eq(v.get(), 1)
-  key(item2, @core.KS_RIGHT)
+  key(item2, @base.KS_RIGHT)
   assert_eq(v.get(), 0)
   // 换选只看焦点项的下标：焦点还在丙（idx 2），→ 恒给 0、↑ 给 1
-  key(item2, @core.KS_RIGHT)
+  key(item2, @base.KS_RIGHT)
   assert_eq(v.get(), 0)
-  key(item2, @core.KS_UP)
+  key(item2, @base.KS_UP)
   assert_eq(v.get(), 1)
-  key(item0, @core.KS_RETURN)
+  key(item0, @base.KS_RETURN)
   assert_eq(v.get(), 0)
 }
 
 ///|
 test "键盘可及性：滑块方向键增减与 Home/End、步进器左右加减、评分箭头改星" {
-  let key = fn(root : @core.Widget, w : @core.Widget, ks : Int) -> Unit {
+  let key = fn(root : @widget.Widget, w : @widget.Widget, ks : Int) -> Unit {
     let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
   }
-  let sv = @core.Store::new(50.0)
+  let sv = @base.Store::new(50.0)
   let root = mount_root([slider(sv, step=10.0)], 300.0, 60.0)
   let sl = kid(root, 0)
   assert_true(sl.focus_id > 0)
-  key(root, sl, @core.KS_RIGHT)
+  key(root, sl, @base.KS_RIGHT)
   assert_eq(sv.get(), 60.0)
-  key(root, sl, @core.KS_LEFT)
+  key(root, sl, @base.KS_LEFT)
   assert_eq(sv.get(), 50.0)
-  key(root, sl, @core.KS_END)
+  key(root, sl, @base.KS_END)
   assert_eq(sv.get(), 100.0)
-  key(root, sl, @core.KS_HOME)
+  key(root, sl, @base.KS_HOME)
   assert_eq(sv.get(), 0.0)
-  let nv = @core.Store::new(5)
+  let nv = @base.Store::new(5)
   let root2 = mount_root([stepper(nv, min=0, max=10, step=2)], 300.0, 60.0)
   let sp = kid(root2, 0)
   assert_true(sp.focus_id > 0)
-  key(root2, sp, @core.KS_RIGHT)
+  key(root2, sp, @base.KS_RIGHT)
   assert_eq(nv.get(), 7)
-  key(root2, sp, @core.KS_LEFT)
+  key(root2, sp, @base.KS_LEFT)
   assert_eq(nv.get(), 5)
   // 步进器只吃方向键（Home/End 走滑块），触界侧吃掉键但不改值
-  key(root2, sp, @core.KS_HOME)
+  key(root2, sp, @base.KS_HOME)
   assert_eq(nv.get(), 5)
-  key(root2, sp, @core.KS_LEFT)
-  key(root2, sp, @core.KS_LEFT)
+  key(root2, sp, @base.KS_LEFT)
+  key(root2, sp, @base.KS_LEFT)
   assert_eq(nv.get(), 1)
-  key(root2, sp, @core.KS_LEFT)
+  key(root2, sp, @base.KS_LEFT)
   assert_eq(nv.get(), 0)
-  key(root2, sp, @core.KS_LEFT)
+  key(root2, sp, @base.KS_LEFT)
   assert_eq(nv.get(), 0)
-  let rv = @core.Store::new(3)
+  let rv = @base.Store::new(3)
   let changes : Array[Int] = []
   let root3 = mount_root(
     [rate(rv, on_change=fn(x : Int) -> Unit { changes.push(x) })],
@@ -1118,13 +1118,13 @@ test "键盘可及性：滑块方向键增减与 Home/End、步进器左右加�
   )
   let rt = kid(root3, 0)
   assert_true(rt.focus_id > 0)
-  key(root3, rt, @core.KS_RIGHT)
+  key(root3, rt, @base.KS_RIGHT)
   assert_eq((rv.get(), changes.length()), (4, 1))
-  key(root3, rt, @core.KS_END)
+  key(root3, rt, @base.KS_END)
   assert_eq(rv.get(), 5)
-  key(root3, rt, @core.KS_LEFT)
+  key(root3, rt, @base.KS_LEFT)
   assert_eq(rv.get(), 4)
-  key(root3, rt, @core.KS_HOME)
+  key(root3, rt, @base.KS_HOME)
   assert_eq(rv.get(), 1)
 }
 
@@ -1142,17 +1142,17 @@ test "键盘可及性：按钮空格/回车激活，禁用不吃键" {
   let b0 = kid(root, 0)
   let b1 = kid(root, 1)
   assert_true(b0.focus_id > 0 && b1.focus_id > 0)
-  let _ = root.dispatch_key(b0.focus_id, { press: true, keysym: @core.KS_RETURN, mods: 0, })
+  let _ = root.dispatch_key(b0.focus_id, { press: true, keysym: @base.KS_RETURN, mods: 0, })
   assert_eq(n.val, 1)
-  let _ = root.dispatch_key(b0.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  let _ = root.dispatch_key(b0.focus_id, { press: true, keysym: @base.KS_SPACE, mods: 0, })
   assert_eq(n.val, 2)
-  let _ = root.dispatch_key(b1.focus_id, { press: true, keysym: @core.KS_SPACE, mods: 0, })
+  let _ = root.dispatch_key(b1.focus_id, { press: true, keysym: @base.KS_SPACE, mods: 0, })
   assert_eq(n.val, 2)
 }
 
 ///|
 test "键盘可及性：下拉选择空格开层、上下移高亮、回车回填、Esc 收层" {
-  let v = @core.Store::new("")
+  let v = @base.Store::new("")
   let (root, w) = mounted_with_overlay(
     select(["甲", "乙", "丙"], v, width=140.0),
     420.0,
@@ -1163,25 +1163,25 @@ test "键盘可及性：下拉选择空格开层、上下移高亮、回车回�
     let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
   }
   // 关着时下键也能开层
-  key(@core.KS_DOWN)
+  key(@base.KS_DOWN)
   root.relayout(420.0, 320.0)
-  assert_eq(@core.overlay_count(), 1)
+  assert_eq(@widget.overlay_count(), 1)
   // ↓ 移到第 2 行，回车取高亮
-  key(@core.KS_DOWN)
-  key(@core.KS_RETURN)
-  assert_eq((v.get(), @core.overlay_count()), ("乙", 0))
+  key(@base.KS_DOWN)
+  key(@base.KS_RETURN)
+  assert_eq((v.get(), @widget.overlay_count()), ("乙", 0))
   // 空格再开（高亮先对到当前值所在行），Esc 收层不改值
-  key(@core.KS_SPACE)
+  key(@base.KS_SPACE)
   root.relayout(420.0, 320.0)
-  assert_eq(@core.overlay_count(), 1)
-  key(@core.KS_ESCAPE)
-  assert_eq((v.get(), @core.overlay_count()), ("乙", 0))
-  @core.overlay_clear()
+  assert_eq(@widget.overlay_count(), 1)
+  key(@base.KS_ESCAPE)
+  assert_eq((v.get(), @widget.overlay_count()), ("乙", 0))
+  @widget.overlay_clear()
 }
 
 ///|
 test "键盘可及性：取色器回车开层、方向键移格、回车取色" {
-  let v = @core.Store::new("")
+  let v = @base.Store::new("")
   let (root, w) = mounted_with_overlay(
     color_picker(v, colors=["#111111", "#222222", "#333333"], width=160.0),
     420.0,
@@ -1191,11 +1191,11 @@ test "键盘可及性：取色器回车开层、方向键移格、回车取色" 
   let key = fn(ks : Int) -> Unit {
     let _ = root.dispatch_key(w.focus_id, { press: true, keysym: ks, mods: 0, })
   }
-  key(@core.KS_RETURN)
+  key(@base.KS_RETURN)
   root.relayout(420.0, 320.0)
-  assert_eq(@core.overlay_count(), 1)
-  key(@core.KS_RIGHT)
-  key(@core.KS_RETURN)
-  assert_eq((v.get(), @core.overlay_count()), ("#222222", 0))
-  @core.overlay_clear()
+  assert_eq(@widget.overlay_count(), 1)
+  key(@base.KS_RIGHT)
+  key(@base.KS_RETURN)
+  assert_eq((v.get(), @widget.overlay_count()), ("#222222", 0))
+  @widget.overlay_clear()
 }

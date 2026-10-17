@@ -275,7 +275,7 @@ test "象形柱几何组合：计数→平铺→符号尺寸（含单位像素�
 
 ///|
 test "象形柱图组件：出像素、两形态、换数据画面变" {
-  let d = @core.Store::new([
+  let d = @base.Store::new([
     BarItem::make("甲", 25.0),
     BarItem::make("乙", 13.0),
     BarItem::make("丙", -8.0),

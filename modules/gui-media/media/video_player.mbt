@@ -4,7 +4,7 @@
 // ① **CPU 回灌 + 软解**（方案 §4.2 第 3 条）：帧走 `@render.Bitmap` → `Painter`，
 //    不走子表面，所以画面能被裁剪、能盖浮层、能与自绘控件混排；
 // ② 时钟在引擎里（墙钟 + 帧时间戳），UI 只负责每 tick 推一步并重绘；
-//    排期通道用 `@core.set_timeout`（本栈的进程级延时通道），组件不自己起线程；
+//    排期通道用 `@shell.set_timeout`（本栈的进程级延时通道），组件不自己起线程；
 // ③ seek 防抖：拖动进度条期间只更新**显示位置**，抬手才真 seek——旧链的坑是
 //    每次拖动都 seek 一次，关键帧距离长时画面会卡一整拍。
 
@@ -60,8 +60,8 @@ pub fn video(
     ()
   },
   on_error? : (String) -> Unit = fn(_s : String) -> Unit { () },
-  handle? : (@core.Widget) -> Unit = fn(_w : @core.Widget) -> Unit { () },
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = fn(_w : @widget.Widget) -> Unit { () },
+) -> @widget.Node {
   let engine = match VideoPlayer::make(path) {
     Ok(p) => p
     Err(e) => {
@@ -99,10 +99,10 @@ pub fn video(
   let speed_i : Ref[Int] = Ref(0)
   // 按钮行是**真控件**，档位/态变了要重挂，所以读数走 Store（`Store::set` 等值
   // 不重发，每 tick 刷一次不产生重建）
-  let playing : @core.Store[Bool] = @core.Store::new(false)
-  let speed_st : @core.Store[Double] = @core.Store::new(1.0)
-  let full_st : @core.Store[Bool] = @core.Store::new(false)
-  let zoom_st : @core.Store[Int] = @core.Store::new(0)
+  let playing : @base.Store[Bool] = @base.Store::new(false)
+  let speed_st : @base.Store[Double] = @base.Store::new(1.0)
+  let full_st : @base.Store[Bool] = @base.Store::new(false)
+  let zoom_st : @base.Store[Int] = @base.Store::new(0)
   if auto_play {
     engine.play()
   }
@@ -114,13 +114,13 @@ pub fn video(
       engine.play()
     }
     playing.set(engine.is_playing())
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn step_by(n : Int) -> Unit {
     // 逐帧：引擎自己先暂停再解到落点，组件不碰时钟
     engine.step(n)
     playing.set(engine.is_playing())
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn cycle_speed() -> Unit {
     speed_i.val = speed_i.val + 1
@@ -128,30 +128,30 @@ pub fn video(
     engine.set_speed(v)
     speed_st.set(v)
     on_speed(v)
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn toggle_full() -> Unit {
     let on = !full_st.get()
     if player_set_fullscreen(on) {
       full_st.set(on)
-      @core.invalidate()
+      @widget.invalidate()
     }
   }
   fn cycle_zoom() -> Unit {
     zoom_st.set((zoom_st.get() + 1) % 3)
-    @core.invalidate()
+    @widget.invalidate()
   }
   fn bump_vol(d : Double) -> Unit {
     engine.set_volume(bar_clamp01(engine.get_volume() + d))
-    @core.invalidate()
+    @widget.invalidate()
   }
-  let screen = @core.Widget::new()
+  let screen = @widget.Widget::new()
   screen.node.set_flex_grow(1.0)
   screen.node.set_min_height(@yoga.fixed(40.0))
   screen.on_draw = Some(fn(
-    _w : @core.Widget,
+    _w : @widget.Widget,
     p : @render.Painter,
-    r : @core.Rect,
+    r : @base.Rect,
   ) -> Unit {
     p.set_fill_color("#000000")
     p.fill_rect(0.0, 0.0, r.w, r.h)
@@ -198,15 +198,15 @@ pub fn video(
     fn() -> Double { engine.get_volume() },
     fn(v : Double) -> Unit {
       engine.set_volume(v)
-      @core.invalidate()
+      @widget.invalidate()
     },
     fn(t : Double) -> Unit {
       engine.seek(t)
-      @core.invalidate()
+      @widget.invalidate()
     },
     dragging,
   )
-  let root = @core.Widget::new()
+  let root = @widget.Widget::new()
   root.node.set_flex_direction(@yoga.Column)
   root.node.set_width(@yoga.fixed(width))
   root.node.set_height(@yoga.fixed(height))
@@ -241,11 +241,11 @@ pub fn video(
     playing.set(engine.is_playing())
     on_tick(engine.current(), engine.frames_decoded(), engine.is_playing())
     if engine.is_playing() || dragging.val {
-      @core.invalidate()
+      @widget.invalidate()
     }
-    let _ = @core.set_timeout(33, tick.val)
+    let _ = @shell.set_timeout(33, tick.val)
   }
-  let _ = @core.set_timeout(33, tick.val)
+  let _ = @shell.set_timeout(33, tick.val)
   handle(root)
-  @core.node_of(root)
+  @widget.node_of(root)
 }

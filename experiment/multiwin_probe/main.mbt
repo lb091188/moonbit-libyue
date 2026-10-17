@@ -41,7 +41,7 @@ fn main {
   let (opened, failed) = slot_reuse_rounds(40)
   println("MULTIWIN-SLOT rounds=40 opened=\{opened} failed=\{failed}")
 
-  let host = match @core.App::new(280, 140, "multiwin 主窗") {
+  let host = match @widget.App::new(280, 140, "multiwin 主窗") {
     Some(a) => a
     None => {
       println("MULTIWIN FAIL (主窗建不出)")

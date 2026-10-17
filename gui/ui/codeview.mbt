@@ -330,8 +330,8 @@ pub fn code_view(
   lang? : String = "moonbit",
   font_size? : Double = 13.0,
   line_numbers? : Bool = false,
-  handle? : (@core.Widget) -> Unit = default_handle,
-) -> @core.Node {
+  handle? : (@widget.Widget) -> Unit = default_handle,
+) -> @widget.Node {
   let font = @text.Font::new("Monospace", font_size)
   // 预排版:逐 token 测宽(分词与测量一次完成,重绘零分词开销)
   let line_h = match @text.line_height_font(font) {
@@ -373,14 +373,14 @@ pub fn code_view(
   }
   let content_w = max_line_w + 32.0
   let view_h = line_h * laid.length().to_double() + 28.0
-  @core.node_of_new(fn(w : @core.Widget) -> @core.Widget {
+  @widget.node_of_new(fn(w : @widget.Widget) -> @widget.Widget {
     watch_theme()
     w.node.set_width(@yoga.fixed(content_w))
     w.node.set_height(@yoga.fixed(view_h))
     w.on_draw = Some(fn(
-      _self : @core.Widget,
+      _self : @widget.Widget,
       p : @render.Painter,
-      r : @core.Rect,
+      r : @base.Rect,
     ) -> Unit {
       // 代码块恒深底(One Dark 底色,深浅主题下都可读)
       p.set_fill_color("#282C34")
