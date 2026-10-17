@@ -914,6 +914,8 @@ extern void *wm_surface_container(int64_t surface_id);
 #define WB_MAX_VIEWS 32
 #define WB_EVQ 32
 #define WB_EV_TEXT 768
+// 求值回包全文的专用上限（与 GTK 分支、MoonBit 侧 WB_EVAL_CAP 同口径）
+#define WB_EVAL_TEXT_MAX 65536
 #define WB_MAX_SCHEMES 16
 #define WB_SCHEME_NAME 40
 #define WB_ROOT_PATH 512
@@ -942,6 +944,8 @@ typedef struct {
   int download_allow;
   int crashed;
   int64_t eval_seq;
+  char *eval_text; // 最近一次求值回包全文（事件槽 768 装不下 DOM JSON，见 wb_eval_text）
+  int eval_len;
   int observing;
   WbEv evs[WB_EVQ];
   int head, count;
@@ -1232,6 +1236,8 @@ static int wb_scheme_slot(WMBView *v, const char *scheme) {
 
 - (void)dealloc {
   [self stopObserving];
+  free(self->eval_text); // 求值回包大缓冲是本层 malloc 的，ARC 不管
+  self->eval_text = NULL;
 }
 
 - (void)startObserving {
@@ -1716,7 +1722,13 @@ int64_t wb_evaluate(int64_t wid, const char *script) {
              return; // 视图已拆：回包没人收，丢弃（与两支同形态）
            }
            if (error != nil) {
-             wb_push(vv, 7, seq, [[error localizedDescription] UTF8String] ?: "");
+             // 回包全文进专用大缓冲，事件只带序号、text 恒空（与 GTK 支同
+             // 形态：DOM JSON 塞进 768 的事件槽会被截成半截）
+             free(vv->eval_text);
+             const char *m = [[error localizedDescription] UTF8String];
+             vv->eval_text = strndup(m != NULL ? m : "", WB_EVAL_TEXT_MAX);
+             vv->eval_len = (int)strlen(vv->eval_text);
+             wb_push(vv, 7, seq, "");
              return;
            }
            NSString *text = nil;
@@ -1735,7 +1747,11 @@ int64_t wb_evaluate(int64_t wid, const char *script) {
            } else if (result != nil) {
              text = [result description];
            }
-           wb_push(vv, 7, seq, text != nil ? [text UTF8String] : "");
+           free(vv->eval_text);
+           const char *c = text != nil ? [text UTF8String] : NULL;
+           vv->eval_text = strndup(c != NULL ? c : "", WB_EVAL_TEXT_MAX);
+           vv->eval_len = (int)strlen(vv->eval_text);
+           wb_push(vv, 7, seq, "");
          }];
     return seq;
   }
@@ -2016,6 +2032,18 @@ int wb_event_text(int64_t id, char *out, int cap) {
     return wb_copy(id, out, cap, "");
   }
   return wb_copy(id, out, cap, v->last.text);
+}
+
+// 取最近一次 JS 求值回包全文：拷进 out（cap 上限），返回全文总长（<=0 =
+// 没有回包）。事件 kind=7 的 text 恒空，全文在这里——与 GTK/Win32 支同口径。
+int wb_eval_text(int64_t id, char *out, int cap) {
+  WMBView *v = wb_get(id);
+  if (v == nil || v->eval_text == NULL || out == NULL || cap <= 0) {
+    return 0;
+  }
+  int n = v->eval_len < cap ? v->eval_len : cap;
+  memmove(out, v->eval_text, (size_t)n);
+  return v->eval_len;
 }
 
 #elif !defined(__linux__) && !defined(_WIN32) && !defined(__APPLE__)

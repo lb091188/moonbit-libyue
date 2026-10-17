@@ -16,8 +16,11 @@ Windows：`webview2_stub.c` 由 moon native-stub 自编（vendor 头相对路径
 这里只下发静态 Loader（缺失时按 sha256 从 Release 资产下载，口径与主仓原
 实现逐字相同——两模块刻意各留一份，本模块要能独立发布）。
 
-macOS：不匹配任何分支（`webkit_stub.c` 的占位分支覆盖非 Linux 非 Windows），
-符号不断、探测返回不可用；`orderOut:` 形态随 W22 mac 批。
+macOS：`webkit_stub.c` 的 WB_HAVE_WKWEBVIEW 分支（WKWebView，系统自带引擎，
+没有 Linux 那条「缺开发包」的退路）由本脚本专编成静态库；它引用主模块 win 桩
+的 `wm_surface_container`，所以还要定位 `gui/build/libyue_win_stub_mac.a` 一起
+链——native-stub 在 macOS 编出的是空翻译单元，这条链不上符号就断，定位不到
+时出声报错。
 
 约束：stdout 只能是 JSON；进度信息走 stderr。
 """
@@ -176,6 +179,76 @@ def compile_webkit_stub(win_archive: Path) -> str:
     return lib.as_posix()
 
 
+MAC_OBJC_CFLAGS = ["-x", "objective-c", "-fobjc-arc"]
+
+# win 桩 mac 归档要链的框架（与主仓 scripts/prebuild.py 的 MAC_WIN_FRAMEWORKS
+# 同表——本模块链的是同一份归档，缺一个框架就在用户机器上 dyld 报错）
+MAC_WIN_FRAMEWORKS = [
+    "-framework", "Cocoa",
+    "-framework", "CoreGraphics",
+    "-framework", "Carbon",
+    "-framework", "IOKit",
+]
+
+MAC_WEB_FRAMEWORKS = [
+    "-framework", "WebKit",          # WKWebView
+    "-framework", "Cocoa",
+]
+
+
+def find_win_mac_stub_archive() -> Path | None:
+    """定位主模块 win 桩的 macOS 归档（webkit mac 分支引用 wm_surface_container）。
+
+    候选与 `find_win_stub_archive` 同序：workspace 兄弟目录 → 依赖缓存 →
+    当前工作区 _build。"""
+    home = Path(os.environ.get("MOON_HOME", str(Path.home() / ".moon")))
+    name = "libyue_win_stub_mac.a"
+    candidates = [
+        MODULE_ROOT.parent.parent / "gui" / "build" / name,
+        home / "packages" / "NoahLiu" / "native-gui" / "gui" / "build" / name,
+        home / "deps" / "NoahLiu" / "native-gui" / "gui" / "build" / name,
+    ]
+    for base in candidates:
+        if base.exists():
+            return base
+    for root in (Path.cwd(), MODULE_ROOT.parent, MODULE_ROOT.parent.parent):
+        blob = root / "_build" / "native"
+        if not blob.is_dir():
+            continue
+        hits = sorted(
+            blob.glob(f"*/build/prebuild/*/{name}"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if hits:
+            return hits[0]
+    return None
+
+
+def compile_mac_webkit_stub() -> str:
+    """把 webkit_stub.c 带 -DWB_HAVE_WKWEBVIEW 专编成静态库；失败给空串。"""
+    src = MODULE_ROOT / "webview" / "webkit_stub.c"
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    lib = BUILD_DIR / "libgui_webview_mac.a"
+    if lib.exists() and lib.stat().st_mtime >= src.stat().st_mtime:
+        return lib.as_posix()
+    cc = shutil.which("cc") or shutil.which("clang") or "cc"
+    obj = BUILD_DIR / "webkit_stub_mac.o"
+    cmd = [cc, "-c", "-O2", *MAC_OBJC_CFLAGS, "-DWB_HAVE_WKWEBVIEW",
+           "-o", obj.as_posix(), src.as_posix()]
+    run = subprocess.run(cmd, capture_output=True, text=True)
+    if run.returncode != 0:
+        print(f"stub: {' '.join(cmd)} 失败\n{run.stderr}", file=sys.stderr)
+        return ""
+    lib.unlink(missing_ok=True)
+    run = subprocess.run(["ar", "rcs", lib.as_posix(), obj.as_posix()],
+                         capture_output=True, text=True)
+    if run.returncode != 0:
+        print(f"stub: ar 失败\n{run.stderr}", file=sys.stderr)
+        return ""
+    return lib.as_posix()
+
+
 def link_configs() -> dict:
     entries: list[dict] = []
     ensure_release_files()
@@ -222,6 +295,32 @@ def link_configs() -> dict:
                 "prebuild: 缺 webview/lib/WebView2LoaderStatic.lib，webview 走占位实现（探测返回不可用）",
                 file=sys.stderr,
             )
+    elif system == "Darwin":
+        # WKWebView 分支专编（Objective-C/ARC）。native-stub 在 macOS 编本文件
+        # 落不进任何分支（空翻译单元），符号全靠这份归档——win 桩 mac 归档
+        # 定位不到就是断链，出声报错不静默。顺序上 -lgui_webview_mac 在前：
+        # 它引用 win 桩的 wm_surface_container（与 Linux 分支同一口径）。
+        win_archive = find_win_mac_stub_archive()
+        if win_archive is None:
+            print(
+                "prebuild: 找不到主模块 win 桩归档 gui/build/libyue_win_stub_mac.a，"
+                "webview 的 mac 分支没法链（native-stub 空翻译单元，符号会断）",
+                file=sys.stderr,
+            )
+            return {"link_configs": entries}
+        web_lib = compile_mac_webkit_stub()
+        if not web_lib:
+            return {"link_configs": entries}
+        win_dir = win_archive.parent
+        entries.append({
+            "package": PKG,
+            # 路径整体加双引号：撇号用户名的教训同 Linux 分支
+            "link_flags": (
+                f"-L{BUILD_DIR.as_posix()} -lgui_webview_mac "
+                f'-L"{win_dir.as_posix()}" -lyue_win_stub_mac '
+                + " ".join([*MAC_WEB_FRAMEWORKS, *MAC_WIN_FRAMEWORKS])
+            ),
+        })
     return {"link_configs": entries}
 
 

@@ -933,6 +933,13 @@ void cr_set_stroke_rgba(int64_t id, int r, int g, int b, int a) {
   (void)id; (void)r; (void)g; (void)b; (void)a;
 }
 void cr_set_line_width(int64_t id, double w) { (void)id; (void)w; }
+// W35 线帽/连接/虚线：mac 走纯光栅路径（cr_begin 恒 0，Painter 不进 cairo
+// 会话），这三支同族给空桩保链接，语义归纯 MoonBit 光栅器。
+void cr_set_line_cap(int64_t id, int cap) { (void)id; (void)cap; }
+void cr_set_line_join(int64_t id, int join) { (void)id; (void)join; }
+void cr_set_dash(int64_t id, const double* dashes, int n, double offset) {
+  (void)id; (void)dashes; (void)n; (void)offset;
+}
 void cr_save(int64_t id) { (void)id; }
 void cr_restore(int64_t id) { (void)id; }
 void cr_translate(int64_t id, double dx, double dy) { (void)id; (void)dx; (void)dy; }

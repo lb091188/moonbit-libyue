@@ -6368,6 +6368,9 @@ typedef struct {
   int backing_w;
   int backing_h;
   size_t backing_cap;
+  int hidden;    // W23 隐藏驻留：orderOut 后置 1，show 唤回清 0
+  int im_active; // 输入法焦点门：0 = 焦点不在输入框，键不经 NSTextInputContext
+  NSEvent *down_ev; // 拖出起拖用的按下事件（beginDraggingSession 要求现场引用）
 }
 @property(nonatomic, strong) NSWindow *win;
 @property(nonatomic, strong) WMView *view;
@@ -6387,6 +6390,8 @@ static int wm_surf_h[WM_MAX_SURFACES];
 // ---- 小工具 ----
 
 void wm_pump(void); // wm_show 里要先跑一轮就绪事件，实现在下方
+// 前置声明：拖放挂接段在文件末尾（窗口拆掉前要撤注册，同 Win32 支的口径）。
+void wm_dragdnd_disable(int64_t id);
 
 static WMState *wm_state(int64_t id) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
@@ -6694,6 +6699,12 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
   if ([self tryDragRect:ev]) {
     return;
   }
+  // 拖出起拖要现场引用这一条按下事件（与 GTK 支存档 button_press 同语义），
+  // 入队照常——应用层看见按下、自己决定要不要 dragdnd_send。
+  WMState *s = wm_state(vsid);
+  if (s != nil) {
+    s->down_ev = ev;
+  }
   [self pushPointer:ev code:2u button:1];
 }
 
@@ -6752,7 +6763,8 @@ static uint32_t wm_keysym_of(NSEvent *ev) {
 }
 
 - (void)keyDown:(NSEvent *)ev {
-  NSTextInputContext *ic = [self inputContext];
+  WMState *s0 = wm_state(vsid);
+  NSTextInputContext *ic = s0 != nil && s0->im_active ? [self inputContext] : nil;
   if (ic != nil && [ic handleEvent:ev]) {
     // 输入法吃掉了：不推按键，改由 insertText:/setMarkedText: 通道回报
     WMState *s = wm_state(vsid);
@@ -7079,6 +7091,7 @@ int64_t wm_window_new(int width, int height, const char *title) {
     }
     WMState *s = [[WMState alloc] init];
     s->sid = id;
+    s->im_active = 1; // 默认视焦点在输入框：首窗首控件常是 entry
     CGFloat sc = wm_scale_of(s); // 还没挂屏：退回主屏比例
     double pw = (double)(width > 1 ? width : 1) / (double)sc;
     double ph = (double)(height > 1 ? height : 1) / (double)sc;
@@ -7122,8 +7135,84 @@ void wm_show(int64_t id) {
     [NSApp activateIgnoringOtherApps:YES];
     [s.view updateTrackingAreas];
     [s.win invalidateCursorRectsForView:s.view];
+    s->hidden = 0; // W23 唤回：Cocoa 的 frame 不随 orderOut 丢，无需复位
     s->need_draw = 1;
     wm_pump(); // 把映射请求推出去，别让首帧等到下一次 wait
+  }
+}
+
+// 隐藏驻留（W23）：orderOut 撤出屏幕、进程照活，语义区别于 miniaturize
+// （最小化进 Dock）。Cocoa 的 frame 不随 orderOut 丢，makeKeyAndOrderFront
+// 原位唤回，无需像 GTK/Win32 那样另存坐标。幂等：已隐藏再调直接返回。
+void wm_hide(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil || s->hidden) {
+      return;
+    }
+    s->hidden = 1;
+    [s.win orderOut:nil];
+  }
+}
+
+int wm_is_hidden(int64_t id) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return 0;
+  }
+  return s->hidden;
+}
+
+// W33 窗口透明度（0–255，255=不透明）。Cocoa 走 alphaValue（合成器合成，
+// 与 GTK 的 gdk_window_set_opacity 同档）。
+void wm_set_opacity(int64_t id, int alpha) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    double a = (alpha <= 0) ? 0.0 : ((alpha >= 255) ? 1.0 : (alpha / 255.0));
+    [s.win setAlphaValue:a];
+  }
+}
+
+// W34 窗口层级：0=normal 1=desktop(沉底) 2=always-on-top 3=dock。
+// Cocoa 直接给 CGWindowLevelForKey 的对应档。
+void wm_set_layer(int64_t id, int layer) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    switch (layer) {
+    case 1:
+      [s.win setLevel:CGWindowLevelForKey(kCGDesktopWindowLevelKey)];
+      break;
+    case 2:
+      [s.win setLevel:CGWindowLevelForKey(kCGFloatingWindowLevelKey)];
+      break;
+    case 3:
+      [s.win setLevel:CGWindowLevelForKey(kCGDockWindowLevelKey)];
+      break;
+    default:
+      [s.win setLevel:CGWindowLevelForKey(kCGNormalWindowLevelKey)];
+      break;
+    }
+  }
+}
+
+// W33 背景透明（Cocoa 档）：opaque=NO + 底色给 clear。绘制区每帧自填全幅
+// 像素，所以「露底」只在窗口还没画首帧时可见——与 GTK 只切 app_paintable
+// 位同口径，真·透明合成留待绘制批次深化。
+void wm_set_transparent_bg(int64_t id, int on) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil) {
+      return;
+    }
+    [s.win setOpaque:on ? NO : YES];
+    [s.win setBackgroundColor:on ? [NSColor clearColor]
+                                 : [NSColor windowBackgroundColor]];
   }
 }
 
@@ -7331,6 +7420,7 @@ void wm_close(int64_t id) {
     if (s == nil) {
       return;
     }
+    wm_dragdnd_disable(id); // 拖放注册要在视图还活着时撤（同 Win32 支）
     // 归属本窗的原生子件槽一起清（视图随窗口销毁）
     for (int i = 1; i < WM_MAX_SURFACES; i++) {
       if (wm_surf_views[i] != nil && wm_surf_win[i] == id) {
@@ -7386,6 +7476,17 @@ void wm_im_reset(int64_t id) {
     s->commit_len = 0;
     [[s.view inputContext] invalidateCharacterCoordinates];
   }
+}
+
+// 输入法焦点门（与 GTK 支的 im_active 同语义）：焦点控件是输入框时 MoonBit
+// 传 1。非输入框焦点时字符键不经 NSTextInputContext（拼音一类的 IM 会把
+// 字母键拦进组合通道，播放器快捷键就收不到了），keyDown 里按这个门分派。
+void wm_im_set_active(int64_t id, int on) {
+  WMState *s = wm_state(id);
+  if (s == nil) {
+    return;
+  }
+  s->im_active = on ? 1 : 0;
 }
 
 int wm_im_commit_len(int64_t id) {
@@ -8207,6 +8308,10 @@ static int wm_hotkey_ensure(void) {
   return st == noErr ? 1 : 0;
 }
 
+// 门面探测（与 GTK 的 X11/Wayland 分档同口径）：Carbon 的注册器装得上就
+// 支持——macOS 上没有「会话不支持」的档，装不上只有异常形态。
+int wm_hotkey_supported(void) { return wm_hotkey_ensure(); }
+
 static OSStatus wm_hotkey_dispatch(EventHandlerCallRef next_handler,
                                    EventRef event, void *user_data) {
   (void)next_handler;
@@ -8230,10 +8335,11 @@ static void wm_hotkey_push(int id) {
   wm_hotkey_fired_count++;
 }
 
-int wm_hotkey_register(int mods, int vk) {
+int wm_hotkey_register(int mods, int vk, int keysym) {
   if (!wm_hotkey_ensure()) {
     return 0;
   }
+  (void)keysym; // X11 专用两套码之一：Carbon 按 vk 查 kVK_* 硬件键位表
   int code = wm_vk_to_mac_keycode(vk);
   if (code < 0) {
     return 0;
@@ -9061,6 +9167,567 @@ int wm_message_box(const char *title, const char *text, int utype) {
   }
 }
 
+/* ---- 系统级拖放（W23a 拖入 / W23b 拖出）macOS Cocoa 分支真实现 ----
+ * 拖入：registerForDraggedTypes 挂在绘制区视图上，收文本与文件 URL 两类格式
+ *   （文件优先编码，与 Win32 支 CF_HDROP > CF_UNICODETEXT 同优先级）。
+ *   draggingEntered/Updated/Exited 对应进 0/移 1/离 2，performDragOperation
+ *   给投递 3、draggingEnded 补 2 收口（与 GTK 支 drag-end 同一形态）。载荷在
+ *   entered 时**同步**读 pasteboard——Cocoa 的拖拽数据在整个拖拽阶段都在手上，
+ *   没有 GTK 那种 motion 期异步取数，也就不需要「已请求过」标记。
+ * 拖出：beginDraggingSessionWithItems 引用 mouseDown 存档的按下事件起拖，
+ *   wm_dragdnd_send 嵌套泵 nextEventMatchingMask 阻塞到
+ *   draggingSession:endedAtPoint（60s 超时救场）——与 GTK/Win32 支的阻塞
+ *   语义同构。
+ * 效果在门面 DND flag（0/1/2/4）与 NSDragOperation（Copy 1 / Move 16 /
+ *   Link 512）之间显式互转；只认单一动作，多位同亮按「没成交」(0) 收，与
+ *   core 侧 drag_effect_of_flag 口径一致。
+ * 坐标系照旧：本栈物理像素、左上原点；draggingLocation 与 atPoint 都是窗口
+ *   基坐标（左下原点），经视图换算。 */
+#define WM_DND_Q 64
+#define WM_DND_PAYLOAD_MAX 65536
+
+typedef struct {
+  int slot, kind, x, y;
+} WmDndEv;
+
+static WmDndEv wm_dnd_q[WM_DND_Q];
+static int wm_dnd_qh = 0, wm_dnd_qc = 0;
+static char wm_dnd_buf[WM_DND_PAYLOAD_MAX]; // 当前会话载荷（线形状）
+static int wm_dnd_buf_len;
+static int wm_dnd_active_slot;              // 拖入会话归属窗（0 = 无）
+static int wm_dnd_enter_sent[WM_MAX_WINDOWS]; // 每窗：本轮会话是否已给过 0
+static int wm_dnd_effect[WM_MAX_WINDOWS];     // 每窗应答效果 flag（MoonBit 每拍写回）
+static int wm_dnd_registered[WM_MAX_WINDOWS]; // 每窗拖入挂接位：count/effect 的
+// 读数按它来（与 Win32 支 registered 同口径；GTK 支给的是恒 1 的另一种语义，
+// 门面试探测试 dragdnd_wbtest 认的是 Win32 这条）。
+// 拖出现场：载荷缓存 + allowed + 收口位（同一时刻只有一条出站会话，与 core
+// 侧 drag_current 单例同口径）
+static char wm_dnd_src[WM_DND_PAYLOAD_MAX];
+static int wm_dnd_src_len, wm_dnd_src_allowed, wm_dnd_src_done, wm_dnd_src_action;
+
+static void wm_dnd_push(int slot, int kind, int x, int y) {
+  if (wm_dnd_qc >= WM_DND_Q) {
+    return; // 满了丢最旧会乱序，宁可丢新的（同窗口事件队列口径）
+  }
+  WmDndEv *e = &wm_dnd_q[(wm_dnd_qh + wm_dnd_qc) % WM_DND_Q];
+  e->slot = slot;
+  e->kind = kind;
+  e->x = x;
+  e->y = y;
+  wm_dnd_qc++;
+}
+
+static void wm_dnd_set_payload(const char *data, int len) {
+  if (len < 0) {
+    len = 0;
+  }
+  if (len > WM_DND_PAYLOAD_MAX) {
+    len = WM_DND_PAYLOAD_MAX;
+  }
+  memmove(wm_dnd_buf, data, (size_t)len);
+  wm_dnd_buf_len = len;
+}
+
+// 线形状编码 `[kind:i32 LE][body]`（与 core 的 drag_encode 同一条编码）
+static int wm_dnd_encode(char *out, int cap, int kind, const char *body,
+                         int blen) {
+  if (cap < 4 || blen > cap - 4 || blen < 0) {
+    return 0;
+  }
+  out[0] = (char)(kind & 255);
+  out[1] = (char)((kind >> 8) & 255);
+  out[2] = (char)((kind >> 16) & 255);
+  out[3] = (char)((kind >> 24) & 255);
+  memmove(out + 4, body, (size_t)blen);
+  return 4 + blen;
+}
+
+static int wm_dnd_le32(const char *p) {
+  return (int)(((unsigned char)p[0]) | (((unsigned char)p[1]) << 8) |
+               (((unsigned char)p[2]) << 16) |
+               (((unsigned char)p[3]) << 24));
+}
+
+static NSDragOperation wm_dnd_flag_to_ns(int flag) {
+  NSDragOperation a = NSDragOperationNone;
+  if (flag & 1) {
+    a |= NSDragOperationCopy;
+  }
+  if (flag & 2) {
+    a |= NSDragOperationMove;
+  }
+  if (flag & 4) {
+    a |= NSDragOperationLink;
+  }
+  return a;
+}
+
+// 只认单一动作；多位同亮按「没成交」（0）
+static int wm_dnd_ns_to_flag(NSDragOperation op) {
+  if (op == NSDragOperationCopy) {
+    return 1;
+  }
+  if (op == NSDragOperationMove) {
+    return 2;
+  }
+  if (op == NSDragOperationLink) {
+    return 4;
+  }
+  return 0;
+}
+
+// 窗口基坐标（左下原点）→ 本栈物理像素（左上原点，非翻转视图 y 翻折）
+static void wm_dnd_pt(NSView *v, NSPoint win_pt, int *out_x, int *out_y) {
+  WMState *s = wm_state(((WMView *)v)->vsid);
+  CGFloat sc = (s != nil) ? wm_scale_of(s) : 1.0;
+  NSPoint p = [v convertPoint:win_pt fromView:nil];
+  if (out_x != NULL) {
+    *out_x = (int)(p.x * sc + 0.5);
+  }
+  if (out_y != NULL) {
+    *out_y = (int)(([v bounds].size.height - p.y) * sc + 0.5);
+  }
+}
+
+static void wm_dnd_push_motion(NSView *v, int px, int py) {
+  int slot = (int)((WMView *)v)->vsid;
+  if (wm_dnd_qc > 0) {
+    WmDndEv *last = &wm_dnd_q[(wm_dnd_qh + wm_dnd_qc - 1 + WM_DND_Q) % WM_DND_Q];
+    if (last->slot == slot && last->kind == 1) {
+      last->x = px;
+      last->y = py;
+      return; // 同窗连续移动：原地覆盖取最新（与 GTK/Win32 支合并口径一致）
+    }
+  }
+  wm_dnd_push(slot, 1, px, py);
+}
+
+// 拖入现场取载荷并编码进 wm_dnd_buf：文件 URL 优先、其次纯文本；两类都没有
+// 给空载荷（上层按「格式不认」收）。
+static void wm_dnd_take_dragging(id<NSDraggingInfo> info) {
+  static char body[WM_DND_PAYLOAD_MAX];
+  wm_dnd_set_payload("", 0);
+  if (info == nil) {
+    return;
+  }
+  NSPasteboard *pb = [info draggingPasteboard];
+  if (pb == nil) {
+    return;
+  }
+  NSArray *urls = [pb readObjectsForClasses:@[ [NSURL class] ]
+                                    options:@{
+                                      NSPasteboardURLReadingFileURLsOnlyKey : @YES
+                                    }];
+  int used = 0;
+  int overflow = 0;
+  for (NSURL *u in urls) {
+    if (u == nil || ![u isFileURL]) {
+      continue;
+    }
+    NSString *p = [u path];
+    if (p == nil) {
+      continue;
+    }
+    const char *c = [p UTF8String];
+    if (c == NULL) {
+      continue;
+    }
+    int n = (int)strlen(c);
+    if (used > 0) {
+      if (used + 1 > WM_DND_PAYLOAD_MAX - 4) {
+        overflow = 1;
+        break;
+      }
+      body[used++] = '\n';
+    }
+    if (used + n > WM_DND_PAYLOAD_MAX - 4) {
+      overflow = 1;
+      break;
+    }
+    memcpy(body + used, c, (size_t)n);
+    used += n;
+  }
+  if (!overflow && used > 0) {
+    wm_dnd_buf_len = wm_dnd_encode(wm_dnd_buf, WM_DND_PAYLOAD_MAX, 4, body, used);
+    return;
+  }
+  NSString *t = [pb stringForType:NSPasteboardTypeString];
+  if (t != nil) {
+    const char *c = [t UTF8String];
+    if (c != NULL) {
+      int n = (int)strlen(c);
+      wm_dnd_buf_len = wm_dnd_encode(wm_dnd_buf, WM_DND_PAYLOAD_MAX, 1, c, n);
+    }
+  }
+}
+
+@interface WMView (WMDragDrop) <NSDraggingDestination, NSDraggingSource>
+@end
+
+@implementation WMView (WMDragDrop)
+
+// ---- 拖入（destination）----
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return NSDragOperationNone;
+  }
+  int px = 0;
+  int py = 0;
+  wm_dnd_pt(self, [sender draggingLocation], &px, &py);
+  wm_dnd_take_dragging(sender);
+  wm_dnd_active_slot = (int)vsid;
+  wm_dnd_enter_sent[(int)vsid] = 1;
+  wm_dnd_push((int)vsid, 0, px, py);
+  return wm_dnd_flag_to_ns(wm_dnd_effect[(int)vsid]);
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+  WMState *s = wm_state(vsid);
+  if (s == nil) {
+    return NSDragOperationNone;
+  }
+  int px = 0;
+  int py = 0;
+  wm_dnd_pt(self, [sender draggingLocation], &px, &py);
+  if (!wm_dnd_enter_sent[(int)vsid]) {
+    // 有的源只发 updated 不发 entered：按 entered 补发 0（上层靠 0 定基准）
+    wm_dnd_take_dragging(sender);
+    wm_dnd_active_slot = (int)vsid;
+    wm_dnd_enter_sent[(int)vsid] = 1;
+    wm_dnd_push((int)vsid, 0, px, py);
+  }
+  wm_dnd_push_motion(self, px, py);
+  // 每拍读 MoonBit 写回的标志位（异步答效果，同 GTK/Win32 支）
+  return wm_dnd_flag_to_ns(wm_dnd_effect[(int)vsid]);
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+  if (wm_dnd_enter_sent[(int)vsid]) {
+    int px = 0;
+    int py = 0;
+    wm_dnd_pt(self, [sender draggingLocation], &px, &py);
+    wm_dnd_push((int)vsid, 2, px, py);
+    wm_dnd_enter_sent[(int)vsid] = 0;
+    if (wm_dnd_active_slot == (int)vsid) {
+      wm_dnd_active_slot = 0;
+    }
+  }
+}
+
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
+  (void)sender;
+  return wm_dnd_effect[(int)vsid] != 0;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+  if (wm_state(vsid) == nil || wm_dnd_effect[(int)vsid] == 0) {
+    return NO; // 没答应收就不消费（同 GTK 支 accept 判定）
+  }
+  int px = 0;
+  int py = 0;
+  wm_dnd_pt(self, [sender draggingLocation], &px, &py);
+  wm_dnd_take_dragging(sender); // drop 时刻再取一次：投递事件的载荷必须完整
+  wm_dnd_push((int)vsid, 3, px, py);
+  return YES;
+}
+
+- (void)draggingEnded:(id<NSDraggingInfo>)sender {
+  (void)sender;
+  if (wm_dnd_enter_sent[(int)vsid]) {
+    // 收口：投递后的 3 也补一条 2（同 GTK 支 drag-end 的收会话形态）
+    wm_dnd_push((int)vsid, 2, 0, 0);
+    wm_dnd_enter_sent[(int)vsid] = 0;
+  }
+  if (wm_dnd_active_slot == (int)vsid) {
+    wm_dnd_active_slot = 0;
+  }
+}
+
+// ---- 拖出（source）----
+
+- (NSDragOperation)draggingSession:(NSDraggingSession *)session
+    sourceOperationMaskForDraggingContext:(NSDraggingContext)context {
+  (void)session;
+  (void)context;
+  // 门面的 allowed 位直接映射成掩码
+  return wm_dnd_flag_to_ns(wm_dnd_src_allowed);
+}
+
+- (void)draggingSession:(NSDraggingSession *)session
+         movedWithEvent:(NSEvent *)event
+                atPoint:(NSPoint)point {
+  (void)session;
+  (void)event;
+  if (wm_state(vsid) == nil) {
+    return;
+  }
+  int px = 0;
+  int py = 0;
+  wm_dnd_pt(self, point, &px, &py);
+  wm_dnd_push_motion(self, px, py);
+}
+
+- (void)draggingSession:(NSDraggingSession *)session
+          endedAtPoint:(NSPoint)point
+             operation:(NSDragOperation)operation {
+  (void)session;
+  (void)point;
+  wm_dnd_src_action = wm_dnd_ns_to_flag(operation);
+  wm_dnd_src_done = 1;
+}
+@end
+
+static int wm_dragdnd_enabled(int64_t id) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) {
+    return 0;
+  }
+  return wm_dnd_registered[(int)id];
+}
+
+int wm_dragdnd_supported(void) { return 1; }
+
+int wm_dragdnd_enable(int64_t id) {
+  @autoreleasepool {
+    WMState *s = wm_state(id);
+    if (s == nil || s.view == nil) {
+      return 0;
+    }
+    [s.view registerForDraggedTypes:@[
+      NSPasteboardTypeString,
+      NSPasteboardTypeFileURL,
+    ]];
+    if (id > 0 && id < WM_MAX_WINDOWS) {
+      wm_dnd_registered[(int)id] = 1; // 重复 enable 幂等
+    }
+    return 1;
+  }
+}
+
+void wm_dragdnd_disable(int64_t id) {
+  @autoreleasepool {
+    if (id <= 0 || id >= WM_MAX_WINDOWS) {
+      return;
+    }
+    wm_dnd_registered[(int)id] = 0;
+    wm_dnd_effect[(int)id] = 0;
+    if (wm_dnd_active_slot == (int)id) {
+      if (wm_dnd_enter_sent[(int)id]) {
+        wm_dnd_push((int)id, 2, 0, 0);
+      }
+      wm_dnd_enter_sent[(int)id] = 0;
+      wm_dnd_active_slot = 0;
+    }
+    WMState *s = wm_state(id);
+    if (s != nil && s.view != nil) {
+      [s.view unregisterDraggedTypes];
+      s->down_ev = nil;
+    }
+  }
+}
+
+int wm_dragdnd_poll(int32_t *out_slot, int32_t *out_kind, int32_t *out_x,
+                    int32_t *out_y) {
+  @autoreleasepool {
+    if (wm_dnd_qc == 0) {
+      return 0;
+    }
+    WmDndEv *e = &wm_dnd_q[wm_dnd_qh];
+    wm_dnd_qh = (wm_dnd_qh + 1) % WM_DND_Q;
+    wm_dnd_qc--;
+    if (out_slot != NULL) {
+      *out_slot = e->slot;
+    }
+    if (out_kind != NULL) {
+      *out_kind = e->kind;
+    }
+    if (out_x != NULL) {
+      *out_x = e->x;
+    }
+    if (out_y != NULL) {
+      *out_y = e->y;
+    }
+    return 1;
+  }
+}
+
+int wm_dragdnd_payload(char *out, int cap) {
+  @autoreleasepool {
+    if (out == NULL || cap <= 0) {
+      return -1;
+    }
+    int n = wm_dnd_buf_len < cap ? wm_dnd_buf_len : cap;
+    memcpy(out, wm_dnd_buf, (size_t)n);
+    return n;
+  }
+}
+
+void wm_dragdnd_set_effect(int64_t id, int effect) {
+  @autoreleasepool {
+    if (id <= 0 || id >= WM_MAX_WINDOWS) {
+      return;
+    }
+    if (effect != 0 && effect != 1 && effect != 2 && effect != 4) {
+      return; // 门面的 DND flag 只有这四档
+    }
+    wm_dnd_effect[(int)id] = effect;
+  }
+}
+
+int wm_dragdnd_effect(int64_t id) {
+  @autoreleasepool {
+    if (id <= 0 || id >= WM_MAX_WINDOWS || !wm_dnd_registered[(int)id]) {
+      return -1; // 未挂接读 -1（Win32 支口径，门面试探测试认这条）
+    }
+    return wm_dnd_effect[(int)id];
+  }
+}
+
+int wm_dragdnd_count(void) {
+  int n = 0;
+  for (int i = 1; i < WM_MAX_WINDOWS; i++) {
+    if (wm_dnd_registered[i]) {
+      n++;
+    }
+  }
+  return n;
+}
+
+// 载荷线形状 → 拖拽项数组：kind 4 = 每路径一个文件 URL 项（Finder 图标错位
+// 叠放），kind 1 = 单个文本项（自绘纸片当拖拽图像）。别的 kind（图像/自定
+// 格式）暂不接——给空表、门面收 2「构造失败」，与 GTK 支同口径。
+static NSArray<NSDraggingItem *> *wm_dnd_build_items(void) {
+  NSMutableArray<NSDraggingItem *> *out = [NSMutableArray array];
+  if (wm_dnd_src_len < 4) {
+    return out;
+  }
+  int kind = wm_dnd_le32(wm_dnd_src);
+  const char *body = wm_dnd_src + 4;
+  int blen = wm_dnd_src_len - 4;
+  if (blen < 0) {
+    return out;
+  }
+  if (kind == 4) {
+    int i = 0;
+    int n = 0;
+    while (i < blen) {
+      int j = i;
+      while (j < blen && body[j] != '\n') {
+        j++;
+      }
+      if (j > i) {
+        NSString *p = [[NSString alloc]
+            initWithBytes:body + i
+                   length:(NSUInteger)(j - i)
+                 encoding:NSUTF8StringEncoding];
+        if (p != nil && [p length] > 0) {
+          NSURL *url = [NSURL fileURLWithPath:p];
+          NSDraggingItem *di =
+              [[NSDraggingItem alloc] initWithPasteboardWriter:url];
+          NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:p];
+          [icon setSize:NSMakeSize(48.0, 48.0)];
+          NSRect f = NSMakeRect(-24.0 + n * 8.0, -24.0 - n * 8.0, 48.0, 48.0);
+          [di setDraggingFrame:f contents:icon];
+          [out addObject:di];
+          n++;
+        }
+      }
+      i = j + 1;
+    }
+    return out;
+  }
+  if (kind == 1) {
+    NSString *t = [[NSString alloc] initWithBytes:body
+                                           length:(NSUInteger)blen
+                                         encoding:NSUTF8StringEncoding];
+    if (t == nil || [t length] == 0) {
+      return out;
+    }
+    NSPasteboardItem *pb = [[NSPasteboardItem alloc] init];
+    [pb setString:t forType:NSPasteboardTypeString];
+    NSDraggingItem *di = [[NSDraggingItem alloc] initWithPasteboardWriter:pb];
+    NSString *snip = [t length] > 60 ? [t substringToIndex:60] : t;
+    NSImage *img =
+        [NSImage imageWithSize:NSMakeSize(180.0, 28.0)
+                       flipped:NO
+              drawingHandler:^BOOL(NSRect r) {
+                NSDictionary *attrs = @{
+                  NSForegroundColorAttributeName : [NSColor labelColor],
+                  NSFontAttributeName : [NSFont systemFontOfSize:13.0],
+                };
+                [snip drawInRect:NSInsetRect(r, 6.0, 6.0)
+                  withAttributes:attrs];
+                return YES;
+              }];
+    [di setDraggingFrame:NSMakeRect(-90.0, -14.0, 180.0, 28.0) contents:img];
+    [out addObject:di];
+    return out;
+  }
+  return out;
+}
+
+int wm_dragdnd_send(int64_t id, const char *payload, int len, int allowed,
+                    int64_t x, int64_t y) {
+  @autoreleasepool {
+    if (!wm_dragdnd_enabled((int)id)) {
+      return 1; // 先 enable
+    }
+    if (payload == NULL || len > WM_DND_PAYLOAD_MAX) {
+      return 2;
+    }
+    WMState *s = wm_state(id);
+    if (s == nil || s.view == nil) {
+      return 2;
+    }
+    NSEvent *down = s->down_ev; // 按下事件必须在场（与 GTK/Win32 同一条契约）
+    if (down == nil) {
+      return 2;
+    }
+    memmove(wm_dnd_src, payload, (size_t)len);
+    wm_dnd_src_len = len;
+    wm_dnd_src_action = 0;
+    wm_dnd_src_done = 0;
+    wm_dnd_src_allowed = allowed;
+    NSArray<NSDraggingItem *> *items = wm_dnd_build_items();
+    if ([items count] == 0) {
+      return 2;
+    }
+    // 起拖点：门面给物理像素、左上原点 → 视图基窗口坐标（左下原点）
+    CGFloat sc = wm_scale_of(s);
+    NSRect vb = [s.view bounds];
+    NSPoint start =
+        NSMakePoint((CGFloat)x / sc, vb.size.height - (CGFloat)y / sc);
+    NSPoint win_pt = [s.view convertPoint:start toView:nil];
+    s->down_ev = nil; // 用掉即清：下一次按下才会再存
+    NSDraggingSession *session =
+        [s.view beginDraggingSessionWithItems:items event:down source:s.view];
+    if (session == nil) {
+      return 2;
+    }
+    // 嵌套泵：阻塞到 draggingSession:endedAtPoint；泵里照常派发普通事件
+    // （泵一停别的窗全冻——同 GTK 支嵌套主循环）。60s 超时救场：
+    // cancelDragOperation: 在现 SDK 已标注不再支持，救场只回 3 不硬撤会话。
+    double deadline = [NSDate timeIntervalSinceReferenceDate] + 60.0;
+    while (!wm_dnd_src_done &&
+           [NSDate timeIntervalSinceReferenceDate] < deadline) {
+      NSEvent *ev =
+          [NSApp nextEventMatchingMask:NSEventMaskAny
+                             untilDate:[NSDate dateWithTimeIntervalSinceNow:
+                                                          0.004]
+                                inMode:NSDefaultRunLoopMode
+                               dequeue:YES];
+    if (ev != nil && !wm_is_wake(ev)) {
+      [NSApp sendEvent:ev];
+    }
+  }
+  if (!wm_dnd_src_done) {
+    return 3;
+  }
+  return wm_dnd_src_action;
+}
+}
+
 #elif !defined(__linux__) && !defined(__APPLE__)
 
 /* 剪贴板三符号（占位）：macOS 走 sys 自己的 pbpaste/pbcopy 命令线。 */
@@ -9183,9 +9850,10 @@ int wm_im_preedit_active(int64_t id) { (void)id; return 0; }
 
 void wm_wakeup(void) {}
 
-int wm_hotkey_register(int mods, int vk) {
+int wm_hotkey_register(int mods, int vk, int keysym) {
   (void)mods;
   (void)vk;
+  (void)keysym;
   return 0;
 }
 
