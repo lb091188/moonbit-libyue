@@ -117,6 +117,29 @@ pub fn Window::set_opacity(self : Window, alpha : Int) -> Unit {
 }
 
 ///|
+/// 设置窗口层级。`layer`：0=普通 1=桌面(沉底，图标下面壁纸上面) 2=置顶 3=dock(面板)。
+pub fn Window::set_layer(self : Window, layer : WindowLayer) -> Unit {
+  wm_set_layer(self.id, window_layer_to_int(layer))
+}
+
+///|
+pub(all) enum WindowLayer {
+  Normal
+  Desktop
+  AlwaysOnTop
+  Dock
+}
+
+fn window_layer_to_int(l : WindowLayer) -> Int {
+  match l {
+    Normal => 0
+    Desktop => 1
+    AlwaysOnTop => 2
+    Dock => 3
+  }
+}
+
+///|
 /// 焦点归属（见 `FocusOwner`）：上层据此决定「让位给本窗子件要不要清自绘控件
 /// 的焦点栈」。GTK 分支真判；Win32 分支目前固定报 `Area`（= 行为与本改动之前
 /// 一致，失焦只交还输入法不清栈），真正的判定随 W 线接；macOS 分支待平台批。

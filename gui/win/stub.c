@@ -926,6 +926,19 @@ void wm_set_opacity(int64_t id, int alpha) {
   SetLayeredWindowAttributes(w->hwnd, 0, (BYTE)alpha, LWA_ALPHA);
 }
 
+/* W34 窗口层级：0=normal 1=desktop(沉底) 2=always-on-top 3=dock */
+void wm_set_layer(int64_t id, int layer) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) return;
+  WmWindow *w = &wm_windows[id];
+  if (w->hwnd == NULL) return;
+  switch (layer) {
+    case 1: SetWindowPos(w->hwnd, HWND_BOTTOM, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE); break;
+    case 2: SetWindowPos(w->hwnd, HWND_TOPMOST, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE); break;
+    case 3: SetWindowPos(w->hwnd, HWND_TOPMOST, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE); break;
+    default: SetWindowPos(w->hwnd, HWND_NOTOPMOST, 0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE); break;
+  }
+}
+
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -4240,6 +4253,22 @@ void wm_set_opacity(int64_t id, int alpha) {
   gdk_window_set_opacity(gw, a);
 }
 
+/* W34 窗口层级：0=normal 1=desktop(沉底) 2=always-on-top 3=dock */
+void wm_set_layer(int64_t id, int layer) {
+  if (id <= 0 || id >= WM_MAX_WINDOWS) return;
+  WmWindow *w = &wm_windows[id];
+  if (w->window == NULL) return;
+  GtkWindow *win = GTK_WINDOW(w->window);
+  switch (layer) {
+    case 1: gtk_window_set_type_hint(win, GDK_WINDOW_TYPE_HINT_DESKTOP); break;
+    case 2: gtk_window_set_keep_above(win, TRUE); break;
+    case 3: gtk_window_set_type_hint(win, GDK_WINDOW_TYPE_HINT_DOCK); break;
+    default: gtk_window_set_keep_above(win, FALSE);
+             gtk_window_set_keep_below(win, FALSE);
+             gtk_window_set_type_hint(win, GDK_WINDOW_TYPE_HINT_NORMAL); break;
+  }
+}
+
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   if (id <= 0 || id >= WM_MAX_WINDOWS) {
     return;
@@ -6240,6 +6269,7 @@ int wm_is_hidden(int64_t id) {
 }
 
 void wm_set_opacity(int64_t id, int alpha) { (void)id; (void)alpha; }
+void wm_set_layer(int64_t id, int layer) { (void)id; (void)layer; }
 
 void wm_size(int64_t id, int32_t *out_w, int32_t *out_h) {
   (void)id;
