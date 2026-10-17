@@ -70,6 +70,7 @@ moon run examples/browser        # 内嵌 WebView 浏览器
 | [roadmap.md](roadmap.md) | 对外路线图：定位、现在能拿到什么、平台与功能矩阵、承诺与版本、下一步、待定决策、明确不做 |
 | [design.md](design.md) | 前端化设计口径：样式表形态、组件命名映射、响应式补强、视图层用 `render` 函数替代模板 |
 | [module-structure.md](module-structure.md) | 模块结构规划（规划中）：`gui/web` 出成 `gui-webview`、`core` 拆 `base`/`shell`/`widget` 的批次、代价与风险，跟踪在 `TODO.md` §1「G9 模块拆分」 |
+| [gpu-architecture.md](gpu-architecture.md) | GPU 合成与 3D 路径架构决策：两层落地（合成器 + 控件级 GPU 绘制）+ 三级 fallback（WebGPU → Cairo → Pure）+ WebGPU via wgpu-native 后端选型 + `Widget.on_render` 口子，跟踪在 `TODO.md` §1「G11 GPU 合成与 3D 路径」 |
 | [adaptation.md](adaptation.md) | 平台适配经验：各平台实测坑、根因与验证结论 |
 | [autostart.md](autostart.md) | 开机自启：Linux 写 XDG .desktop、Windows 写 HKCU Run 键，统一 `is_enabled` / `enable` / `disable` |
 | [tray.md](tray.md) | Linux 托盘：SNI 协议栈设计、架构、后端降级与桌面兼容性 |

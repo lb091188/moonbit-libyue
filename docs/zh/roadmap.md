@@ -226,6 +226,32 @@ Linux 列带 **X11** 的格只在 X11 会话成立，带 **DE** 的格行为随�
 | 倍速、逐帧、缩放、全屏与快捷键 | 🚧 | ✅ | ❌ |
 | 硬解与 GPU 合成 | ❌ | ❌ | ❌ |
 
+### GPU 合成与 3D 路径
+
+| 功能点 | Windows | Linux | macOS |
+|---|---|---|---|
+| 软件 Painter（CPU 光栅 / Cairo） | ✅ | ✅ | ❌ |
+| GPU 合成器（present 走纹理上传 + quad） | ❌ | ❌ | ❌ |
+| 控件级 GPU 绘制（shader / vertex buffer） | ❌ | ❌ | ❌ |
+| WebGPU 后端（wgpu-native 可选模块） | ❌ | ❌ | ❌ |
+| Widget.on_render(RenderCtx) 协议口子 | ✅ | ✅ | ✅ |
+
+**架构定案（2026-10-17）**：**WebGPU 作可选后端，两层落地，三级 fallback**。
+
+- **两层**：
+  1. **GPU 合成层**（内部改造、对外 API 零变化）：`wm_present` 从 CPU 拷贝改为 bitmap 上传纹理 + 全屏四边形合成；收益是大窗缩放/多层动画更流畅。
+  2. **控件级 GPU 绘制**（协议扩展）：视频、地图、3D、游戏类控件通过 `Widget.on_render(Widget, RenderCtx, Rect)` 拿 GPU context 直接提交绘制指令；普通控件继续走 `on_draw(Painter)`。
+
+- **三级 fallback**：WebGPU 可用 → GPU 合成；不可用 → Cairo（Linux）/ Pure（Windows）；Cairo 也缺 → 纯 MoonBit 光栅。运行时探测分派，遵循「不用 `#cfg(platform=)`」硬规则。
+
+- **依赖档位**：wgpu-native 动态 .so 约 9.3 MB，与 GTK3 栈同量级；纯 C11 ABI（`webgpu.h`），链接期零新增依赖（`libdl/libgcc_s/libpthread/libm/libc` 之外全走 dlopen）。MoonBit 侧已有 `moonbit-community/wgpu-mbt`（Apache-2.0，pin v29.0.1.1）同构使用 native-stub + prebuild 下发。三平台后端由 wgpu-native 内部选（D3D12 / Vulkan / Metal），MoonBit 侧不分叉。
+
+- **入口已留**：`@render.RenderCtx` 枚举当前只有 `Cpu(Painter)` 变体；`gpu_backend_available()` 恒 false。WebGPU 模块落地时只加 `Gpu(GpuContext)` 变体 + 探实现，不改 Widget 协议。
+
+- **前置门槛**：Linux 侧需 Vulkan 1.1+（deepin 20 档待复验）；Windows 需 D3D12 FL 11_0（Win10 20H2+）；macOS 需 Metal（10.15+）。任一档缺时语义化降级到 CPU 合成，不阻断构建。
+
+- **落地时点**：Q2 起（11 月赛季后），第一步「X11 窗口里 wgpu 出三角形色块」真机验收，第二步替换 `wm_present` 走纹理合成，第三步开 `Gpu(GpuContext)` 变体接视频控件。
+
 ## 承诺与版本
 
 - 当前版本 `0.1.1`：**0.x 阶段接口随批次演进**，破坏性改动在提交信息写明并同步文档。
@@ -237,6 +263,7 @@ Linux 列带 **X11** 的格只在 X11 会话成立，带 **DE** 的格行为随�
 2. **可信度**：CI 门禁 + 真机人工清单 + 版本承诺，能力族验收一律走这三件套。
 3. **内容**：文档站、组件文档、教程与 showcase 持续补齐；组件文档配图，教程给可运行的最小工程。
 4. **治理**：issue 模板与贡献指南随对外投放建立；本文与平台矩阵随每批更新，不积压。
+5. **GPU 合成与 3D 路径**：WebGPU 作可选后端（`gui-gpu` 独立模块），两层落地（合成器 + 控件级 GPU 绘制）、三级 fallback（WebGPU → Cairo → Pure）。Q2 赛季起开工，第一步 X11 三角形色块真机验收。详见「GPU 合成与 3D 路径」小节。
 
 ## 待定决策
 
