@@ -40,3 +40,24 @@ test "registered_classes 列出已注册名" {
   assert_true(names.length() == 2)
   reset_class_registry()
 }
+
+test "resolve_named：多类按序合并、尾属性赢" {
+  reset_class_registry()
+  define_class("base", style(padding_left=1.0, padding_top=2.0))
+  define_class("override", style(padding_left=99.0))
+  let s = resolve_named(["base", "override"])
+  assert_true(s.padding_left == Some(99.0))
+  assert_true(s.padding_top == Some(2.0))
+  reset_class_registry()
+}
+
+test "resolve_with_variant：按深浅色选枚" {
+  reset_class_registry()
+  define_class("card", style(padding_left=4.0))
+  define_class("card-dark", style(cursor=@widget.CURSOR_HAND))
+  let light = resolve_with_variant(["card", "card-dark:dark"], false)
+  let dark = resolve_with_variant(["card", "card-dark:dark"], true)
+  assert_true(light.cursor == None)
+  assert_true(dark.cursor == Some(@widget.CURSOR_HAND))
+  reset_class_registry()
+}

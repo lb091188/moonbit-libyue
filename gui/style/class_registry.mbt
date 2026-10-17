@@ -37,6 +37,51 @@ pub fn class_of(names : Array[String]) -> Array[Style] {
 }
 
 ///|
+/// 按名数组解析并**合并成一条 Style**——直接塞进组件的 merge 序列，
+/// 匿名块与命名类可按调用方顺序自由穿插。未注册的名字跳过。
+pub fn resolve_named(names : Array[String]) -> Style {
+  merge_all(class_of(names))
+}
+
+///|
+/// 便捷：把命名类序列直接落到控件上。语义与 `apply(w, resolve_named(names))` 等价。
+pub fn apply_named(w : @widget.Widget, names : Array[String]) -> Unit {
+  apply(w, resolve_named(names))
+}
+
+///|
+/// 主题联动档：给类名加 `dark:` / `light:` 前缀的变体展开——按当前深浅色选一枚。
+/// 输入是变体名数组（每项以 `:` 前的部分去注册表查找），返回合并后的 Style。
+/// 未注册的变体基名同样跳过。
+pub fn resolve_with_variant(names : Array[String], dark : Bool) -> Style {
+  let out : Array[Style] = []
+  for n in names {
+    let parts : Array[String] = []
+    for p in n.split(":") {
+      parts.push(p.to_owned())
+    }
+    let base = if parts.length() > 0 { parts[0] } else { n }
+    let variant = if parts.length() > 1 { parts[1] } else { "" }
+    let chosen = if variant == "" {
+      base
+    } else if variant == "dark" && dark {
+      base
+    } else if variant == "light" && !dark {
+      base
+    } else {
+      ""
+    }
+    if chosen != "" {
+      match registry.get(chosen) {
+        Some(c) => out.push(c.style)
+        None => ()
+      }
+    }
+  }
+  merge_all(out)
+}
+
+///|
 /// 列出所有已注册类名（诊断用）。
 pub fn registered_classes() -> Array[String] {
   let out : Array[String] = []
