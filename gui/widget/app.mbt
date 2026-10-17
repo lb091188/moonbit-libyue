@@ -52,6 +52,24 @@ pub fn App::add_key_fallthrough(self : App, f : (KeyEvent) -> Bool) -> Unit {
 }
 
 ///|
+/// W32 便捷：把组合键字符串（"Ctrl+S" / "Alt+Shift+Tab" 等）绑到回调上。
+/// 走的是同一条 `key_fallthrough` 通道，只在解析命中时调用 `cb`。
+/// 解析失败的 spec 会被静默忽略（回调永不触发），不阻断注册流程。
+pub fn App::bind_combo(self : App, spec : String, cb : () -> Unit) -> Unit {
+  match parse_combo(spec) {
+    Some((mods, keysym)) => self.add_key_fallthrough(fn(ev : KeyEvent) -> Bool {
+      if match_combo(ev, mods, keysym) {
+        cb()
+        true
+      } else {
+        false
+      }
+    })
+    None => ()
+  }
+}
+
+///|
 /// 装进程级挂钩（多窗形态只有一套）：重绘请求广播给所有在窗、浮层按当前窗取
 /// 宿主、延时定时器走共用的 `Loop`。每建一扇窗都装一遍，装的是同一组闭包，
 /// 重复安装没有副作用（无头测试自装的静态宿主会在下一扇窗建好时被接管）。

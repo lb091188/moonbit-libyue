@@ -89,6 +89,13 @@ pub(all) struct Widget {
   /// 指针回调：首参是控件本身（要读 `rect` 判「松开是否在自己范围内」、
   /// 拖动边界等，都由参数拿，不要把控件句柄捕获进闭包——见 `on_draw` 注）
   mut on_pointer : Option[(Widget, PointerEvent) -> Bool]
+  /// W32 双击/三击回调：宿主在 `dispatch_on_path` 派发 Down 时喂控件自带的
+  /// `ClickTracker`（400 ms/4 px 阈值），命中双击/三击档时调用对应回调。
+  /// `on_pointer` 仍照收每次 Down/Up，两者共存不冲突。
+  mut on_double_click : Option[(Widget, PointerEvent) -> Unit]
+  mut on_triple_click : Option[(Widget, PointerEvent) -> Unit]
+  /// 每控件独立的多击状态（宿主维护，控件读写无必要）
+  mut tracker : ClickTracker
   mut on_key : Option[(KeyEvent) -> Bool]
   mut on_scroll : Option[(ScrollEvent) -> Bool]
   /// 交互态（悬停 / 按下）：**由宿主按命中与捕获统一维护**，控件只在
@@ -162,6 +169,9 @@ pub fn Widget::new() -> Widget {
     on_draw: None,
     on_render: None,
     on_pointer: None,
+    on_double_click: None,
+    on_triple_click: None,
+    tracker: ClickTracker::new(),
     on_key: None,
     on_scroll: None,
     hovered: false,
@@ -532,6 +542,28 @@ fn dispatch_on_path(path : Array[Widget], ev : PointerEvent) -> Bool {
       y: ev.y - w.rect.y,
       button: ev.button,
       mods: ev.mods,
+    }
+    // W32 多击检测：**只在最深命中档**喂 tracker 与触发回调——避免每层祖先
+    // 都收到重复的 double_click。最深档对普通键是 path 末项，对右键（祖先
+    // 优先）是 path 首项。与 on_pointer 并存，两者语义不冲突。
+    let is_deepest = if ancestor_first { i == 0 } else { i == path.length() - 1 }
+    let is_down = match ev.kind {
+      PointerKind::Down => true
+      _ => false
+    }
+    if is_down && is_deepest {
+      let _ = w.tracker.feed_down(at_local.x, at_local.y)
+      if w.tracker.is_double() {
+        match w.on_double_click {
+          Some(f) => f(w, at_local)
+          None => ()
+        }
+      } else if w.tracker.is_triple() {
+        match w.on_triple_click {
+          Some(f) => f(w, at_local)
+          None => ()
+        }
+      }
     }
     match w.on_pointer {
       Some(f) => handled = f(w, at_local)
