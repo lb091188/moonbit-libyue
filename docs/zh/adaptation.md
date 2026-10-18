@@ -2533,9 +2533,9 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - 顺带一条同名族口径：CI 三 job 的库包清单今后以 **Linux job 为基准**（它是全量），Windows 按平台门减 sys/dbus，macOS 减 dbus；新增包要三处同改，少一处就是下一次 merge 的伤口。
 
 - **CI 链接修复后首轮真跑到读数环，三处「runner 环境 ≠ 真机」的测试口径补齐（2026-10-18）**：Windows 链接门通了之后，模块步那条裸 `moon test`（workspace 全量）第一次把 sys 读数环暴露出来——
-  1. **`/tmp` 是 Linux/mac 的落点，不是 Windows 的**：appfind 读盘用例的 `af_tmp()` 写死 `/tmp`，Windows 上 `sys_write_text_file` 直接 false、四条判红。改运行时分派落 `TEMP`（探不到退 `.`），与「Dock 起来的进程没有 shell PATH」同为「测试夹具也要过平台门」。
+  1. **`/tmp` 是 Linux/mac 的落点，不是 Windows 的**：appfind 读盘用例的 `af_tmp()` 与 fsx `list_dir` 用例都写死 `/tmp`，Windows 上 `sys_write_text_file` 直接 false、五条判红。改运行时分派平台临时根（Windows 落 TEMP/TMP，探不到退 `.`；POSIX 读 TMPDIR 回 `/tmp`），与「Dock 起来的进程没有 shell PATH」同为「测试夹具也要过平台门」。
   2. **`vol_supported()` 不等于「读得到」**：Windows 的 supported 只证 COM 可起，**默认音频端点要到 `vol_get` 才暴露缺失**，而 CI runner 没有音频设备。读数环改「探针即分支」：首读 Err 就 skip 出声，设备在场（真机）才走回环断言——同 GIF 退帧那条的判据哲学。
-  3. **首 tick 位置上界按帧周期给**：video 冒烟 0.09–0.15 的窗在慢 runner（CI macOS）被解码积压突破（实测 0.204），上界放到一帧半（0.25，fps=12），「确实推进且没跳段」的回环语义不变。
+  3. **墙钟冒烟窗不跟 runner 抖动对赌**：video 首 tick 的位置窗先按「一帧半」放宽（0.25）仍被 CI macOS 以 0.251 贴脸突破——解码积压没有上界可承诺。定稿把判据换成结构事实「已推进且未过半」（t1∈(0,0.5)，素材 1s），精确 ≈0.1 的期望只留在注释里；「推进了没跳段」的回环语义由后续 seek/pause 各步照旧钉住。
 - 另记一条 CI 结构事实：三个 job 的「单元测试(gui-webview 模块)」步在工作区里会**裸跑全量 workspace**（`moon test` 从模块目录向上归一化），所以模块步实际是全平台最后一道全量闸——包清单只约束前几步，新增测试最先在这里现形。
 
 ## 维护约定

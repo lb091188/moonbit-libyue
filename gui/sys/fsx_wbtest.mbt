@@ -19,11 +19,13 @@ test "fsx 扁平文本解码：按 '\\n' 拆分去空行" {
 
 ///|
 test "fsx_list_dir：真实目录枚举（临时文件可见，不含 . ..）" {
-  let f1 = "/tmp/fsx_wbtest_a.txt"
-  let f2 = "/tmp/fsx_wbtest_b.txt"
+  // 落点走平台临时目录根（Windows runner 没有 /tmp，写盘直接 false）。
+  let tmp = fsx_tmp_root()
+  let f1 = tmp + "/fsx_wbtest_a.txt"
+  let f2 = tmp + "/fsx_wbtest_b.txt"
   inspect(sys_write_text_file(f1, "x"), content="true")
   inspect(sys_write_text_file(f2, "y"), content="true")
-  match fsx_list_dir("/tmp") {
+  match fsx_list_dir(tmp) {
     Ok(names) => {
       let mut has_a = false
       let mut has_b = false
