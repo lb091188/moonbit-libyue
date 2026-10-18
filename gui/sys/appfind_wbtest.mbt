@@ -3,8 +3,17 @@
 // 断言（不存在的目录/文件静默跳过）。
 
 ///|
-/// 真实读盘用例的样本落点。
-fn af_tmp() -> String { "/tmp" }
+/// 真实读盘用例的样本落点（Windows 没有 /tmp：落 TEMP，探不到退回当前目录）。
+fn af_tmp() -> String {
+  if sys_platform() == "windows" {
+    match envx_get("TEMP") {
+      Some(t) => t
+      None => "."
+    }
+  } else {
+    "/tmp"
+  }
+}
 
 ///|
 test "appfind INI 子集解析：注释/空行/组切换/首等号拆分/同名键首个生效" {
