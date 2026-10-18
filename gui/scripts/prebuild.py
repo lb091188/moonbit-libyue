@@ -187,9 +187,6 @@ MAC_TEXT_FRAMEWORKS = [
 def link_configs() -> dict:
     entries: list[dict] = []
     system = platform.system()
-    if system == "Windows":
-        # WebView2 的头与静态 Loader 只有 Windows 分支用得到，别的环境不必下载
-        ensure_release_files()
     if system == "Linux":
         libs = []
         for name in LINUX_PKG_CONFIG_LIBS:

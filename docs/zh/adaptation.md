@@ -2526,6 +2526,12 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 
 - **Windows CI 链接缺 `wm_hotkey_supported`（2026-10-18）**：merge 后 CI 的 Windows job 在 shell 白盒 exe 上 LNK2019——三段式重建时 **WIN32 臂把 hotkey 的 supported 一条漏了**（register/unregister/poll 都在），GTK/mac/占位三臂反而都有。修复形态：WIN32 臂补 `return 1`（RegisterHotKey 恒在）。口径：改完单一 stub.c 的臂结构，要拿 `ffi.mbt` 的 extern 名清单与目标臂的定义逐个对——`grep -oE '= "wm_[a-z_]+"' | sort -u` 与臂内定义 `comm -23` 一步查全，别等 CI 逐个炸。（`wm_win_gui_marker` 是这类扫描要放过的合法例外：它定义在同包的另一支 native-stub `win_gui.c` 里。）
 
+- **merge 之后 CI 才炸出来的三处「合并伤口」（2026-10-18）**：mac 分支是从 webview 出模块（4602886）**之前**的基线分叉的，并入 master 时带回了三类过期形态，本机测试全绿也照不出来，只有 CI 三平台各跑一遍才逐个现形——
+  1. **主仓 prebuild 的 Windows 死调用**：mac 支把 `if system=="Windows": ensure_release_files()` 带回了 `link_configs()`，而这个函数（下载 WebView2 头/Loader）在出模块时已删到只剩模块那份——Windows job 直接 `NameError`，整条链接门都没走到。查法：CI 日志的 traceback 指到调用行，`git show <merge>^2:<file> | grep def` 确认定义只活在 mac 父侧。**跨分叉合并后，对被搬动过的文件要按「调用点全仓可解析」过一遍**（python 侧 `ast`+跑一次输出即可）。
+  2. **macOS 桩门禁的旧路径**：ci.yml 的 mac gate 还写着 `web/webkit_stub.c`（模块化的前一站），clang 报 no such file、五桩门直接红。改指 `../modules/gui-webview/webview/webkit_stub.c`（working-directory 是 gui）——**门禁脚本引用源码路径时，移动包的批次要连 CI 配置一起改**，这与「重复库告警」不同，是硬引用。
+  3. **macOS job 的包清单过期**：测试/构建步还点 `core`（已拆成 base/shell/widget 三层）与 `web`（已出模块），Linux/Windows job 当年改清单时 mac job 还没建所以没人回头补。对齐到 Linux 的 15 包去掉 dbus（mac 无会话总线）= 13 包，并给 mac 补上「单元测试(gui-webview 模块)」一步（Linux/Windows 都有、mac 缺——模块的 Darwin 链接分支就此进 CI 覆盖面）。
+- 顺带一条同名族口径：CI 三 job 的库包清单今后以 **Linux job 为基准**（它是全量），Windows 按平台门减 sys/dbus，macOS 减 dbus；新增包要三处同改，少一处就是下一次 merge 的伤口。
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

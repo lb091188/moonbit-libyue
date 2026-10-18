@@ -347,7 +347,8 @@ jobs:
           gate win/stub.c WM_STUB_MAC
           gate render/stub.c WM_STUB_MAC
           gate text/stub.c WM_STUB_MAC
-          gate web/webkit_stub.c WB_HAVE_WKWEBVIEW
+          # webview 已出成独立模块（gui/web 不复存在），mac 支的桩在模块里受同一道门禁。
+          gate ../modules/gui-webview/webview/webkit_stub.c WB_HAVE_WKWEBVIEW
           # sys 桩是纯 C(moon native-stub 自编),但 __APPLE__ 分支里那些
           # CoreGraphics 口同样在新 SDK 上被动过,一并做语法检查。
           gate sys/sys_stub.c "" c
@@ -385,13 +386,14 @@ jobs:
         run: moon check
 
       # 与 Windows job 同口径的平台排除:dbus 是 Linux 桌面基建,macOS 无会话总线。
+      # core/web 两个旧包名已退场(core 拆成 base/shell/widget 三层,web 出成独立模块)。
       # 失败时把关键行塞进 error 注解(匿名 API 可读),并回显输出尾部。
-      - name: 单元测试(库模块,12 包)
+      - name: 单元测试(库模块,13 包)
         working-directory: gui
         run: |
           set +e
           moon test \
-            core ui render text theme icons sys input win chart mdview web \
+            base shell widget ui render text theme icons sys input win chart mdview style \
             >/tmp/mt.out 2>&1
           code=$?
           set -e
@@ -405,6 +407,12 @@ jobs:
           fi
           grep -aE "Total tests" /tmp/mt.out | tail -1
 
+      # webview 扩展模块与 Linux job 同一步:回证模块 prebuild 的 Darwin 分支
+      # (WB_HAVE_WKWEBVIEW 归档 + 主仓 libyue_win_stub_mac.a)在真 macOS 上链得上。
+      - name: 单元测试(gui-webview 模块)
+        working-directory: modules/gui-webview
+        run: moon test
+
       # 库模块全量构建 + hello 示例的 native 链接:后者顺带验证 prebuild 的
       # Darwin 分支下发的 framework 链接参数能传播到独立模块(示例模块不配 prebuild)。
       # 逐包点名而不裸 `moon build`:裸构建在 workspace 下等于构建整个 workspace,
@@ -416,7 +424,7 @@ jobs:
       - name: 构建(库模块 + hello 示例 + 媒体线)
         run: |
           set +e
-          (cd gui && moon build core ui render text theme icons sys input win dbus chart mdview web \
+          (cd gui && moon build base shell widget ui render text theme icons sys input win chart mdview style \
             --target native) >/tmp/mb.out 2>&1; c1=$?
           moon build examples/hello --target native >>/tmp/mb.out 2>&1; c2=$?
           moon build modules/gui-examples/systemprobe modules/gui-examples/native-web \
