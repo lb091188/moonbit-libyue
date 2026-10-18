@@ -2524,6 +2524,8 @@ W9 与表格排序批落库后,Windows 本机库测试长期 3 条红(`moon test
 - **render mac 臂 W35 三支空桩**：`cr_set_line_cap/join/dash` 给空实现保链接——mac 走纯光栅路径（`cr_begin` 恒 0，Painter 从不进 cairo 会话），线帽语义归纯 MoonBit 光栅器，与 GTK/Win32 的 cairo 真实现刻意不同形态、同门面契约。
 - **验证口径**：这批在 mac 本机跑的（`moon test --target native` 全 workspace 1236/1236），是 master 合并 mac 后**首次**在真 macOS 上全量跑库测试；CI 的 macOS job 覆盖面不变，真机目视项仍按 `_人工测试清单.md` T 节走。
 
+- **Windows CI 链接缺 `wm_hotkey_supported`（2026-10-18）**：merge 后 CI 的 Windows job 在 shell 白盒 exe 上 LNK2019——三段式重建时 **WIN32 臂把 hotkey 的 supported 一条漏了**（register/unregister/poll 都在），GTK/mac/占位三臂反而都有。修复形态：WIN32 臂补 `return 1`（RegisterHotKey 恒在）。口径：改完单一 stub.c 的臂结构，要拿 `ffi.mbt` 的 extern 名清单与目标臂的定义逐个对——`grep -oE '= "wm_[a-z_]+"' | sort -u` 与臂内定义 `comm -23` 一步查全，别等 CI 逐个炸。（`wm_win_gui_marker` 是这类扫描要放过的合法例外：它定义在同包的另一支 native-stub `win_gui.c` 里。）
+
 ## 维护约定
 
 1. 新增结论写进对应小节,只记「坑 + 修复」;协议互操作结论必须来自真总线、真面板,单测自洽不算数。

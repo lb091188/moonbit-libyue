@@ -2917,6 +2917,8 @@ void wm_wakeup(void) {
 
 /* ---- 全局快捷键（W20b）实装在下方：表声明在文件头（pump 要用），这里只放
  * 注册/注销/抽取三个入口。 */
+/* 本平台是否支持全局快捷键：Win32 的 RegisterHotKey 恒在，回 1。 */
+int wm_hotkey_supported(void) { return 1; }
 /* 注册全局快捷键：mods 用内核 MOD_* 位（1 shift/2 ctrl/4 alt/8 meta），
  * vk 是 Win32 虚拟键码。返回 id（>=1）或 0 失败（组合键被系统/别的程序占用、
  * 或表满）。RegisterHotKey 用 NULL hwnd = 线程队列。 */
